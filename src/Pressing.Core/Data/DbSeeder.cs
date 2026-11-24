@@ -360,6 +360,7 @@ public static class DbSeeder
         var order = new Order
         {
             ClientId = client.Id,
+            TicketNumber = $"TEMP-{Guid.NewGuid():N}",
             Client = client,
             CreatedAt = createdAt,
             DueDate = createdAt.AddDays(express ? 1 : 3),
