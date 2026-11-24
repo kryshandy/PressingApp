@@ -10,9 +10,9 @@ TestResults/
 .idea/
 
 # Runtime data
-data/
-logs/
-backups/
+/data/
+/logs/
+/backups/
 *.db
 *.db-wal
 *.db-shm
