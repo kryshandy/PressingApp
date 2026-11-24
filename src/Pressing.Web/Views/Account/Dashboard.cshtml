@@ -1,0 +1,77 @@
+@model DashboardViewModel
+@{
+    Layout = "_AccountLayout";
+    ViewData["Title"] = "Tableau de bord";
+    ViewData["Section"] = "dashboard";
+    var d = Model.Data;
+    var c = d.Client;
+    var recent = d.RecentOrders.Take(6).ToList();
+}
+
+<header class="account-head">
+    <p class="eyebrow">@Ui.Greeting()</p>
+    <h1 class="display-2">@c.FirstName, ravi de vous revoir</h1>
+    <p class="muted">Voici l'état de vos vêtements et de votre compte.</p>
+</header>
+
+<div class="stat-grid">
+    <article class="stat-card">
+        <span class="stat-icon">@Icons.Svg("package", size: 22)</span>
+        <span class="stat-label">Commandes en cours</span>
+        <span class="stat-value">@d.ActiveOrders.Count</span>
+    </article>
+    <article class="stat-card @(d.ReadyItems > 0 ? "stat-ready" : "")">
+        <span class="stat-icon">@Icons.Svg("check", size: 22)</span>
+        <span class="stat-label">Articles prêts à retirer</span>
+        <span class="stat-value">@d.ReadyItems</span>
+    </article>
+    <article class="stat-card @(d.Balance > 0 ? "stat-due" : "")">
+        <span class="stat-icon">@Icons.Svg("wallet", size: 22)</span>
+        <span class="stat-label">Solde à payer</span>
+        <span class="stat-value stat-money">@Fmt.Money(d.Balance)</span>
+    </article>
+    <a class="stat-card stat-link" href="/compte/fidelite">
+        <span class="stat-icon">@Icons.Svg("star", size: 22)</span>
+        <span class="stat-label">Points fidélité</span>
+        <span class="stat-value">@c.LoyaltyPoints.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("fr-FR"))</span>
+    </a>
+</div>
+
+<section class="block" aria-labelledby="active-title">
+    <div class="block-head">
+        <h2 id="active-title" class="block-title">Commandes en cours</h2>
+        <a class="link-arrow" href="/compte/commandes?filtre=en-cours">Tout voir @Icons.Svg("arrow-right", size: 16)</a>
+    </div>
+    @if (d.ActiveOrders.Count == 0)
+    {
+        <div class="empty-state empty-compact">
+            @Icons.Svg("hanger", size: 30)
+            <h3>Aucune commande en cours</h3>
+            <p>Dès que vous déposerez des vêtements en boutique, leur avancement apparaîtra ici.</p>
+        </div>
+    }
+    else
+    {
+        <div class="order-cards">
+            @foreach (var o in d.ActiveOrders.OrderBy(o => o.DueDate))
+            {
+                @await Html.PartialAsync("_OrderCard", o)
+            }
+        </div>
+    }
+</section>
+
+<section class="block" aria-labelledby="recent-title">
+    <div class="block-head">
+        <h2 id="recent-title" class="block-title">Dernières commandes</h2>
+        <a class="link-arrow" href="/compte/commandes">Historique complet @Icons.Svg("arrow-right", size: 16)</a>
+    </div>
+    @if (recent.Count == 0)
+    {
+        <p class="muted">Aucune commande pour le moment.</p>
+    }
+    else
+    {
+        @await Html.PartialAsync("_OrdersTable", (IReadOnlyList<OrderSummaryDto>)recent)
+    }
+</section>

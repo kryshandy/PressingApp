@@ -1,0 +1,55 @@
+@model LoginForm
+@{
+    ViewData["Title"] = "Connexion";
+    ViewData["Nav"] = "compte";
+    ViewData["BodyClass"] = "auth-page";
+}
+
+<section class="auth">
+    <div class="container">
+        <div class="auth-card">
+            <div class="auth-aside">
+                <span class="brand-mark">@Icons.Svg("logo", size: 24)</span>
+                <h2>Votre linge, vos commandes, vos points.</h2>
+                <ul>
+                    <li>@Icons.Svg("eye", size: 20)Suivez chaque étape en direct</li>
+                    <li>@Icons.Svg("receipt", size: 20)Retrouvez tous vos reçus en PDF</li>
+                    <li>@Icons.Svg("star", size: 20)Consultez vos points de fidélité</li>
+                </ul>
+            </div>
+            <div class="auth-form">
+                <p class="eyebrow">Espace client</p>
+                <h1 class="display-3">Connexion</h1>
+                <p class="muted">Utilisez le téléphone ou l'e-mail renseigné en boutique.</p>
+
+                <form method="post" action="/compte/connexion" novalidate>
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="ReturnUrl" />
+                    <div asp-validation-summary="ModelOnly" class="flash flash-error" role="alert"></div>
+
+                    <div class="field">
+                        <label asp-for="Identifier">Téléphone ou e-mail</label>
+                        <input asp-for="Identifier" autocomplete="username" autocapitalize="off" spellcheck="false" required />
+                        <span asp-validation-for="Identifier" class="field-error"></span>
+                    </div>
+                    <div class="field">
+                        <label asp-for="Password">Mot de passe</label>
+                        <div class="password-wrap">
+                            <input asp-for="Password" type="password" autocomplete="current-password" required />
+                            <button type="button" class="pw-toggle" data-toggle-password="Password" aria-label="Afficher le mot de passe">@Icons.Svg("eye", size: 20)</button>
+                        </div>
+                        <span asp-validation-for="Password" class="field-error"></span>
+                    </div>
+
+                    <div class="form-row">
+                        <label class="check"><input asp-for="Remember" type="checkbox" /><span>Rester connecté</span></label>
+                        <a href="/compte/mot-de-passe-oublie">Mot de passe oublié ?</a>
+                    </div>
+
+                    <button class="btn btn-ink btn-block" type="submit">Se connecter @Icons.Svg("arrow-right", size: 18)</button>
+                </form>
+                <p class="auth-foot">Pas encore d'accès ? <a href="/contact">Demandez-le en boutique ou par message</a>.</p>
+            </div>
+        </div>
+    </div>
+</section>

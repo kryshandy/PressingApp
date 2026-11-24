@@ -1,0 +1,65 @@
+@model LoyaltyViewModel
+@{
+    Layout = "_AccountLayout";
+    ViewData["Title"] = "Programme de fidélité";
+    ViewData["Section"] = "loyalty";
+    var fr = System.Globalization.CultureInfo.GetCultureInfo("fr-FR");
+}
+
+<header class="account-head">
+    <p class="eyebrow">Fidélité</p>
+    <h1 class="display-2">Vos points fidélité</h1>
+</header>
+
+<section class="loyalty-hero">
+    <span class="loyalty-icon">@Icons.Svg("star", size: 30)</span>
+    <div>
+        <p class="loyalty-label">Solde actuel</p>
+        <p class="loyalty-points">@Model.Client.LoyaltyPoints.ToString("N0", fr) <small>point@(Model.Client.LoyaltyPoints > 1 ? "s" : "")</small></p>
+        <p class="muted">Vos points se cumulent à chaque commande et peuvent être utilisés en boutique lors d'un prochain dépôt.</p>
+    </div>
+</section>
+
+<section class="block" aria-labelledby="hist-title">
+    <h2 id="hist-title" class="block-title">Historique</h2>
+    @if (Model.Transactions.Count == 0)
+    {
+        <div class="empty-state empty-compact">
+            @Icons.Svg("star", size: 30)
+            <h3>Pas encore de mouvement</h3>
+            <p>Vos premiers points apparaîtront dès votre prochaine commande.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table-ui table-stack">
+                <thead>
+                    <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Opération</th>
+                        <th scope="col">Détail</th>
+                        <th scope="col" class="num">Points</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model.Transactions)
+                    {
+                        <tr>
+                            <th scope="row" data-label="Date">@Fmt.Date(t.CreatedAt)</th>
+                            <td data-label="Opération">@t.TypeLabel</td>
+                            <td data-label="Détail">
+                                @t.Note
+                                @if (t.OrderId is not null && !string.IsNullOrWhiteSpace(t.TicketNumber))
+                                {
+                                    <a class="cell-sub" href="/compte/commandes/@t.OrderId">@t.TicketNumber</a>
+                                }
+                            </td>
+                            <td data-label="Points" class="num @(t.Points >= 0 ? "text-ok" : "text-due")"><strong>@(t.Points > 0 ? "+" : "")@t.Points.ToString("N0", fr)</strong></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

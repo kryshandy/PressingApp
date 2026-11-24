@@ -1,0 +1,41 @@
+@model OrdersViewModel
+@{
+    Layout = "_AccountLayout";
+    ViewData["Title"] = "Mes commandes";
+    ViewData["Section"] = "orders";
+    var tabs = new[]
+    {
+        (Key: "en-cours", Label: "En cours", Count: Model.CountActive),
+        (Key: "terminees", Label: "Terminées", Count: Model.CountDone),
+        (Key: "toutes", Label: "Toutes", Count: Model.CountAll)
+    };
+}
+
+<header class="account-head">
+    <p class="eyebrow">Historique</p>
+    <h1 class="display-2">Mes commandes</h1>
+</header>
+
+<nav class="segmented" aria-label="Filtrer les commandes">
+    @foreach (var t in tabs)
+    {
+        <a href="/compte/commandes?filtre=@t.Key" aria-current="@(Model.Filter == t.Key ? "page" : "")">@t.Label <span class="count">@t.Count</span></a>
+    }
+</nav>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="empty-state">
+        @Icons.Svg("package", size: 32)
+        <h2>Aucune commande à afficher</h2>
+        <p>@(Model.Filter == "en-cours" ? "Vous n'avez aucune commande en cours." : Model.Filter == "terminees" ? "Aucune commande terminée pour l'instant." : "Vous n'avez pas encore déposé de vêtements.")</p>
+        @if (Model.Filter != "toutes" && Model.CountAll > 0)
+        {
+            <a class="btn btn-ghost-ink" href="/compte/commandes?filtre=toutes">Voir toutes les commandes</a>
+        }
+    </div>
+}
+else
+{
+    @await Html.PartialAsync("_OrdersTable", Model.Items)
+}

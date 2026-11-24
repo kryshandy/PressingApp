@@ -1,0 +1,65 @@
+@model ProfileForm
+@{
+    Layout = "_AccountLayout";
+    ViewData["Title"] = "Mon profil";
+    ViewData["Section"] = "profile";
+}
+
+<header class="account-head">
+    <p class="eyebrow">Mon compte</p>
+    <h1 class="display-2">Mon profil</h1>
+    <p class="muted">Gardez vos coordonnées à jour pour recevoir vos notifications de retrait et vos reçus.</p>
+</header>
+
+<form class="panel" method="post" action="/compte/profil" novalidate>
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="flash flash-error" role="alert"></div>
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="field">
+                <label asp-for="FirstName">Prénom</label>
+                <input asp-for="FirstName" autocomplete="given-name" required />
+                <span asp-validation-for="FirstName" class="field-error"></span>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="field">
+                <label asp-for="LastName">Nom</label>
+                <input asp-for="LastName" autocomplete="family-name" required />
+                <span asp-validation-for="LastName" class="field-error"></span>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="field">
+                <label asp-for="Phone">Téléphone</label>
+                <input asp-for="Phone" type="tel" autocomplete="tel" required />
+                <span asp-validation-for="Phone" class="field-error"></span>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="field">
+                <label asp-for="WhatsApp">WhatsApp</label>
+                <input asp-for="WhatsApp" type="tel" required />
+                <span asp-validation-for="WhatsApp" class="field-error"></span>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="field">
+                <label asp-for="Email">Adresse e-mail</label>
+                <input asp-for="Email" type="email" autocomplete="email" />
+                <span asp-validation-for="Email" class="field-error"></span>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="field">
+                <label asp-for="Address">Adresse</label>
+                <input asp-for="Address" autocomplete="street-address" />
+                <span asp-validation-for="Address" class="field-error"></span>
+            </div>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button class="btn btn-ink" type="submit">Enregistrer les modifications</button>
+        <a class="btn btn-ghost-ink" href="/compte/mot-de-passe">@Icons.Svg("lock", size: 18)Changer de mot de passe</a>
+    </div>
+</form>

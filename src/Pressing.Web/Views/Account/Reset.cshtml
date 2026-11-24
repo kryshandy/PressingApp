@@ -1,0 +1,46 @@
+@model ResetForm
+@{
+    ViewData["Title"] = "Nouveau mot de passe";
+    ViewData["Nav"] = "compte";
+    ViewData["BodyClass"] = "auth-page";
+}
+
+<section class="auth">
+    <div class="container">
+        <div class="auth-card auth-card-single">
+            <div class="auth-form">
+                <p class="eyebrow">Espace client</p>
+                <h1 class="display-3">Choisir un nouveau mot de passe</h1>
+
+                @if (string.IsNullOrWhiteSpace(Model.Token))
+                {
+                    <div class="flash flash-error" role="alert">@Icons.Svg("alert", size: 20)<p>Ce lien de réinitialisation est incomplet ou a expiré.</p></div>
+                    <a class="btn btn-ink" href="/compte/mot-de-passe-oublie">Demander un nouveau lien</a>
+                }
+                else
+                {
+                    <form method="post" action="/compte/reinitialiser" novalidate>
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="Token" />
+                        <div asp-validation-summary="ModelOnly" class="flash flash-error" role="alert"></div>
+                        <div class="field">
+                            <label asp-for="NewPassword">Nouveau mot de passe</label>
+                            <div class="password-wrap">
+                                <input asp-for="NewPassword" type="password" autocomplete="new-password" minlength="6" required />
+                                <button type="button" class="pw-toggle" data-toggle-password="NewPassword" aria-label="Afficher le mot de passe">@Icons.Svg("eye", size: 20)</button>
+                            </div>
+                            <span class="hint">6 caractères minimum ; mélangez lettres, chiffres et symboles.</span>
+                            <span asp-validation-for="NewPassword" class="field-error"></span>
+                        </div>
+                        <div class="field">
+                            <label asp-for="ConfirmPassword">Confirmer le mot de passe</label>
+                            <input asp-for="ConfirmPassword" type="password" autocomplete="new-password" required />
+                            <span asp-validation-for="ConfirmPassword" class="field-error"></span>
+                        </div>
+                        <button class="btn btn-ink btn-block" type="submit">Enregistrer le mot de passe</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</section>

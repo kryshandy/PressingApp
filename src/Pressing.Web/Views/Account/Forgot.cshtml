@@ -1,0 +1,40 @@
+@model ForgotForm
+@{
+    ViewData["Title"] = "Mot de passe oublié";
+    ViewData["Nav"] = "compte";
+    ViewData["BodyClass"] = "auth-page";
+    var sent = ViewData["Sent"] as string;
+}
+
+<section class="auth">
+    <div class="container">
+        <div class="auth-card auth-card-single">
+            <div class="auth-form">
+                <p class="eyebrow">Espace client</p>
+                <h1 class="display-3">Mot de passe oublié</h1>
+
+                @if (sent is not null)
+                {
+                    <div class="flash flash-success" role="status">@Icons.Svg("check", size: 20)<p>@sent</p></div>
+                    <p class="muted">Pensez à vérifier vos courriers indésirables. Le lien reçu est valable pour une durée limitée.</p>
+                    <a class="btn btn-ghost-ink" href="/compte/connexion">Retour à la connexion</a>
+                }
+                else
+                {
+                    <p class="muted">Indiquez votre téléphone ou votre e-mail : si un compte existe, nous vous envoyons un lien pour choisir un nouveau mot de passe.</p>
+                    <form method="post" action="/compte/mot-de-passe-oublie" novalidate>
+                        @Html.AntiForgeryToken()
+                        <div asp-validation-summary="ModelOnly" class="flash flash-error" role="alert"></div>
+                        <div class="field">
+                            <label asp-for="Identifier">Téléphone ou e-mail</label>
+                            <input asp-for="Identifier" autocomplete="username" autocapitalize="off" required />
+                            <span asp-validation-for="Identifier" class="field-error"></span>
+                        </div>
+                        <button class="btn btn-ink btn-block" type="submit">Envoyer le lien</button>
+                    </form>
+                    <p class="auth-foot"><a href="/compte/connexion">Retour à la connexion</a></p>
+                }
+            </div>
+        </div>
+    </div>
+</section>

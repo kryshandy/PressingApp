@@ -1,0 +1,171 @@
+@model OrderDetailViewModel
+@{
+    Layout = "_AccountLayout";
+    var o = Model.Order;
+    ViewData["Title"] = "Commande " + o.TicketNumber;
+    ViewData["Section"] = "orders";
+    var step = Ui.StepOf(o.Status);
+    var payments = o.Payments.OrderBy(p => p.PaidAt).ToList();
+}
+
+<a class="back-link" href="/compte/commandes">@Icons.Svg("arrow-left", size: 18)Mes commandes</a>
+
+<header class="account-head account-head-split">
+    <div>
+        <p class="eyebrow">Commande</p>
+        <h1 class="display-2">@o.TicketNumber</h1>
+        <p class="muted">Déposée le @Fmt.DateTime(o.CreatedAt)@(o.IsExpress ? " · Express" : "") · @o.DeliveryTypeLabel</p>
+    </div>
+    <div class="head-actions">
+        <span class="pill pill-lg" style="--pill:@Fmt.StatusColor(o.Status)"><i class="pill-dot"></i>@o.StatusLabel</span>
+        <a class="btn btn-ink btn-sm" href="/compte/commandes/@o.Id/recu">@Icons.Svg("download", size: 18)Télécharger le reçu</a>
+    </div>
+</header>
+
+<section class="panel">
+    @if (step < 0)
+    {
+        <div class="flash flash-error" role="status">
+            @Icons.Svg("alert", size: 20)
+            <p>Cette commande a été annulée@(o.CancelledAt is not null ? " le " + Fmt.Date(o.CancelledAt.Value) : "").@(string.IsNullOrWhiteSpace(o.CancelReason) ? "" : " Motif : " + o.CancelReason)</p>
+        </div>
+    }
+    @await Html.PartialAsync("_Timeline", step)
+    <dl class="meta-grid">
+        <div><dt>Retrait prévu</dt><dd>@Fmt.Date(o.DueDate)</dd></div>
+        @if (o.ReadyNotifiedAt is not null)
+        {
+            <div><dt>Prête depuis</dt><dd>@Fmt.DateTime(o.ReadyNotifiedAt.Value)</dd></div>
+        }
+        @if (o.CompletedAt is not null)
+        {
+            <div><dt>Retirée le</dt><dd>@Fmt.DateTime(o.CompletedAt.Value)</dd></div>
+        }
+        @if (o.DeliveryType == DeliveryType.HomeDelivery && !string.IsNullOrWhiteSpace(o.DeliveryAddress))
+        {
+            <div><dt>Livraison à</dt><dd>@o.DeliveryAddress</dd></div>
+        }
+    </dl>
+</section>
+
+<section class="block" aria-labelledby="items-title">
+    <h2 id="items-title" class="block-title">Articles</h2>
+    <div class="table-wrap">
+        <table class="table-ui table-stack">
+            <thead>
+                <tr>
+                    <th scope="col">Article</th>
+                    <th scope="col">Service</th>
+                    <th scope="col">Statut</th>
+                    <th scope="col" class="num">Qté</th>
+                    <th scope="col" class="num">Prix unitaire</th>
+                    <th scope="col" class="num">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var it in o.Items)
+                {
+                    <tr>
+                        <th scope="row" data-label="Article">
+                            @it.CategoryName
+                            @if (!string.IsNullOrWhiteSpace(it.Description)) { <small class="cell-sub">@it.Description</small> }
+                            @if (!string.IsNullOrWhiteSpace(it.Notes)) { <small class="cell-sub">@it.Notes</small> }
+                        </th>
+                        <td data-label="Service">@it.ServiceLabel@if (it.IsExpress) { <span class="tag-express" title="Express">@Icons.Svg("bolt", size: 14)</span> }</td>
+                        <td data-label="Statut">
+                            <span class="pill" style="--pill:@Fmt.StatusColor(it.Status)"><i class="pill-dot"></i>@it.StatusLabel</span>
+                            @if (it.PickedUpQuantity > 0 && it.RemainingQuantity > 0) { <small class="cell-sub">@it.PickedUpQuantity retiré@(it.PickedUpQuantity > 1 ? "s" : ""), @it.RemainingQuantity restant@(it.RemainingQuantity > 1 ? "s" : "")</small> }
+                        </td>
+                        <td data-label="Qté" class="num">@it.Quantity</td>
+                        <td data-label="Prix unitaire" class="num">@Fmt.Money(it.UnitPrice)@if (it.ExpressSupplement > 0) { <small class="cell-sub">+ @Fmt.Money(it.ExpressSupplement) express</small> }</td>
+                        <td data-label="Total" class="num"><strong>@Fmt.Money(it.LineTotal)</strong></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <section class="block" aria-labelledby="pay-title">
+            <h2 id="pay-title" class="block-title">Paiements</h2>
+            @if (payments.Count == 0)
+            {
+                <p class="muted">Aucun paiement enregistré pour le moment.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="table-ui table-stack">
+                        <thead>
+                            <tr>
+                                <th scope="col">Date</th>
+                                <th scope="col">Mode</th>
+                                <th scope="col">Type</th>
+                                <th scope="col" class="num">Montant</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in payments)
+                            {
+                                <tr>
+                                    <th scope="row" data-label="Date">@Fmt.DateTime(p.PaidAt)</th>
+                                    <td data-label="Mode">@p.MethodLabel@if (!string.IsNullOrWhiteSpace(p.Reference)) { <small class="cell-sub">Réf. @p.Reference</small> }</td>
+                                    <td data-label="Type">@p.TypeLabel</td>
+                                    <td data-label="Montant" class="num @(p.Type == PaymentType.Refund ? "text-due" : "")">@(p.Type == PaymentType.Refund ? "−" : "")@Fmt.Money(p.Amount)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        @if (o.Pickups.Count > 0)
+        {
+            <section class="block" aria-labelledby="pick-title">
+                <h2 id="pick-title" class="block-title">Retraits</h2>
+                <ul class="pickup-list">
+                    @foreach (var pk in o.Pickups.OrderBy(p => p.PickedUpAt))
+                    {
+                        <li>
+                            <span class="pickup-dot">@Icons.Svg("hanger", size: 18)</span>
+                            <div>
+                                <strong>@Fmt.DateTime(pk.PickedUpAt)</strong>
+                                <span>@string.Join(", ", pk.Items.Select(i => $"{i.Quantity} × {i.CategoryName} ({i.ServiceLabel})"))</span>
+                                @if (!string.IsNullOrWhiteSpace(pk.Note)) { <small>@pk.Note</small> }
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(o.Notes))
+        {
+            <section class="block">
+                <h2 class="block-title">Remarques</h2>
+                <p class="muted">@o.Notes</p>
+            </section>
+        }
+    </div>
+
+    <div class="col-lg-5">
+        <section class="block" aria-labelledby="tot-title">
+            <h2 id="tot-title" class="block-title">Récapitulatif</h2>
+            <dl class="totals">
+                <div><dt>Sous-total</dt><dd>@Fmt.Money(o.Subtotal)</dd></div>
+                @if (o.ExpressTotal > 0) { <div><dt>Supplément express</dt><dd>@Fmt.Money(o.ExpressTotal)</dd></div> }
+                @if (o.DeliveryFee > 0) { <div><dt>Livraison</dt><dd>@Fmt.Money(o.DeliveryFee)</dd></div> }
+                @if (o.DiscountAmount > 0) { <div class="is-minus"><dt>Remise</dt><dd>−@Fmt.Money(o.DiscountAmount)</dd></div> }
+                @if (o.PromotionDiscount > 0) { <div class="is-minus"><dt>Promotion@(string.IsNullOrWhiteSpace(o.PromotionCode) ? "" : " " + o.PromotionCode)</dt><dd>−@Fmt.Money(o.PromotionDiscount)</dd></div> }
+                @if (o.LoyaltyDiscount > 0) { <div class="is-minus"><dt>Points fidélité (@o.LoyaltyPointsRedeemed)</dt><dd>−@Fmt.Money(o.LoyaltyDiscount)</dd></div> }
+                <div class="is-total"><dt>Total</dt><dd>@Fmt.Money(o.Total)</dd></div>
+                <div><dt>Déjà réglé</dt><dd>@Fmt.Money(o.PaidAmount)</dd></div>
+                <div class="is-balance @(o.Balance > 0 ? "is-due" : "is-ok")"><dt>@(o.Balance > 0 ? "Solde à payer" : "Commande soldée")</dt><dd>@Fmt.Money(Math.Max(0, o.Balance))</dd></div>
+            </dl>
+            <a class="btn btn-ink btn-block" href="/compte/commandes/@o.Id/recu">@Icons.Svg("download", size: 18)Télécharger le reçu (PDF)</a>
+        </section>
+    </div>
+</div>
