@@ -1,0 +1,25 @@
+@model ErrorViewModel?
+@{
+    var code = Model?.Code ?? 500;
+    ViewData["Title"] = code == 403 ? "Accès refusé" : "Une erreur est survenue";
+    var message = !string.IsNullOrWhiteSpace(Model?.Message)
+        ? Model!.Message
+        : code switch
+        {
+            403 => "Vous n'avez pas accès à cette page.",
+            400 => "Votre demande n'a pas pu être comprise.",
+            405 => "Cette action n'est pas disponible depuis cette adresse.",
+            _ => "Un incident imprévu s'est produit de notre côté. Réessayez dans un instant."
+        };
+}
+<section class="status-page">
+    <div class="container status-inner">
+        <p class="status-code" aria-hidden="true">@code</p>
+        <h1 class="display-1">@(code == 403 ? "Accès refusé" : "Un petit accroc")</h1>
+        <p class="page-lede">@message</p>
+        <div class="status-actions">
+            <a class="btn btn-ink" href="/">Retour à l'accueil</a>
+            <a class="btn btn-ghost-ink" href="/contact">Nous contacter</a>
+        </div>
+    </div>
+</section>

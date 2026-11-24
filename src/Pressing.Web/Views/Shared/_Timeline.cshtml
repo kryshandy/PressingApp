@@ -1,0 +1,26 @@
+@* Timeline de suivi : modèle = étape courante (0..3), -1 si annulée ; ViewData["Done"] = true si tout est terminé. *@
+@model int
+@{
+    var steps = new[]
+    {
+        (Label: "Déposé", Icon: "package", Text: "Dépôt enregistré"),
+        (Label: "En traitement", Icon: "droplet", Text: "Soin en cours"),
+        (Label: "Prêt", Icon: "check", Text: "À retirer en boutique"),
+        (Label: "Retiré", Icon: "hanger", Text: "Remis au client")
+    };
+    var current = Model;
+    var compact = ViewData["Compact"] as bool? == true;
+}
+<ol class="timeline @(compact ? "timeline-compact" : "")" aria-label="Étapes de la commande">
+    @for (var i = 0; i < steps.Length; i++)
+    {
+        var state = current < 0 ? "todo" : i < current ? "done" : i == current ? (current == 3 ? "done" : "current") : "todo";
+        <li class="tl-step is-@state" @(state == "current" ? "aria-current=step" : "")>
+            <span class="tl-dot">@(state == "done" ? Icons.Svg("check", size: 18) : Icons.Svg(steps[i].Icon, size: 18))</span>
+            <span class="tl-text">
+                <strong>@steps[i].Label</strong>
+                @if (!compact) { <small>@steps[i].Text</small> }
+            </span>
+        </li>
+    }
+</ol>

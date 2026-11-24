@@ -1,0 +1,142 @@
+@inject ShopDirectory ShopDir
+@{
+    var shop = await ShopDir.GetShopAsync();
+    var nav = ViewData["Nav"] as string ?? "";
+    var title = ViewData["Title"] as string;
+    var fullTitle = string.IsNullOrWhiteSpace(title) ? $"{shop.Name} — {shop.Slogan}" : $"{title} — {shop.Name}";
+    var signedIn = User.Identity?.IsAuthenticated == true;
+    var description = ViewData["Description"] as string
+        ?? $"{shop.Name} : nettoyage à sec, lavage et repassage soignés. Suivez vos vêtements en ligne et retrouvez vos reçus dans votre espace client.";
+    string Cur(string key) => nav == key ? "page" : "";
+    var hours = Ui.HoursLines(shop.OpeningHours);
+}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@fullTitle</title>
+    <meta name="description" content="@description" />
+    <meta name="theme-color" content="#0E1A2B" />
+    <link rel="icon" href="~/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap-grid.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap-utilities.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="@(ViewData["BodyClass"] ?? "")">
+    <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+    <header class="site-header" id="site-header">
+        <div class="container header-inner">
+            <a class="brand" href="/" aria-label="@shop.Name — accueil">
+                <span class="brand-mark">@Icons.Svg("logo", size: 22)</span>
+                <span class="brand-name">@shop.Name</span>
+            </a>
+
+            <nav class="main-nav" aria-label="Navigation principale">
+                <a href="/" aria-current="@Cur("home")">Accueil</a>
+                <a href="/tarifs" aria-current="@Cur("tarifs")">Tarifs</a>
+                <a href="/suivi" aria-current="@Cur("suivi")">Suivre ma commande</a>
+                <a href="/contact" aria-current="@Cur("contact")">Contact</a>
+            </nav>
+
+            <div class="header-actions">
+                @if (signedIn)
+                {
+                    <a class="btn btn-brass btn-sm" href="/compte">@Icons.Svg("user", size: 18)<span>Mon espace</span></a>
+                }
+                else
+                {
+                    <a class="btn btn-ghost-light btn-sm" href="/compte/connexion">@Icons.Svg("user", size: 18)<span>Espace client</span></a>
+                }
+            </div>
+
+            <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" data-menu-toggle>
+                <span class="visually-hidden">Ouvrir le menu</span>
+                <span class="when-closed">@Icons.Svg("menu")</span>
+                <span class="when-open">@Icons.Svg("close")</span>
+            </button>
+        </div>
+
+        <div class="mobile-menu" id="mobile-menu" hidden>
+            <nav class="container" aria-label="Navigation mobile">
+                <a href="/" aria-current="@Cur("home")">Accueil</a>
+                <a href="/tarifs" aria-current="@Cur("tarifs")">Tarifs</a>
+                <a href="/suivi" aria-current="@Cur("suivi")">Suivre ma commande</a>
+                <a href="/contact" aria-current="@Cur("contact")">Contact</a>
+                @if (signedIn)
+                {
+                    <a href="/compte" aria-current="@Cur("compte")">Mon espace</a>
+                    <form method="post" action="/compte/deconnexion">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="link-button">Se déconnecter</button>
+                    </form>
+                }
+                else
+                {
+                    <a href="/compte/connexion" class="mobile-cta">Espace client</a>
+                }
+            </nav>
+        </div>
+    </header>
+
+    <main id="contenu" tabindex="-1">
+        @await Html.PartialAsync("_Flash")
+        @RenderBody()
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="row g-5">
+                <div class="col-lg-5">
+                    <a class="brand brand-footer" href="/">
+                        <span class="brand-mark">@Icons.Svg("logo", size: 22)</span>
+                        <span class="brand-name">@shop.Name</span>
+                    </a>
+                    <p class="footer-lede">@shop.Slogan</p>
+                    <p class="footer-small">Un soin attentif, une traçabilité totale : chaque vêtement est suivi du dépôt jusqu'au retrait.</p>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <h2 class="footer-title">Explorer</h2>
+                    <ul class="footer-list">
+                        <li><a href="/tarifs">Nos tarifs</a></li>
+                        <li><a href="/suivi">Suivre ma commande</a></li>
+                        <li><a href="/compte">Espace client</a></li>
+                        <li><a href="/contact">Nous contacter</a></li>
+                    </ul>
+                </div>
+                <div class="col-6 col-lg-4">
+                    <h2 class="footer-title">Boutique</h2>
+                    <ul class="footer-list footer-list-icons">
+                        @if (!string.IsNullOrWhiteSpace(shop.Address))
+                        {
+                            <li>@Icons.Svg("map-pin", size: 18)<span>@shop.Address@(string.IsNullOrWhiteSpace(shop.City) ? "" : ", " + shop.City)</span></li>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(shop.Phone))
+                        {
+                            <li>@Icons.Svg("phone", size: 18)<a href="@Ui.PhoneHref(shop.Phone)">@shop.Phone</a></li>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(shop.Email))
+                        {
+                            <li>@Icons.Svg("mail", size: 18)<a href="mailto:@shop.Email">@shop.Email</a></li>
+                        }
+                        @foreach (var line in hours)
+                        {
+                            <li>@Icons.Svg("clock", size: 18)<span>@line</span></li>
+                        }
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>© @DateTime.Now.Year @shop.Name. Tous droits réservés.</span>
+                <a href="/mentions-legales">Mentions légales</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="~/js/site.js" asp-append-version="true"></script>
+</body>
+</html>

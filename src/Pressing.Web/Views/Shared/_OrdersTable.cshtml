@@ -1,0 +1,30 @@
+@model IReadOnlyList<OrderSummaryDto>
+<div class="table-wrap">
+    <table class="table-ui table-stack">
+        <thead>
+            <tr>
+                <th scope="col">Ticket</th>
+                <th scope="col">Déposée le</th>
+                <th scope="col">Statut</th>
+                <th scope="col" class="num">Articles</th>
+                <th scope="col" class="num">Total</th>
+                <th scope="col" class="num">Solde</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var o in Model)
+            {
+                <tr>
+                    <th scope="row" data-label="Ticket"><a href="/compte/commandes/@o.Id">@o.TicketNumber</a>@if (o.IsExpress) { <span class="tag-express" title="Express">@Icons.Svg("bolt", size: 14)</span> }</th>
+                    <td data-label="Déposée le">@Fmt.Date(o.CreatedAt)</td>
+                    <td data-label="Statut"><span class="pill" style="--pill:@Fmt.StatusColor(o.Status)"><i class="pill-dot"></i>@o.StatusLabel</span></td>
+                    <td data-label="Articles" class="num">@o.ItemCount</td>
+                    <td data-label="Total" class="num">@Fmt.Money(o.Total)</td>
+                    <td data-label="Solde" class="num @(o.Balance > 0 ? "text-due" : "text-ok")">@(o.Balance > 0 ? Fmt.Money(o.Balance) : "Soldé")</td>
+                    <td class="row-action"><a class="icon-link" href="/compte/commandes/@o.Id" aria-label="Voir la commande @o.TicketNumber">@Icons.Svg("arrow-right", size: 18)</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

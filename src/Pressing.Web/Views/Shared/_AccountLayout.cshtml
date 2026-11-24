@@ -1,0 +1,46 @@
+@{
+    Layout = "_Layout";
+    ViewData["Nav"] = "compte";
+    ViewData["BodyClass"] = "has-tabbar";
+    var section = ViewData["Section"] as string ?? "";
+    var name = User.Identity?.Name ?? "";
+    string Cur(string key) => section == key ? "page" : "";
+    var items = new[]
+    {
+        (Key: "dashboard", Href: "/compte", Icon: "dashboard", Label: "Tableau de bord", Short: "Accueil"),
+        (Key: "orders", Href: "/compte/commandes", Icon: "package", Label: "Mes commandes", Short: "Commandes"),
+        (Key: "loyalty", Href: "/compte/fidelite", Icon: "star", Label: "Fidélité", Short: "Fidélité"),
+        (Key: "profile", Href: "/compte/profil", Icon: "user", Label: "Mon profil", Short: "Profil"),
+        (Key: "password", Href: "/compte/mot-de-passe", Icon: "lock", Label: "Mot de passe", Short: "Sécurité")
+    };
+}
+<div class="account-shell container">
+    <aside class="account-side" aria-label="Espace client">
+        <div class="side-card">
+            <div class="avatar" aria-hidden="true">@Ui.Initials(name)</div>
+            <div class="side-name">@name</div>
+            <div class="side-sub">Espace client</div>
+            <nav class="side-nav">
+                @foreach (var it in items)
+                {
+                    <a href="@it.Href" aria-current="@Cur(it.Key)">@Icons.Svg(it.Icon, size: 20)<span>@it.Label</span></a>
+                }
+            </nav>
+            <form method="post" action="/compte/deconnexion" class="side-logout">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="side-link">@Icons.Svg("logout", size: 20)<span>Se déconnecter</span></button>
+            </form>
+        </div>
+    </aside>
+
+    <section class="account-main">
+        @RenderBody()
+    </section>
+</div>
+
+<nav class="tabbar" aria-label="Espace client">
+    @foreach (var it in items)
+    {
+        <a href="@it.Href" aria-current="@Cur(it.Key)">@Icons.Svg(it.Icon, size: 22)<span>@it.Short</span></a>
+    }
+</nav>

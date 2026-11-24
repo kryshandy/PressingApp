@@ -1,0 +1,19 @@
+@{
+    var items = new List<(string Kind, string Text)>();
+    if (TempData["Success"] is string s) items.Add(("success", s));
+    if (TempData["Error"] is string e) items.Add(("error", e));
+    if (TempData["Info"] is string i) items.Add(("info", i));
+    if (ViewData["Info"] is string vi) items.Add(("info", vi));
+}
+@if (items.Count > 0)
+{
+    <div class="container flash-zone">
+        @foreach (var (kind, text) in items)
+        {
+            <div class="flash flash-@kind" role="@(kind == "error" ? "alert" : "status")">
+                @Icons.Svg(kind == "success" ? "check" : kind == "error" ? "alert" : "info", size: 20)
+                <p>@text</p>
+            </div>
+        }
+    </div>
+}

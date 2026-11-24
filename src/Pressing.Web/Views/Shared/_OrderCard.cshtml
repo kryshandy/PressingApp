@@ -1,0 +1,40 @@
+@* Carte de commande active avec barre de progression. *@
+@model OrderSummaryDto
+@{
+    var o = Model;
+    var step = Ui.StepOf(o.Status);
+    var color = Fmt.StatusColor(o.Status);
+    var labels = new[] { "Dépôt", "Traitement", "Prêt", "Retrait" };
+}
+<article class="order-card">
+    <header class="order-card-head">
+        <div>
+            <a class="order-ticket" href="/compte/commandes/@o.Id">@o.TicketNumber</a>
+            <span class="order-sub">Déposée @Fmt.Relative(o.CreatedAt) · @o.ItemCount article@(o.ItemCount > 1 ? "s" : "")@(o.IsExpress ? " · Express" : "")</span>
+        </div>
+        <span class="pill" style="--pill:@color"><i class="pill-dot"></i>@o.StatusLabel</span>
+    </header>
+
+    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Ui.Percent(o.Status)" aria-label="Avancement de la commande @o.TicketNumber">
+        <span class="progress-bar" style="width:@(Ui.Percent(o.Status))%"></span>
+    </div>
+    <ol class="progress-steps" aria-hidden="true">
+        @for (var i = 0; i < labels.Length; i++)
+        {
+            <li class="@(i <= step ? "is-on" : "")">@labels[i]</li>
+        }
+    </ol>
+
+    <footer class="order-card-foot">
+        <span><span class="muted">Retrait prévu</span> <strong>@Fmt.Date(o.DueDate)</strong></span>
+        @if (o.ReadyCount > 0 && o.Status != OrderStatus.Completed)
+        {
+            <span class="ready-note">@Icons.Svg("check", size: 16)@o.ReadyCount prêt@(o.ReadyCount > 1 ? "s" : "") à retirer</span>
+        }
+        @if (o.Balance > 0)
+        {
+            <span class="balance-note">Solde : <strong>@Fmt.Money(o.Balance)</strong></span>
+        }
+        <a class="link-arrow" href="/compte/commandes/@o.Id">Détails @Icons.Svg("arrow-right", size: 16)</a>
+    </footer>
+</article>
