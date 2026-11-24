@@ -1,0 +1,29 @@
+@host = http://localhost:5180
+
+### Santé
+GET {{host}}/api/health
+
+### Connexion du personnel (copier le jeton dans @token)
+POST {{host}}/api/auth/staff/login
+Content-Type: application/json
+
+{ "username": "admin", "password": "Admin@2026!" }
+
+###
+@token = COLLER_LE_JETON_ICI
+
+### Tableau de bord
+GET {{host}}/api/dashboard
+Authorization: Bearer {{token}}
+
+### Clients
+GET {{host}}/api/clients?search=&page=1&pageSize=25
+Authorization: Bearer {{token}}
+
+### Commandes prêtes
+GET {{host}}/api/orders/ready
+Authorization: Bearer {{token}}
+
+### Rapport (30 derniers jours)
+GET {{host}}/api/reports
+Authorization: Bearer {{token}}
