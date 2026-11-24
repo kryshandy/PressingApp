@@ -77,3 +77,5 @@ public record ClientDetailDto(
     IReadOnlyList<OrderSummaryDto> Orders,
     IReadOnlyList<PaymentDto> Payments,
     IReadOnlyList<LoyaltyTransactionDto> LoyaltyTransactions);
+
+public record AdjustLoyaltyRequest(int Points, string Note);
