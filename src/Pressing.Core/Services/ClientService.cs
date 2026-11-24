@@ -40,12 +40,16 @@ public class ClientService
         {
             string raw = search.Trim();
             string term = $"%{raw}%";
-            string normalized = $"%{PhoneNormalizer.Normalize(raw)}%";
+            // Un texte sans chiffre (nom, ticket sans numéro…) donnerait le motif "%%" qui correspond à tout :
+            // on ne filtre sur le téléphone normalisé que s'il y a des chiffres à chercher.
+            string digits = PhoneNormalizer.Normalize(raw);
+            bool searchPhone = digits.Length > 0;
+            string normalized = $"%{digits}%";
             query = query.Where(c =>
                 EF.Functions.Like(c.FirstName, term) ||
                 EF.Functions.Like(c.LastName, term) ||
                 EF.Functions.Like(c.Phone, term) ||
-                EF.Functions.Like(c.PhoneNormalized, normalized) ||
+                (searchPhone && EF.Functions.Like(c.PhoneNormalized, normalized)) ||
                 EF.Functions.Like(c.WhatsApp, term) ||
                 EF.Functions.Like(c.Email ?? string.Empty, term) ||
                 c.Orders.Any(o => EF.Functions.Like(o.TicketNumber, term)));
