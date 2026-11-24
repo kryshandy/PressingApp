@@ -1,0 +1,42 @@
+@model Pressing.Core.Options.ShopInfo
+@{
+    ViewData["Title"] = "Mentions légales";
+    var name = string.IsNullOrWhiteSpace(Model.LegalName) ? Model.Name : Model.LegalName;
+}
+
+<section class="page-head">
+    <div class="container">
+        <p class="eyebrow">Informations</p>
+        <h1 class="display-1">Mentions légales</h1>
+    </div>
+</section>
+
+<section class="section section-tight-top">
+    <div class="container container-narrow prose">
+        <h2>Éditeur du site</h2>
+        <p>
+            Ce site est édité par <strong>@name</strong>@(string.IsNullOrWhiteSpace(Model.Address) ? "" : ", " + Model.Address)@(string.IsNullOrWhiteSpace(Model.City) ? "" : ", " + Model.City).
+            @if (!string.IsNullOrWhiteSpace(Model.Phone)) { <text>Téléphone : @Model.Phone. </text> }
+            @if (!string.IsNullOrWhiteSpace(Model.Email)) { <text>E-mail : <a href="mailto:@Model.Email">@Model.Email</a>.</text> }
+        </p>
+
+        <h2>Données personnelles</h2>
+        <p>
+            Les informations que vous nous confiez (coordonnées, historique de commandes, points de fidélité) servent uniquement à la gestion de vos dépôts,
+            à l'envoi de vos reçus et aux notifications de retrait. Elles ne sont jamais cédées à des tiers. Vous pouvez à tout moment les consulter et les
+            modifier depuis votre <a href="/compte/profil">espace client</a>, ou demander leur suppression en boutique.
+        </p>
+
+        <h2>Cookies</h2>
+        <p>
+            Le site n'utilise que des cookies strictement nécessaires : un cookie de session pour votre espace client et un cookie de sécurité pour protéger
+            les formulaires. Aucun traceur publicitaire n'est déposé.
+        </p>
+
+        <h2>Responsabilité</h2>
+        <p>
+            Les tarifs et délais affichés sont fournis à titre indicatif ; la boutique confirme le prix définitif lors du dépôt.
+            Le suivi en ligne reflète l'état de vos articles au moment de la consultation.
+        </p>
+    </div>
+</section>

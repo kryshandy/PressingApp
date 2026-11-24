@@ -1,0 +1,102 @@
+@model SuiviViewModel
+@{
+    ViewData["Title"] = "Suivre ma commande";
+    ViewData["Nav"] = "suivi";
+    ViewData["Description"] = "Suivez en temps réel l'avancement de vos vêtements : saisissez votre numéro de ticket et votre téléphone.";
+    var r = Model.Result;
+}
+
+<section class="page-head">
+    <div class="container">
+        <p class="eyebrow">Suivi de commande</p>
+        <h1 class="display-1">Où en sont vos vêtements ?</h1>
+        <p class="page-lede">Votre numéro de ticket figure sur votre reçu. Le téléphone est celui que vous avez communiqué lors du dépôt.</p>
+    </div>
+</section>
+
+<section class="section section-tight-top">
+    <div class="container container-narrow">
+        <form class="panel track-form" method="get" action="/suivi" novalidate>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <div class="field">
+                        <label for="ticket">Numéro de ticket</label>
+                        <input id="ticket" name="ticket" type="text" value="@Model.Ticket" placeholder="PRESS-2026-00001" autocomplete="off" autocapitalize="characters" required />
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="field">
+                        <label for="phone">Téléphone</label>
+                        <input id="phone" name="phone" type="tel" value="@Model.Phone" placeholder="+225 07 00 00 00 00" autocomplete="tel" required />
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-ink btn-block">Rechercher</button>
+                </div>
+            </div>
+        </form>
+
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <div class="flash flash-error mt-4" role="alert">@Icons.Svg("alert", size: 20)<p>@Model.Error</p></div>
+        }
+        else if (Model.Searched && r is null)
+        {
+            <div class="empty-state" role="status">
+                @Icons.Svg("search", size: 32)
+                <h2>Commande introuvable</h2>
+                <p>Aucune commande ne correspond à ce ticket et à ce téléphone. Vérifiez la saisie (par exemple <strong>PRESS-2026-00001</strong>) et utilisez le numéro donné lors du dépôt.</p>
+                <a class="btn btn-ghost-ink" href="/contact">Besoin d'aide ? Contactez-nous</a>
+            </div>
+        }
+
+        @if (r is not null)
+        {
+            var step = Ui.StepOf(r.Status);
+            var cancelled = step < 0;
+            var color = Ui.ColorForOrderName(r.Status);
+            <article class="track-result" aria-live="polite" data-reveal>
+                <header class="result-head">
+                    <div>
+                        <p class="eyebrow">Ticket</p>
+                        <h2 class="result-ticket">@r.TicketNumber</h2>
+                    </div>
+                    <span class="pill pill-lg" style="--pill:@color"><i class="pill-dot"></i>@r.StatusLabel</span>
+                </header>
+
+                @if (cancelled)
+                {
+                    <div class="flash flash-error" role="status">@Icons.Svg("alert", size: 20)<p>Cette commande a été annulée. Contactez la boutique pour plus d'informations.</p></div>
+                }
+                @await Html.PartialAsync("_Timeline", step)
+
+                <dl class="meta-grid">
+                    <div><dt>Déposée le</dt><dd>@Fmt.DateTime(r.CreatedAt)</dd></div>
+                    <div><dt>Retrait prévu</dt><dd>@Fmt.Date(r.DueDate)@(r.IsExpress ? " · Express" : "")</dd></div>
+                    <div><dt>Boutique</dt><dd>@r.ShopName</dd></div>
+                </dl>
+
+                <h3 class="block-title">Vos articles</h3>
+                <ul class="item-list">
+                    @foreach (var it in r.Items)
+                    {
+                        <li>
+                            <span class="item-qty">@it.Quantity ×</span>
+                            <span class="item-name">@it.CategoryName <small>@it.ServiceLabel</small></span>
+                            <span class="pill" style="--pill:@Ui.ColorForItemLabel(it.StatusLabel)"><i class="pill-dot"></i>@it.StatusLabel</span>
+                        </li>
+                    }
+                </ul>
+
+                @if (!string.IsNullOrWhiteSpace(r.ShopAddress) || !string.IsNullOrWhiteSpace(r.ShopPhone))
+                {
+                    <p class="result-foot">
+                        @Icons.Svg("map-pin", size: 18)
+                        <span>Retrait : @((r.ShopAddress ?? "").Trim(',', ' '))@(string.IsNullOrWhiteSpace(r.ShopPhone) ? "" : " · ")@if (!string.IsNullOrWhiteSpace(r.ShopPhone)) { <a href="@Ui.PhoneHref(r.ShopPhone)">@r.ShopPhone</a> }</span>
+                    </p>
+                }
+                <p class="result-cta">Retrouvez vos reçus et l'historique complet dans votre <a href="/compte">espace client</a>.</p>
+            </article>
+        }
+    </div>
+</section>

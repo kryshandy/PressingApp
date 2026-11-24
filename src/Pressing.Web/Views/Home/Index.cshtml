@@ -1,0 +1,312 @@
+@model HomeViewModel
+@{
+    ViewData["Nav"] = "home";
+    var shop = Model.Info.Shop;
+    var cats = Model.Info.Categories.Where(c => c.IsActive).OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToList();
+    var now = DateTime.Now;
+    var promos = Model.Info.Promotions
+        .Where(p => p.IsActive && p.ValidFrom <= now && p.ValidTo >= now && (p.MaxUses <= 0 || p.UsedCount < p.MaxUses))
+        .OrderBy(p => p.ValidTo).Take(3).ToList();
+    var hours = Ui.HoursLines(shop.OpeningHours);
+
+    var services = new[]
+    {
+        (Type: ServiceType.Washing, Title: "Lavage", Text: "Un lavage minutieux, adapté à chaque fibre, pour un linge frais et parfaitement propre.", Icon: "droplet"),
+        (Type: ServiceType.WashAndIron, Title: "Lavage + repassage", Text: "La formule complète : vos vêtements vous reviennent lavés, repassés et prêts à porter.", Icon: "shirt"),
+        (Type: ServiceType.Ironing, Title: "Repassage", Text: "Plis nets, cols impeccables, finitions à la vapeur pour une tenue irréprochable.", Icon: "iron"),
+        (Type: ServiceType.DryCleaning, Title: "Nettoyage à sec", Text: "Costumes, robes, manteaux et pièces délicates traités avec des procédés doux.", Icon: "hanger"),
+        (Type: ServiceType.StainRemoval, Title: "Détachage", Text: "Taches tenaces, auréoles, traces anciennes : chaque tache reçoit un traitement ciblé.", Icon: "sparkle")
+    };
+    var expressMin = cats.SelectMany(c => c.Prices).Where(p => p.IsActive && p.ExpressSupplement > 0)
+        .Select(p => p.ExpressSupplement).DefaultIfEmpty(0).Min();
+}
+
+<section class="hero" aria-labelledby="hero-title">
+    <svg class="hero-art" viewBox="0 0 1440 640" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+        <defs>
+            <linearGradient id="thread" x1="0" x2="1">
+                <stop offset="0" stop-color="#B08D57" stop-opacity="0" />
+                <stop offset=".5" stop-color="#B08D57" stop-opacity=".55" />
+                <stop offset="1" stop-color="#B08D57" stop-opacity="0" />
+            </linearGradient>
+        </defs>
+        <g fill="none" stroke="url(#thread)" stroke-width="1">
+            <path d="M-40 430C180 340 330 520 560 440S900 300 1120 390 1360 470 1500 380" />
+            <path d="M-40 462C190 372 340 552 570 472S910 332 1130 422 1370 502 1500 412" />
+            <path d="M-40 494C200 404 350 584 580 504S920 364 1140 454 1380 534 1500 444" />
+            <path d="M-40 526C210 436 360 616 590 536S930 396 1150 486 1390 566 1500 476" />
+            <path d="M-40 558C220 468 370 648 600 568S940 428 1160 518 1400 598 1500 508" />
+        </g>
+        <g fill="none" stroke="#F7F3EC" stroke-opacity=".16" stroke-width="1">
+            <circle cx="1130" cy="150" r="44" />
+            <circle cx="1130" cy="150" r="30" stroke-opacity=".10" />
+            <circle cx="1230" cy="250" r="22" />
+            <circle cx="1020" cy="270" r="14" />
+            <circle cx="1310" cy="110" r="12" />
+            <circle cx="900" cy="120" r="8" />
+            <circle cx="1350" cy="330" r="30" stroke-opacity=".10" />
+        </g>
+        <g fill="#F7F3EC" fill-opacity=".35">
+            <circle cx="1118" cy="136" r="3" />
+            <circle cx="1222" cy="243" r="2" />
+            <circle cx="1017" cy="264" r="1.6" />
+        </g>
+    </svg>
+
+    <div class="container hero-inner">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-7">
+                <p class="eyebrow eyebrow-light">@(string.IsNullOrWhiteSpace(shop.City) ? "Maison de soin textile" : "Maison de soin textile · " + shop.City)</p>
+                <h1 id="hero-title" class="hero-title">@shop.Name</h1>
+                <p class="hero-slogan">@(string.IsNullOrWhiteSpace(shop.Slogan) ? "L'art du linge impeccable" : shop.Slogan)</p>
+                <p class="hero-lede">
+                    Chaque vêtement est examiné, traité et repassé avec la précision d'un atelier d'exception.
+                    Déposez-le en boutique, suivez son avancement en ligne, retirez-le quand il est prêt.
+                </p>
+                <div class="hero-cta">
+                    <a class="btn btn-brass" href="/tarifs">Découvrir les tarifs @Icons.Svg("arrow-right", size: 18)</a>
+                    <a class="btn btn-ghost-light" href="/compte/connexion">Accéder à mon espace</a>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <form class="track-card" method="get" action="/suivi" aria-labelledby="track-title">
+                    <div class="track-head">
+                        <span class="track-icon">@Icons.Svg("package", size: 22)</span>
+                        <div>
+                            <h2 id="track-title" class="track-title">Suivre ma commande</h2>
+                            <p class="track-sub">Saisissez votre ticket et votre téléphone.</p>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label for="hero-ticket">Numéro de ticket</label>
+                        <input id="hero-ticket" name="ticket" type="text" placeholder="PRESS-2026-00001" autocomplete="off" autocapitalize="characters" required />
+                    </div>
+                    <div class="field">
+                        <label for="hero-phone">Téléphone du dépôt</label>
+                        <input id="hero-phone" name="phone" type="tel" placeholder="+225 07 00 00 00 00" autocomplete="tel" required />
+                    </div>
+                    <button class="btn btn-ink btn-block" type="submit">Voir l'avancement @Icons.Svg("arrow-right", size: 18)</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="trust" aria-label="Nos engagements">
+    <div class="container">
+        <ul class="trust-list">
+            <li>@Icons.Svg("eye", size: 22)<span><strong>Suivi en direct</strong>Chaque étape, à tout moment</span></li>
+            <li>@Icons.Svg("receipt", size: 22)<span><strong>Reçu numérique</strong>PDF dans votre espace</span></li>
+            <li>@Icons.Svg("star", size: 22)<span><strong>Points fidélité</strong>Récompensés à chaque dépôt</span></li>
+            <li>@Icons.Svg("shield", size: 22)<span><strong>Contrôle qualité</strong>Chaque pièce vérifiée avant retrait</span></li>
+        </ul>
+    </div>
+</section>
+
+<section class="section" id="services" aria-labelledby="services-title">
+    <div class="container">
+        <header class="section-head" data-reveal>
+            <p class="eyebrow">Nos savoir-faire</p>
+            <h2 id="services-title" class="display-2">Des soins pensés pour chaque étoffe</h2>
+            <p class="section-lede">Du coton du quotidien à la soie la plus fine, nous choisissons le traitement qui préserve les fibres, les couleurs et la tenue de vos vêtements.</p>
+        </header>
+
+        <div class="row g-4">
+            @foreach (var s in services)
+            {
+                var from = Ui.MinPrice(cats, s.Type);
+                <div class="col-md-6 col-lg-4" data-reveal>
+                    <article class="service-card">
+                        <span class="service-icon">@Icons.Svg(s.Icon, size: 26)</span>
+                        <h3>@s.Title</h3>
+                        <p>@s.Text</p>
+                        @if (from is not null)
+                        {
+                            <p class="service-price">à partir de <strong>@Fmt.Money(from.Value)</strong></p>
+                        }
+                    </article>
+                </div>
+            }
+            <div class="col-md-6 col-lg-4" data-reveal>
+                <article class="service-card service-card-accent">
+                    <span class="service-icon">@Icons.Svg("bolt", size: 26)</span>
+                    <h3>Service express</h3>
+                    <p>Une échéance serrée ? Votre commande est traitée en priorité et vous est rendue dans les meilleurs délais.</p>
+                    @if (expressMin > 0)
+                    {
+                        <p class="service-price">supplément dès <strong>@Fmt.Money(expressMin)</strong> par article</p>
+                    }
+                </article>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section section-alt" aria-labelledby="steps-title">
+    <div class="container">
+        <header class="section-head" data-reveal>
+            <p class="eyebrow">Comment ça marche</p>
+            <h2 id="steps-title" class="display-2">Quatre étapes, aucune inquiétude</h2>
+        </header>
+        <ol class="steps">
+            <li data-reveal>
+                <span class="step-num">01</span>
+                <span class="step-icon">@Icons.Svg("package", size: 24)</span>
+                <h3>Dépôt</h3>
+                <p>Vous déposez vos vêtements en boutique. Un ticket numéroté et un reçu vous sont remis.</p>
+            </li>
+            <li data-reveal>
+                <span class="step-num">02</span>
+                <span class="step-icon">@Icons.Svg("droplet", size: 24)</span>
+                <h3>Traitement</h3>
+                <p>Lavage, nettoyage à sec, détachage et repassage sont réalisés selon la nature de chaque pièce.</p>
+            </li>
+            <li data-reveal>
+                <span class="step-num">03</span>
+                <span class="step-icon">@Icons.Svg("check", size: 24)</span>
+                <h3>Prêt</h3>
+                <p>Contrôle qualité terminé : vous êtes prévenu et pouvez suivre l'état de chaque article en ligne.</p>
+            </li>
+            <li data-reveal>
+                <span class="step-num">04</span>
+                <span class="step-icon">@Icons.Svg("hanger", size: 24)</span>
+                <h3>Retrait</h3>
+                <p>Vous récupérez vos vêtements, en une ou plusieurs fois, et réglez le solde éventuel.</p>
+            </li>
+        </ol>
+    </div>
+</section>
+
+@if (cats.Count > 0)
+{
+    <section class="section" aria-labelledby="tarifs-title">
+        <div class="container">
+            <header class="section-head section-head-split" data-reveal>
+                <div>
+                    <p class="eyebrow">Tarifs</p>
+                    <h2 id="tarifs-title" class="display-2">Des prix clairs, sans surprise</h2>
+                </div>
+                <a class="link-arrow" href="/tarifs">Voir la grille complète @Icons.Svg("arrow-right", size: 18)</a>
+            </header>
+
+            <div class="price-grid">
+                @foreach (var c in cats.Take(6))
+                {
+                    var best = c.Prices.Where(p => p.IsActive && p.Price > 0).OrderBy(p => p.Price).FirstOrDefault();
+                    <div class="price-row" data-reveal>
+                        <span class="price-name">@c.Name</span>
+                        <span class="price-dots" aria-hidden="true"></span>
+                        @if (best is not null)
+                        {
+                            <span class="price-value"><small>@best.ServiceLabel</small> @Fmt.Money(best.Price)</span>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </section>
+}
+
+@if (promos.Count > 0)
+{
+    <section class="section section-tight" aria-labelledby="promo-title">
+        <div class="container">
+            <header class="section-head" data-reveal>
+                <p class="eyebrow">Offres du moment</p>
+                <h2 id="promo-title" class="display-2">Promotions en cours</h2>
+            </header>
+            <div class="row g-4">
+                @foreach (var p in promos)
+                {
+                    <div class="col-md-6 col-lg-4" data-reveal>
+                        <article class="promo-card">
+                            <span class="promo-icon">@Icons.Svg("gift", size: 22)</span>
+                            <div class="promo-value">@(p.Type == PromotionType.Percentage ? $"−{p.Value:0.##} %" : "−" + Fmt.Money(p.Value))</div>
+                            <p class="promo-desc">@p.Description</p>
+                            <div class="promo-meta">
+                                <span class="promo-code">@p.Code</span>
+                                <span>jusqu'au @Fmt.Date(p.ValidTo)</span>
+                            </div>
+                        </article>
+                    </div>
+                }
+            </div>
+            <p class="fineprint">Communiquez le code en boutique lors du dépôt pour en bénéficier.</p>
+        </div>
+    </section>
+}
+
+<section class="section section-alt" aria-labelledby="info-title">
+    <div class="container">
+        <header class="section-head" data-reveal>
+            <p class="eyebrow">Nous trouver</p>
+            <h2 id="info-title" class="display-2">La boutique vous accueille</h2>
+        </header>
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-3" data-reveal>
+                <div class="info-card">
+                    <span class="info-icon">@Icons.Svg("map-pin", size: 22)</span>
+                    <h3>Adresse</h3>
+                    <p>@(string.IsNullOrWhiteSpace(shop.Address) ? "Adresse communiquée en boutique" : shop.Address)@(string.IsNullOrWhiteSpace(shop.City) ? "" : ", " + shop.City)</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3" data-reveal>
+                <div class="info-card">
+                    <span class="info-icon">@Icons.Svg("clock", size: 22)</span>
+                    <h3>Horaires</h3>
+                    @if (hours.Count == 0)
+                    {
+                        <p>Horaires communiqués en boutique</p>
+                    }
+                    else
+                    {
+                        <p>@foreach (var l in hours) { <span class="d-block">@l</span> }</p>
+                    }
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3" data-reveal>
+                <div class="info-card">
+                    <span class="info-icon">@Icons.Svg("phone", size: 22)</span>
+                    <h3>Téléphone</h3>
+                    @if (!string.IsNullOrWhiteSpace(shop.Phone))
+                    {
+                        <p><a href="@Ui.PhoneHref(shop.Phone)">@shop.Phone</a></p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(shop.Email))
+                    {
+                        <p><a href="mailto:@shop.Email">@shop.Email</a></p>
+                    }
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3" data-reveal>
+                <div class="info-card">
+                    <span class="info-icon">@Icons.Svg("message", size: 22)</span>
+                    <h3>WhatsApp</h3>
+                    @if (!string.IsNullOrWhiteSpace(shop.WhatsApp))
+                    {
+                        <p><a href="@Ui.WhatsAppHref(shop.WhatsApp)" rel="noopener" target="_blank">@shop.WhatsApp</a></p>
+                    }
+                    else
+                    {
+                        <p>Écrivez-nous depuis la page contact.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-band" aria-labelledby="cta-title">
+    <div class="container cta-inner" data-reveal>
+        <div>
+            <p class="eyebrow eyebrow-light">Espace client</p>
+            <h2 id="cta-title" class="display-2 text-ivory">Toutes vos commandes, en un seul endroit</h2>
+            <p class="cta-lede">Consultez l'avancement, téléchargez vos reçus, suivez vos points fidélité et mettez à jour vos coordonnées.</p>
+        </div>
+        <div class="cta-actions">
+            <a class="btn btn-brass" href="/compte/connexion">Me connecter @Icons.Svg("arrow-right", size: 18)</a>
+            <a class="btn btn-ghost-light" href="/contact">Activer mon accès</a>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,107 @@
+@model ContactViewModel
+@{
+    ViewData["Title"] = "Contact";
+    ViewData["Nav"] = "contact";
+    ViewData["Description"] = "Une question, une demande de devis, un accès à votre espace client ? Écrivez-nous ou passez à la boutique.";
+    var shop = Model.Shop;
+    var hours = Ui.HoursLines(shop.OpeningHours);
+}
+
+<section class="page-head">
+    <div class="container">
+        <p class="eyebrow">Contact</p>
+        <h1 class="display-1">Parlons de vos vêtements</h1>
+        <p class="page-lede">Une question, un devis, une pièce délicate à confier ? Nous vous répondons rapidement.</p>
+    </div>
+</section>
+
+<section class="section section-tight-top">
+    <div class="container">
+        <div class="row g-5">
+            <div class="col-lg-5 order-lg-2">
+                <div class="panel contact-card">
+                    <h2 class="panel-title">Coordonnées</h2>
+                    <ul class="contact-list">
+                        @if (!string.IsNullOrWhiteSpace(shop.Address))
+                        {
+                            <li>@Icons.Svg("map-pin", size: 22)<div><strong>Adresse</strong><span>@shop.Address@(string.IsNullOrWhiteSpace(shop.City) ? "" : ", " + shop.City)</span></div></li>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(shop.Phone))
+                        {
+                            <li>@Icons.Svg("phone", size: 22)<div><strong>Téléphone</strong><a href="@Ui.PhoneHref(shop.Phone)">@shop.Phone</a></div></li>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(shop.WhatsApp))
+                        {
+                            <li>@Icons.Svg("message", size: 22)<div><strong>WhatsApp</strong><a href="@Ui.WhatsAppHref(shop.WhatsApp)" target="_blank" rel="noopener">@shop.WhatsApp</a></div></li>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(shop.Email))
+                        {
+                            <li>@Icons.Svg("mail", size: 22)<div><strong>E-mail</strong><a href="mailto:@shop.Email">@shop.Email</a></div></li>
+                        }
+                        @if (hours.Count > 0)
+                        {
+                            <li>@Icons.Svg("clock", size: 22)<div><strong>Horaires</strong>@foreach (var l in hours) { <span>@l</span> }</div></li>
+                        }
+                    </ul>
+                </div>
+            </div>
+
+            <div class="col-lg-7 order-lg-1">
+                <form class="panel" method="post" action="/contact" novalidate>
+                    @Html.AntiForgeryToken()
+                    <h2 class="panel-title">Envoyer un message</h2>
+
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="flash flash-error" role="alert" tabindex="-1" data-focus-on-load>
+                            @Icons.Svg("alert", size: 20)
+                            <div>
+                                <p>Merci de corriger les éléments suivants :</p>
+                                <ul class="error-list">
+                                    @foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).Distinct())
+                                    {
+                                        <li>@e</li>
+                                    }
+                                </ul>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="field">
+                                <label for="Name">Nom complet</label>
+                                <input id="Name" name="Name" type="text" value="@Model.Form.Name" autocomplete="name" required maxlength="120" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="field">
+                                <label for="Phone">Téléphone <span class="optional">(facultatif)</span></label>
+                                <input id="Phone" name="Phone" type="tel" value="@Model.Form.Phone" autocomplete="tel" maxlength="30" />
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="field">
+                                <label for="Email">Adresse e-mail</label>
+                                <input id="Email" name="Email" type="email" value="@Model.Form.Email" autocomplete="email" required maxlength="160" />
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="field">
+                                <label for="Message">Votre message</label>
+                                <textarea id="Message" name="Message" rows="6" required minlength="10" maxlength="2000">@Model.Form.Message</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="hp" aria-hidden="true">
+                        <label for="Website">Ne pas remplir</label>
+                        <input id="Website" name="Website" type="text" tabindex="-1" autocomplete="off" />
+                    </div>
+
+                    <button class="btn btn-ink" type="submit">Envoyer le message @Icons.Svg("arrow-right", size: 18)</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>

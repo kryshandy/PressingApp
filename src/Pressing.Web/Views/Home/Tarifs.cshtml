@@ -1,0 +1,84 @@
+@model TarifsViewModel
+@{
+    ViewData["Title"] = "Tarifs";
+    ViewData["Nav"] = "tarifs";
+    ViewData["Description"] = "La grille complète des tarifs : lavage, repassage, nettoyage à sec et détachage, avec suppléments express et délais.";
+    var cats = Model.Info.Categories.Where(c => c.IsActive && c.Prices.Any(p => p.IsActive))
+        .OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToList();
+    var services = Enum.GetValues<ServiceType>();
+    string Delay(int d) => d <= 0 ? "Sur place" : d == 1 ? "24 h" : $"{d} jours";
+}
+
+<section class="page-head">
+    <div class="container">
+        <p class="eyebrow">Tarifs</p>
+        <h1 class="display-1">Une grille simple, des prix annoncés d'avance</h1>
+        <p class="page-lede">Chaque tarif s'entend par article. Le supplément express vous garantit un traitement prioritaire ; le délai indiqué est le délai standard.</p>
+    </div>
+</section>
+
+<section class="section section-tight-top">
+    <div class="container">
+        <div class="filter-bar" data-tarif-filter>
+            <label class="search-field" for="tarif-search">
+                @Icons.Svg("search", size: 20)
+                <span class="visually-hidden">Rechercher un vêtement</span>
+                <input id="tarif-search" type="search" placeholder="Rechercher un vêtement (chemise, robe, costume…)" autocomplete="off" data-search />
+            </label>
+            <div class="chips" role="group" aria-label="Filtrer par service">
+                <button type="button" class="chip is-active" data-chip="all" aria-pressed="true">Tous les services</button>
+                @foreach (var s in services)
+                {
+                    <button type="button" class="chip" data-chip="@s" aria-pressed="false">@s.Label()</button>
+                }
+            </div>
+        </div>
+
+        @if (cats.Count == 0)
+        {
+            <div class="empty-state">
+                @Icons.Svg("tag", size: 32)
+                <h2>La grille tarifaire arrive bientôt</h2>
+                <p>Contactez la boutique pour obtenir un devis.</p>
+                <a class="btn btn-ink" href="/contact">Nous contacter</a>
+            </div>
+        }
+        else
+        {
+            <div class="row g-4" data-tarif-list aria-live="polite">
+                @foreach (var c in cats)
+                {
+                    <div class="col-md-6 col-xl-4" data-tarif-card data-name="@c.Name.ToLowerInvariant()">
+                        <article class="tarif-card">
+                            <h2 class="tarif-title">@c.Name</h2>
+                            <ul class="tarif-lines">
+                                @foreach (var p in c.Prices.Where(p => p.IsActive).OrderBy(p => p.ServiceType))
+                                {
+                                    <li class="tarif-line" data-service="@p.ServiceType">
+                                        <span class="tarif-ico">@Icons.Svg(Icons.ForService(p.ServiceType), size: 20)</span>
+                                        <span class="tarif-label">
+                                            @p.ServiceType.Label()
+                                            <small>@Delay(p.EstimatedDays)@(p.ExpressSupplement > 0 ? " · express +" + Fmt.Money(p.ExpressSupplement) : "")</small>
+                                        </span>
+                                        <span class="tarif-price">@Fmt.Money(p.Price)</span>
+                                    </li>
+                                }
+                            </ul>
+                        </article>
+                    </div>
+                }
+            </div>
+            <div class="empty-state" data-tarif-empty hidden>
+                @Icons.Svg("search", size: 32)
+                <h2>Aucun résultat</h2>
+                <p>Essayez un autre mot, ou contactez-nous : nous traitons aussi les pièces sur mesure.</p>
+            </div>
+        }
+
+        <aside class="note-card">
+            @Icons.Svg("info", size: 22)
+            <p>Les tarifs peuvent varier pour les pièces très volumineuses ou nécessitant un soin particulier ; la boutique vous le confirme avant tout traitement.
+               Vous bénéficiez de points de fidélité à chaque commande et d'éventuelles promotions sur présentation de leur code.</p>
+        </aside>
+    </div>
+</section>
