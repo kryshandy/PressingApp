@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Pressing.Web</RootNamespace>
+    <SuppressImplicitRequiredAttributeForNonNullableReferenceTypes>true</SuppressImplicitRequiredAttributeForNonNullableReferenceTypes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pressing.Client\Pressing.Client.csproj" />
+  </ItemGroup>
+
+</Project>
