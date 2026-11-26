@@ -1,134 +1,171 @@
-# Application de gestion de pressing
+# Pressing Éclat — logiciel de gestion de pressing (v1)
 
-Système complet de gestion de pressing composé de **quatre projets** qui partagent **une seule base de données SQLite** :
+Solution complète pour un pressing : **une application Desktop pour le personnel**, **un site web pour les clients**
+et **une API** qui centralise les données. Tout fonctionne en local sur un poste Windows, sans serveur de base de données à installer.
 
-| Projet | Rôle | Adresse |
+| Application | Pour qui | Adresse |
 | --- | --- | --- |
-| `Pressing.Shared` | Entités Entity Framework Core, DTO, règles métier (tarifs, tickets, paiements, soldes, statuts, retraits) | bibliothèque |
-| `Pressing.API` | API ASP.NET Core utilisée par l'application desktop | `http://localhost:5180` |
-| `Pressing.Desktop` | Application Windows Forms réservée au personnel | lancée en local |
-| `Pressing.Web` | Site client ASP.NET Core MVC (Bootstrap, responsive) | `http://localhost:5181` |
+| **Pressing Desktop** (Windows Forms, thème sombre) | caissiers, managers, administrateur | application Windows |
+| **Site client** (ASP.NET Core MVC) | clients du pressing | http://localhost:5181 |
+| **API REST** (ASP.NET Core, JWT) | utilisée par le Desktop et le site | http://localhost:5180 |
 
-Les modifications effectuées depuis le desktop (dépôt, tarif, statut, paiement, retrait) sont immédiatement visibles sur le site client, car les deux applications utilisent la même base et lisent les données à chaque requête.
+Les trois partagent **la même base SQLite** à travers l'API : un dépôt enregistré au comptoir est immédiatement visible par le client sur le site.
 
-## 1. Prérequis
+---
 
-- Windows 10/11
-- **.NET 10 SDK** (le runtime Windows Desktop est nécessaire pour les Windows Forms)
-- PowerShell (toutes les commandes du projet utilisent PowerShell)
-- Aucun serveur de base de données à installer : SQLite est embarqué
+## 1. Fonctionnalités de la v1
 
-## 2. Installation et compilation
+### Au comptoir (Desktop)
+- **Connexion du personnel** avec 3 rôles : *Administrateur*, *Manager*, *Caissier* — le menu s'adapte au rôle.
+- **Tableau de bord** : chiffre d'affaires du jour et du mois, commandes actives, prêtes, en retard, total des impayés, graphique des 7 derniers jours, répartition par statut, commandes récentes et prêtes à retirer, notifications.
+- **Clients** : fiche complète (nom, prénom, téléphone, WhatsApp, e-mail, adresse, notes), recherche, historique des commandes et paiements, solde dû, points de fidélité, activation de l'**accès web** (mot de passe, e-mail de bienvenue).
+- **Nouveau dépôt** : choix ou création rapide du client, plusieurs articles (catégorie × service : lavage, lavage + repassage, repassage, nettoyage à sec, détachage), quantités, prix repris de la grille tarifaire, **express** par article ou global, date de retrait prévue, retrait en boutique ou livraison, remise, code promo, points fidélité, **acompte** ; récapitulatif calculé en direct ; **ticket unique** `PRESS-AAAA-00000`.
+- **Suivi des articles** : statut individuel *Déposé → En traitement → Prêt → Retiré* (couleurs bleu, orange, vert, gris) ; le statut de la commande se déduit de ses articles.
+- **Paiements** en plusieurs fois (espèces, Mobile Money, carte, virement), solde calculé automatiquement.
+- **Retraits** totaux ou **partiels** (choix des articles et quantités), avec encaissement du reste ; retrait refusé tant que le solde n'est pas réglé (paramétrable).
+- **Reçu PDF** (A5, QR code) à imprimer ou envoyer par e-mail.
+- **Caisse** : encaissements de la période par mode de paiement. **Impayés** : liste et total des soldes.
+- **Tarifs** : grille catégorie × service, supplément express, délai.
+- **Annulation et remboursement** (Manager/Admin), avec remboursement par mode de paiement d'origine.
+- **Administration** : promotions, rapports par période avec export CSV, gestion du personnel, paramètres de la boutique, configuration des e-mails, **sauvegarde vérifiée de la base**, journal d'audit.
 
-Ouvrir PowerShell dans le dossier racine du projet (`application de base`) :
+### Pour les clients (site web)
+- Accueil, **tarifs**, **suivi d'une commande** par ticket + téléphone (frise des étapes), contact.
+- **Espace client** : tableau de bord (commandes en cours, articles prêts, solde, points), liste et détail des commandes, **téléchargement du reçu PDF**, profil, changement et réinitialisation du mot de passe, historique de fidélité.
+- Site responsive (mobile → grand écran), accessible, sécurisé (cookie HttpOnly, anti-falsification, CSP).
+
+### Sécurité et fiabilité
+- Mots de passe hachés (PBKDF2), jetons JWT revérifiés à chaque requête (compte désactivé ou rôle changé = accès coupé).
+- Un client ne voit **que ses propres** commandes et reçus.
+- Limitation des tentatives de connexion par adresse IP.
+- Journal d'audit de toutes les opérations sensibles.
+- **133 tests automatisés** (calculs, paiements, retraits, droits, portail, suivi).
+
+---
+
+## 2. Prérequis
+
+- Windows 10 ou 11
+- [.NET SDK 10](https://dotnet.microsoft.com/download) ou plus récent (le runtime *Windows Desktop* est inclus dans le SDK)
+- PowerShell (fourni avec Windows)
+
+Aucun serveur de base de données : SQLite est embarqué.
+
+## 3. Installation et lancement
 
 ```powershell
-.\scripts\build.ps1
+git clone https://github.com/kryshandy/PressingApp.git
+cd PressingApp
+copy .env.example .env          # configuration locale (facultatif : les valeurs par défaut fonctionnent)
+.\scripts\build.ps1 -Tests      # restaure, compile et lance les tests
+.\scripts\start.ps1             # démarre l'API, le site et le Desktop
 ```
 
-Ce script restaure les paquets NuGet et compile les quatre projets.
+- Sans le Desktop : `.\scripts\start.ps1 -SansDesktop`
+- Arrêt : `.\scripts\stop.ps1`
+- Journaux : dossier `logs\`
 
-## 3. Lancement
-
-```powershell
-.\scripts\start.ps1
-```
-
-Le script démarre l'API, le site web et l'application desktop, puis affiche les adresses.  
-Pour démarrer sans ouvrir le desktop :
+Lancement manuel, projet par projet :
 
 ```powershell
-.\scripts\start.ps1 -SansDesktop
-```
-
-Arrêt de toutes les applications :
-
-```powershell
-.\scripts\stop.ps1
-```
-
-### Lancement manuel (facultatif)
-
-```powershell
-dotnet run --project src/Pressing.API
-dotnet run --project src/Pressing.Web
+dotnet run --project src/Pressing.Api        # http://localhost:5180
+dotnet run --project src/Pressing.Web        # http://localhost:5181
 dotnet run --project src/Pressing.Desktop
 ```
 
-L'API et Desktop doivent hériter de la même variable d'environnement `PRESSING_STAFF_API_KEY`. `scripts/start.ps1` génère une clé temporaire si elle n'est pas déjà définie et la transmet aux processus qu'il lance. Pour lancer les exécutables séparément, définissez une clé aléatoire dans l'environnement des deux processus. Ne stockez pas cette clé dans les fichiers du dépôt.
+> Si Windows affiche une alerte du pare-feu au premier lancement de l'API, autorisez l'accès au réseau privé
+> uniquement si d'autres postes du pressing doivent s'y connecter.
 
-## 4. Base de données
+## 4. Comptes de démonstration
 
-- Fichier : `%LOCALAPPDATA%\Pressing\pressing.db`  
-  (par exemple `C:\Users\<votre nom>\AppData\Local\Pressing\pressing.db`)
-- Création automatique au premier lancement, avec les 16 catégories d'articles et leurs tarifs de départ.
-- Le mode WAL de SQLite est activé : l'API, le site et le desktop peuvent travailler en parallèle.
-- Les données (clients, commandes, tickets, paiements, retraits, statuts, historiques) restent disponibles après fermeture et redémarrage.
-- Les anciennes commandes et les historiques ne sont jamais supprimés.
-- Le bouton **Sauvegarder les données** du Desktop crée une copie SQLite via l'API, puis vérifie son intégrité. Les sauvegardes se trouvent dans `%LOCALAPPDATA%\Pressing\Backups` lorsque la base par défaut est utilisée.
-- L'API permet de créer une copie de récupération vérifiée dans `Recovery` à partir d'une sauvegarde. Elle ne remplace jamais la base active.
-- Le schéma est actuellement créé avec `EnsureCreated` et aucun historique de migrations EF Core n'existe. Aucune migration n'est appliquée automatiquement. Avant toute évolution du schéma, il faut définir une migration non destructive, la tester sur une copie restaurée et vérifier une sauvegarde ; le remplacement de la base active reste une opération manuelle distincte.
+Créés automatiquement au premier démarrage (à changer en production) :
 
-Ne supprimez, ne réinitialisez et ne remplacez jamais `pressing.db`, `pressing.db-wal` ou `pressing.db-shm` pour résoudre un problème. Créez une sauvegarde vérifiée et demandez une analyse avant toute intervention sur les données.
+| Rôle | Identifiant | Mot de passe |
+| --- | --- | --- |
+| Administrateur | `admin` | `Admin@2026!` (variable `PRESSING_ADMIN_PASSWORD`) |
+| Manager | `manager` | `Manager@2026!` |
+| Caissier | `caisse` | `Caisse@2026!` |
+| Clients démo (site web) | leur téléphone ou e-mail (voir l'écran Clients) | `Client@2026!` |
 
-## 5. Comptes clients du site web
+Les données de démonstration (clients, commandes, paiements) se désactivent avec `PRESSING_SEED_DEMO=false`.
 
-Lors de la création d'un client dans le desktop :
+## 5. Parcours type au comptoir
 
-- les champs **Nom**, **Prénom**, **Téléphone** et **WhatsApp** sont obligatoires ;
-- le champ **Mot de passe** est facultatif :
-  - s'il est renseigné, le compte Web est activé (l'identifiant saisi est utilisé, ou le téléphone s'il est laissé vide) ;
-  - s'il est laissé vide, la fiche client est créée sans accès Web. Le compte peut être activé plus tard depuis la fiche client.
+1. **Nouveau dépôt** (F2) → rechercher le client ou « Nouveau client ».
+2. Ajouter les articles (catégorie, service, quantité, express), saisir l'acompte → **Valider le dépôt**.
+3. Le ticket s'affiche en grand → **Reçu PDF** / **Envoyer par e-mail**.
+4. En atelier : dans **Commandes**, ouvrir la commande et passer les articles *En traitement* puis *Prêt*
+   (le client reçoit l'e-mail « commande prête » si les e-mails sont configurés).
+5. Au retour du client : **Retraits** → saisir/scanner le ticket → cocher les articles → encaisser le reste → valider.
+6. En fin de journée : **Caisse** pour le total par mode de paiement, **Impayés** pour les relances.
 
-Ces informations sont affichées sur la fiche client du desktop pour être communiquées au client.  
-Un client connecté ne peut consulter que ses propres commandes, soldes, statuts et reçus.
+## 6. Configuration (`.env`)
 
-## 6. Fonctionnalités couvertes
+Toutes les variables sont documentées dans [`.env.example`](.env.example). Les principales :
 
-### Desktop (personnel)
-- Tableau de bord : grille tarifaire, caisse du jour et totale, commandes en cours, vêtements prêts, impayés, recherche rapide et accès rapides.
-- Fiches clients : ajout, modification, consultation, recherche (nom, prénom, téléphone, WhatsApp, ticket), historique, solde, paiements et retraits.
-- Dépôts : ticket unique `PRESS-AAAA-00000`, plusieurs articles, quantités, catégories, prix repris de la grille tarifaire, acompte, dates par article.
-- Lavage express : supplément configurable par catégorie, délai réduit, signalétique visible.
-- Statuts indépendants par article : Déposé (bleu), En traitement (orange), Prêt (vert), Retiré (gris), avec historique des changements.
-- Retraits totaux ou partiels : articles choisis, montant versé, date/heure, mise à jour des statuts.
-- Paiements en plusieurs fois, soldes calculés automatiquement, liste des impayés.
-- Caisse calculée uniquement à partir des paiements réellement enregistrés (acompte, paiement direct, paiement lors du retrait).
+| Variable | Rôle | Défaut |
+| --- | --- | --- |
+| `PRESSING_DB_PATH` | fichier de la base SQLite | `%LOCALAPPDATA%\Pressing\pressing.db` |
+| `PRESSING_BACKUP_PATH` | dossier des sauvegardes | `Backups` à côté de la base |
+| `PRESSING_PUBLIC_API_URL` | adresse de l'API utilisée par le Desktop et le site | `http://localhost:5180` |
+| `PRESSING_WEB_URL` | adresse du site (liens dans les e-mails) | `http://localhost:5181` |
+| `PRESSING_ADMIN_USERNAME` / `PRESSING_ADMIN_PASSWORD` | compte administrateur initial | `admin` / `Admin@2026!` |
+| `PRESSING_SEED_DEMO` | données de démonstration | `true` |
+| `EMAIL_PROVIDER` | `auto`, `resend`, `smtp` ou `simulated` | `auto` (simulé si rien n'est configuré) |
+| `RESEND_API_KEY` ou `SMTP_*` | envoi réel des e-mails | vide |
+| `PRESSING_TRUSTED_PROXIES` | IP des proxys de confiance (reverse proxy) | vide |
 
-### Site client
-- Connexion/déconnexion sécurisée (cookie d'authentification, jetons anti-forgerie).
-- Historique complet des commandes, montants à payer, suivi des vêtements (dont « prêt à récupérer »).
-- Génération et téléchargement d'un reçu PDF par commande (anciennes commandes comprises).
+Le fichier `.env` n'est **jamais** versionné.
 
-Aucun module hors cahier des charges (stock, dépenses, fidélité, réclamation, livraison) n'a été ajouté.
+**Installation sur plusieurs postes** : l'API tourne sur un poste « serveur » du pressing ; sur les autres postes,
+réglez `PRESSING_PUBLIC_API_URL=http://<ip-du-serveur>:5180` dans le `.env` du Desktop. Ne partagez jamais le fichier
+`.db` par le réseau : tous les postes passent par l'API.
 
-## 7. Tests
+## 7. Données et sauvegardes
 
-Pour enchaîner automatiquement compilation, scénario fonctionnel, redémarrage, vérification de persistance et arrêt :
+- Base : `%LOCALAPPDATA%\Pressing\pressing.db` (créée automatiquement, mode WAL, catalogue de 20 catégories et tarifs de départ).
+- **Paramètres → Sauvegardes → Sauvegarder maintenant** crée une copie vérifiée dans `Backups`.
+- Ne supprimez jamais `pressing.db`, `pressing.db-wal` ou `pressing.db-shm` : faites d'abord une sauvegarde.
+- Le schéma est créé avec `EnsureCreated` ; le passage aux migrations EF Core est le premier chantier de la v2 (voir CONTRIBUTING).
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
+## 8. Architecture
+
+```
+src/Pressing.Core      Entités EF Core, DTO, services métier, reçus PDF (QuestPDF), e-mails
+src/Pressing.Api       API REST minimal API + JWT ; seul projet qui accède à la base
+src/Pressing.Client    Client HTTP typé de l'API (partagé par le Desktop et le site)
+src/Pressing.Desktop   Application Windows Forms du personnel
+src/Pressing.Web       Site public + espace client
+tests/Pressing.Tests   Tests unitaires et d'intégration (xUnit, WebApplicationFactory)
+docs/API.md            Contrat de toutes les routes de l'API
+scripts/               build.ps1, start.ps1, stop.ps1
 ```
 
-Le script crée une base temporaire et des dossiers de journaux/résultats isolés sous `%TEMP%`. Les scénarios vérifient notamment les retraits successifs, la quantité restante, les paiements invalides, l'authentification API, l'atomicité client-compte, les vues Web, le reçu PDF, la sauvegarde vérifiée et une copie de restauration non destructive. `smoke.ps1` et `persistence.ps1` refusent désormais de s'exécuter hors de ce contexte isolé.
+Documentation de l'API générée : http://localhost:5180/openapi/v1.json — exemples de requêtes dans `src/Pressing.Api/Pressing.Api.http`.
 
-Les journaux d'exécution sont dans le dossier `logs`.
+Guides internes :
+- [docs/API.md](docs/API.md) — contrat de l'API et règles métier
+- [src/Pressing.Desktop/DESIGN.md](src/Pressing.Desktop/DESIGN.md) — charte de mise en page du Desktop
+- [src/Pressing.Desktop/README-DESKTOP.md](src/Pressing.Desktop/README-DESKTOP.md) — ajouter un écran au Desktop
+- [CONTRIBUTING.md](CONTRIBUTING.md) — **organisation de l'équipe et fonctionnalités avancées de la v2**
 
-## 8. Dépannage
+## 9. Tests et vérifications
 
-- **« Le port est déjà utilisé »** : lancer `.\scripts\stop.ps1` avant de redémarrer.
-- **Page blanche ou erreur de connexion à l'API** : vérifier que `Pressing.API` est démarré sur le port 5180 et consulter `logs\api.err.log`.
-- **Mot de passe oublié** : le personnel peut définir un nouveau mot de passe depuis la fiche client du desktop.
-- **Erreur de compilation** : relancer `.\scripts\build.ps1` ; vérifier que le SDK .NET 10 est installé (`dotnet --list-sdks`).
-## Contributions : Prénom Nom (branche `prenom/desktop-theme-sombre`)
+```powershell
+.\scripts\build.ps1 -Tests
+```
 
-Refonte de l'interface de l'application **Pressing.Desktop** (Windows Forms).
+- Tests unitaires et d'intégration : base SQLite temporaire, jamais la base réelle.
+- Autotest de l'application Desktop (API démarrée) :
+  `src\Pressing.Desktop\bin\Debug\net10.0-windows\Pressing.Desktop.exe --selftest` — parcourt tous les écrans et un
+  dépôt complet (dépôt → statuts → paiement → retrait → reçu) et affiche `SELFTEST OK`.
 
-- **Correction des textes coupés** : mise à l'échelle DPI (`AutoScaleDimensions`) et cartes qui remplissent leur cellule.
-- **Thème sombre** : palette centralisée dans `Ui/Theme.cs`, barre de titre sombre.
-- **Menu latéral** : icônes Segoe MDL2, état survol/actif, nouveau logo.
-- **Tableau de bord** : cartes de statistiques redessinées, tableaux plus lisibles, statuts recolorés.
-- **Boutons** : coins arrondis, styles plein, contour et secondaire.
-- **Fenêtres secondaires** : dépôt, retrait, paiement, tarifs, historique, impayés et fiche client harmonisés.
+## 10. Suite du projet
 
-Fichiers principaux : `Ui/Theme.cs`, `Ui/UiFactory.cs`, `Ui/Grids.cs`, `Forms/FrmPrincipal.cs`.
+La v2 (notifications WhatsApp/SMS, paiement Mobile Money en ligne, collecte et livraison, étiquettes code-barres,
+clôture de caisse, migrations, CI, déploiement…) est répartie entre les 5 membres de l'équipe dans
+**[CONTRIBUTING.md](CONTRIBUTING.md)**.
+
+## Équipe
+
+Projet réalisé par l'équipe B2A Keyce — 5 membres. Le thème sombre du Desktop s'appuie sur le travail initial de Mael.
