@@ -50,6 +50,13 @@ public sealed class PressingApiClient : IDisposable
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(Token);
 
+    /// <summary>
+    /// Adresse IP du visiteur final, transmise à l'API en <c>X-Forwarded-For</c> à chaque requête lorsqu'elle est définie
+    /// (utile derrière le site web : la limitation de débit de l'API porte alors sur le visiteur et non sur le serveur web).
+    /// L'API ne tient compte de l'en-tête que si l'appelant est un proxy de confiance (boucle locale ou <c>PRESSING_TRUSTED_PROXIES</c>).
+    /// </summary>
+    public string? ForwardedFor { get; set; }
+
     /// <summary>Déclenché lorsqu'une requête authentifiée reçoit un 401.</summary>
     public event EventHandler? Unauthorized;
 
@@ -382,6 +389,8 @@ public sealed class PressingApiClient : IDisposable
         var token = Token;
         var authenticated = !anonymous && !string.IsNullOrEmpty(token);
         if (authenticated) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var forwardedFor = ForwardedFor;
+        if (!string.IsNullOrWhiteSpace(forwardedFor)) request.Headers.TryAddWithoutValidation("X-Forwarded-For", forwardedFor.Trim());
         if (body is not null) request.Content = JsonContent.Create(body, body.GetType(), options: ApiJson.Options);
 
         try

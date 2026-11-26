@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -19,6 +20,18 @@ using Pressing.Core.Services;
 EnvFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
+
+// PRESSING_API_URL (ex. http://0.0.0.0:5180) : adresse d'écoute. L'option --urls de la ligne de commande
+// et les variables ASPNETCORE_URLS / DOTNET_URLS restent prioritaires.
+string? configuredApiUrl = Environment.GetEnvironmentVariable("PRESSING_API_URL");
+bool urlsFromCommandLine = args.Any(a => a.StartsWith("--urls", StringComparison.OrdinalIgnoreCase));
+bool urlsFromEnvironment =
+    !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")) ||
+    !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOTNET_URLS"));
+if (!string.IsNullOrWhiteSpace(configuredApiUrl) && !urlsFromCommandLine && !urlsFromEnvironment)
+{
+    builder.WebHost.UseUrls(configuredApiUrl.Trim());
+}
 
 PressingDatabaseOptions databaseOptions = PressingDatabase.ResolveOptions(builder.Environment.ContentRootPath);
 string? configuredDatabase = builder.Configuration["Database:Path"];
@@ -95,6 +108,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = TokenRevalidation.ValidateAsync
+        };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -156,15 +173,28 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
+// IP réelle derrière le site web / un reverse proxy : boucle locale (par défaut) + PRESSING_TRUSTED_PROXIES
+// (adresses IP séparées par des virgules). Les autres sources ne peuvent pas imposer leur X-Forwarded-For.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    foreach (string raw in (Environment.GetEnvironmentVariable("PRESSING_TRUSTED_PROXIES") ?? string.Empty)
+                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+        if (IPAddress.TryParse(raw, out IPAddress? proxy))
+        {
+            options.KnownProxies.Add(proxy);
+        }
+    }
+});
+
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-});
+// Doit rester avant UseRateLimiter : la limitation de débit est partitionnée par l'IP déjà corrigée.
+app.UseForwardedHeaders();
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();

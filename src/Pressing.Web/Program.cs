@@ -1,6 +1,8 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using System.Net;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
 using Pressing.Client;
@@ -19,6 +21,17 @@ builder.Services.AddControllersWithViews(options =>
 {
     options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute());
     options.Filters.Add<ApiExceptionFilter>();
+});
+
+// IP réelle du visiteur derrière un reverse proxy : boucle locale (par défaut) + PRESSING_TRUSTED_PROXIES (IP séparées par des virgules).
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    foreach (var raw in (Environment.GetEnvironmentVariable("PRESSING_TRUSTED_PROXIES") ?? "")
+                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+        if (IPAddress.TryParse(raw, out var proxy)) o.KnownProxies.Add(proxy);
+    }
 });
 
 builder.Services.AddMemoryCache();
@@ -81,6 +94,8 @@ builder.Services.AddAuthorization();
 builder.Services.Configure<RouteOptions>(o => o.LowercaseUrls = true);
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 var fr = new CultureInfo("fr-FR");
 app.UseRequestLocalization(new RequestLocalizationOptions

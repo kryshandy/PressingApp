@@ -12,6 +12,8 @@ public sealed class PortalApi
     {
         Api = api;
         Api.Token = accessor.HttpContext?.User.Token();
+        // IP du visiteur : l'API s'en sert pour sa limitation de débit (sinon tous les visiteurs partageraient celle du site).
+        Api.ForwardedFor = accessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
     }
 
     public PressingApiClient Api { get; }
