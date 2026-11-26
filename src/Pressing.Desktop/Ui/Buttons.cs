@@ -24,6 +24,8 @@ public class FlatButton : Button
     private bool _hover;
     private bool _down;
     private bool _busy;
+    private string _lastAccessibleName = string.Empty;
+    private string _lastAccessibleDescription = string.Empty;
 
     public FlatButton()
     {
@@ -38,12 +40,14 @@ public class FlatButton : Button
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         Margin = new Padding(0, 0, Theme.S(8), 0);
         UseVisualStyleBackColor = false;
+        AccessibleRole = AccessibleRole.PushButton;
+        UpdateAccessibleDescription();
     }
 
     public ButtonKind Kind
     {
         get => _kind;
-        set { _kind = value; Invalidate(); }
+        set { _kind = value; UpdateAccessibleDescription(); Invalidate(); }
     }
 
     /// <summary>Glyphe de la police d'icônes (voir <see cref="Icons"/>).</summary>
@@ -51,6 +55,34 @@ public class FlatButton : Button
     {
         get => _icon;
         set { _icon = value ?? string.Empty; Invalidate(); }
+    }
+
+    /// <summary>Le libellé visible sert de nom accessible, sauf nom explicite défini par l'appelant.</summary>
+    protected override void OnTextChanged(EventArgs e)
+    {
+        base.OnTextChanged(e);
+        if (string.IsNullOrWhiteSpace(AccessibleName) || AccessibleName == _lastAccessibleName)
+        {
+            AccessibleName = Text;
+            _lastAccessibleName = Text;
+        }
+    }
+
+    private void UpdateAccessibleDescription()
+    {
+        string description = _kind switch
+        {
+            ButtonKind.Primary => "Action principale",
+            ButtonKind.Danger => "Action destructive",
+            ButtonKind.Ghost => "Action sans cadre",
+            ButtonKind.Info => "Action de navigation",
+            _ => "Action secondaire"
+        };
+        if (string.IsNullOrWhiteSpace(AccessibleDescription) || AccessibleDescription == _lastAccessibleDescription)
+        {
+            AccessibleDescription = description;
+            _lastAccessibleDescription = description;
+        }
     }
 
     public int Radius { get; set; } = 10;
@@ -65,7 +97,7 @@ public class FlatButton : Button
     /// <summary>Déclenche le clic même si le bouton est masqué (menu « Plus d'actions »).</summary>
     public void RaiseClick()
     {
-        if (Enabled)
+        if (Enabled && !_busy)
         {
             OnClick(EventArgs.Empty);
         }
@@ -212,7 +244,28 @@ public sealed class NavButton : Control
         Font = Theme.F(10f);
         Height = Theme.S(38);
         Margin = new Padding(0, Theme.S(1), 0, Theme.S(1));
+        AccessibleRole = AccessibleRole.MenuItem;
     }
+
+    protected override void OnTextChanged(EventArgs e)
+    {
+        base.OnTextChanged(e);
+        if (string.IsNullOrWhiteSpace(AccessibleName) || AccessibleName == _lastAccessibleName)
+        {
+            AccessibleName = Text;
+            _lastAccessibleName = Text;
+        }
+
+        string description = $"Ouvrir la section : {Text}";
+        if (string.IsNullOrWhiteSpace(AccessibleDescription) || AccessibleDescription == _lastAccessibleDescription)
+        {
+            AccessibleDescription = description;
+            _lastAccessibleDescription = description;
+        }
+    }
+
+    private string _lastAccessibleName = string.Empty;
+    private string _lastAccessibleDescription = string.Empty;
 
     public string Glyph { get; set; } = string.Empty;
 

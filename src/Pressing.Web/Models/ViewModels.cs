@@ -14,6 +14,9 @@ public record TarifsViewModel(PublicInfoDto Info);
 
 public class SuiviViewModel
 {
+    public const string RequiredMessage = "Veuillez indiquer un numéro de suivi et un numéro de téléphone.";
+    public const string PartialMessage = "Renseignez à la fois le numéro de ticket et le téléphone utilisé lors du dépôt.";
+
     public string Ticket { get; set; } = "";
     public string Phone { get; set; } = "";
     public bool Searched { get; set; }

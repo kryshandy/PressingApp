@@ -78,6 +78,9 @@ public sealed class ThemedGrid : DataGridView
         ShowCellToolTips = true;
         StandardTab = true;
         TabStop = true;
+        AccessibleRole = AccessibleRole.Table;
+        AccessibleName = "Tableau de données";
+        AccessibleDescription = "Tableau en lecture seule. Utilisez les flèches pour parcourir les lignes et les colonnes.";
     }
 
     /// <summary>Remplace la source de données en conservant la ligne sélectionnée quand c'est possible.</summary>
@@ -406,6 +409,8 @@ public sealed class ThemedGrid : DataGridView
             SortMode = DataGridViewColumnSortMode.NotSortable,
             ReadOnly = true
         };
+        // HeaderText est le nom annoncé par DataGridView pour l'en-tête : chaque cellule est ainsi reliée
+        // visuellement et pour les lecteurs d'écran à son libellé de colonne (aucun rendu modifié).
         if (right)
         {
             col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;

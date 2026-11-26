@@ -1,6 +1,6 @@
-# Contribuer à Pressing Éclat — fonctionnalités avancées (v2)
+# Contribuer à Pressing Éclat — fonctionnalités avancées
 
-La **v1** couvre tout le fonctionnement classique d'un pressing (voir [README.md](README.md)).
+La **version 2.0.0** couvre tout le fonctionnement classique d'un pressing (voir [README.md](README.md)).
 Ce guide explique **comment l'équipe de 5 développe la suite sans se marcher dessus** : organisation
 du code, règles Git, répartition des chantiers avancés et critères de qualité.
 

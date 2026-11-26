@@ -1,4 +1,4 @@
-# Pressing Éclat — logiciel de gestion de pressing (v1)
+# Pressing Éclat — logiciel de gestion de pressing (version 2.0.0)
 
 Solution complète pour un pressing : **une application Desktop pour le personnel**, **un site web pour les clients**
 et **une API** qui centralise les données. Tout fonctionne en local sur un poste Windows, sans serveur de base de données à installer.
@@ -13,7 +13,7 @@ Les trois partagent **la même base SQLite** à travers l'API : un dépôt enreg
 
 ---
 
-## 1. Fonctionnalités de la v1
+## 1. Fonctionnalités de la version 2.0.0
 
 ### Au comptoir (Desktop)
 - **Connexion du personnel** avec 3 rôles : *Administrateur*, *Manager*, *Caissier* — le menu s'adapte au rôle.
@@ -107,15 +107,23 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | --- | --- | --- |
 | `PRESSING_DB_PATH` | fichier de la base SQLite | `%LOCALAPPDATA%\Pressing\pressing.db` |
 | `PRESSING_BACKUP_PATH` | dossier des sauvegardes | `Backups` à côté de la base |
-| `PRESSING_PUBLIC_API_URL` | adresse de l'API utilisée par le Desktop et le site | `http://localhost:5180` |
-| `PRESSING_WEB_URL` | adresse du site (liens dans les e-mails) | `http://localhost:5181` |
+| `PRESSING_API_URL` | **adresse d'écoute** de l'API (serveur uniquement) | `http://0.0.0.0:5180` |
+| `PRESSING_PUBLIC_API_URL` | **adresse publique** de l'API utilisée par le Desktop et le site | `http://localhost:5180` |
+| `PRESSING_WEB_URL` | adresse publique du site (liens dans les e-mails) | `http://localhost:5181` |
 | `PRESSING_ADMIN_USERNAME` / `PRESSING_ADMIN_PASSWORD` | compte administrateur initial | `admin` / `Admin@2026!` |
 | `PRESSING_SEED_DEMO` | données de démonstration | `true` |
 | `EMAIL_PROVIDER` | `auto`, `resend`, `smtp` ou `simulated` | `auto` (simulé si rien n'est configuré) |
 | `RESEND_API_KEY` ou `SMTP_*` | envoi réel des e-mails | vide |
 | `PRESSING_TRUSTED_PROXIES` | IP des proxys de confiance (reverse proxy) | vide |
 
-Le fichier `.env` n'est **jamais** versionné.
+`PRESSING_API_URL` et `PRESSING_PUBLIC_API_URL` sont **différents** : le premier dit à l'API sur quelle adresse
+elle écoute (`0.0.0.0:5180` derrière un proxy) ; le second dit aux clients quelle adresse appeler
+(`https://api.exemple.local` si un reverse proxy termine TLS). En local, les deux valeurs par défaut pointent vers
+`localhost:5180`. Les en-têtes `X-Forwarded-For` / `X-Forwarded-Proto` ne sont acceptés que depuis la boucle locale
+ou les IP listées dans `PRESSING_TRUSTED_PROXIES` ; `X-Real-IP` n'est pas utilisé.
+
+Le fichier `.env` n'est **jamais** versionné. La clé JWT générée (`jwt.key`, à côté de la base) est également
+ignorée par Git ; ne la copiez pas sur un autre poste (chaque serveur doit avoir la sienne).
 
 **Installation sur plusieurs postes** : l'API tourne sur un poste « serveur » du pressing ; sur les autres postes,
 réglez `PRESSING_PUBLIC_API_URL=http://<ip-du-serveur>:5180` dans le `.env` du Desktop. Ne partagez jamais le fichier
@@ -126,7 +134,7 @@ réglez `PRESSING_PUBLIC_API_URL=http://<ip-du-serveur>:5180` dans le `.env` du 
 - Base : `%LOCALAPPDATA%\Pressing\pressing.db` (créée automatiquement, mode WAL, catalogue de 20 catégories et tarifs de départ).
 - **Paramètres → Sauvegardes → Sauvegarder maintenant** crée une copie vérifiée dans `Backups`.
 - Ne supprimez jamais `pressing.db`, `pressing.db-wal` ou `pressing.db-shm` : faites d'abord une sauvegarde.
-- Le schéma est créé avec `EnsureCreated` ; le passage aux migrations EF Core est le premier chantier de la v2 (voir CONTRIBUTING).
+- Le schéma est créé avec `EnsureCreated` ; le passage aux migrations EF Core est prévu dans les évolutions futures (voir CONTRIBUTING).
 
 ## 8. Architecture
 
@@ -147,7 +155,7 @@ Guides internes :
 - [docs/API.md](docs/API.md) — contrat de l'API et règles métier
 - [src/Pressing.Desktop/DESIGN.md](src/Pressing.Desktop/DESIGN.md) — charte de mise en page du Desktop
 - [src/Pressing.Desktop/README-DESKTOP.md](src/Pressing.Desktop/README-DESKTOP.md) — ajouter un écran au Desktop
-- [CONTRIBUTING.md](CONTRIBUTING.md) — **organisation de l'équipe et fonctionnalités avancées de la v2**
+- [CONTRIBUTING.md](CONTRIBUTING.md) — **organisation de l'équipe et fonctionnalités avancées à venir**
 
 ## 9. Tests et vérifications
 
@@ -162,8 +170,8 @@ Guides internes :
 
 ## 10. Suite du projet
 
-La v2 (notifications WhatsApp/SMS, paiement Mobile Money en ligne, collecte et livraison, étiquettes code-barres,
-clôture de caisse, migrations, CI, déploiement…) est répartie entre les 5 membres de l'équipe dans
+Les évolutions à venir (notifications WhatsApp/SMS, paiement Mobile Money en ligne, collecte et livraison,
+étiquettes code-barres, clôture de caisse, migrations, CI, déploiement…) sont réparties entre les 5 membres dans
 **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ## Équipe
