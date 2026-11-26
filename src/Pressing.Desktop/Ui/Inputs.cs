@@ -27,7 +27,8 @@ public class InputBox : Control
             BackColor = Theme.SurfaceAlt,
             ForeColor = Theme.Text,
             Font = Theme.Body,
-            TabStop = true
+            TabStop = true,
+            AccessibleRole = AccessibleRole.Text
         };
         _box.GotFocus += (_, _) => { _focused = true; Invalidate(); if (SelectAllOnFocus) _box.SelectAll(); };
         _box.LostFocus += (_, _) => { _focused = false; Invalidate(); };
@@ -46,11 +47,15 @@ public class InputBox : Control
         set => _box.Text = value ?? string.Empty;
     }
 
-    /// <summary>Texte d'aide affiché (dessiné au thème) quand le champ est vide.</summary>
+    /// <summary>Texte d'aide affiché (dessiné au thème) quand le champ est vide ; sert aussi de nom accessible.</summary>
     public string PlaceholderText
     {
         get => _box.Cue;
-        set => _box.Cue = value;
+        set
+        {
+            _box.Cue = value ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(_box.AccessibleName)) _box.AccessibleName = _box.Cue;
+        }
     }
 
     public bool ReadOnly
@@ -310,12 +315,20 @@ public sealed class SelectBox : Control
         {
             if (_drop is { Visible: true })
             {
-                _drop.Close();
+                CloseDropDown();
             }
             else
             {
                 OpenDropDown();
             }
+        }
+    }
+
+    private void CloseDropDown()
+    {
+        if (_drop is { IsDisposed: false } drop)
+        {
+            drop.Close();
         }
     }
 
@@ -351,6 +364,7 @@ public sealed class SelectBox : Control
             return;
         }
 
+        CloseDropDown();
         int itemHeight = Theme.S(34);
         int visible = Math.Min(_items.Count, 8);
         ListBox list = new()
@@ -428,7 +442,7 @@ public sealed class SelectBox : Control
         void Commit()
         {
             int idx = list.SelectedIndex;
-            drop.Close();
+            CloseDropDown();
             if (idx >= 0)
             {
                 SelectedIndex = idx;
@@ -455,12 +469,20 @@ public sealed class SelectBox : Control
             }
             else if (args.KeyCode == Keys.Escape)
             {
-                drop.Close();
+                CloseDropDown();
                 Focus();
                 args.Handled = true;
             }
         };
-        drop.Closed += (_, _) => { if (ReferenceEquals(_drop, drop)) _drop = null; drop.Dispose(); };
+        drop.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_drop, drop))
+            {
+                _drop = null;
+            }
+
+            DropDownDisposer.DisposeAfterMessages(drop);
+        };
         _drop = drop;
         drop.Show(this, new Point(0, Height + Theme.S(2)));
         list.Focus();
@@ -688,7 +710,7 @@ public sealed class DateBox : Control
         {
             if (_drop is { Visible: true })
             {
-                _drop.Close();
+                CloseDropDown();
             }
             else
             {
@@ -697,8 +719,17 @@ public sealed class DateBox : Control
         }
     }
 
+    private void CloseDropDown()
+    {
+        if (_drop is { IsDisposed: false } drop)
+        {
+            drop.Close();
+        }
+    }
+
     private void OpenCalendar()
     {
+        CloseDropDown();
         CalendarView calendar = new(_value);
         Panel frame = new()
         {
@@ -719,13 +750,43 @@ public sealed class DateBox : Control
         drop.Items.Add(new ToolStripControlHost(frame) { Margin = Padding.Empty, Padding = Padding.Empty, AutoSize = false, Size = frame.Size });
         calendar.DatePicked += (_, d) =>
         {
-            drop.Close();
+            CloseDropDown();
             Value = d;
             Focus();
         };
-        drop.Closed += (_, _) => { if (ReferenceEquals(_drop, drop)) _drop = null; drop.Dispose(); };
+        drop.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_drop, drop))
+            {
+                _drop = null;
+            }
+
+            DropDownDisposer.DisposeAfterMessages(drop);
+        };
         _drop = drop;
         drop.Show(this, new Point(0, Height + Theme.S(2)));
+    }
+}
+
+/// <summary>
+/// Libère un menu déroulant après la fin du traitement des messages Windows. Une sélection peut
+/// déclencher deux fermetures (appel explicite puis fermeture automatique) ; détruire le contrôle
+/// pendant la première rend la seconde invalide et provoque « Cannot access a disposed object ».
+/// </summary>
+internal static class DropDownDisposer
+{
+    internal static void DisposeAfterMessages(ToolStripDropDown drop)
+    {
+        void OnIdle(object? sender, EventArgs e)
+        {
+            Application.Idle -= OnIdle;
+            if (!drop.IsDisposed)
+            {
+                drop.Dispose();
+            }
+        }
+
+        Application.Idle += OnIdle;
     }
 }
 

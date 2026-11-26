@@ -24,6 +24,7 @@ TestResults/
 .env.*.local
 !.env.example
 appsettings.Local.json
+jwt.key
 
 # OS
 Thumbs.db

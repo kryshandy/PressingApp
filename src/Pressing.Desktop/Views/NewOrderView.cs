@@ -99,7 +99,11 @@ public sealed class NewOrderView : BaseView
     private readonly InputBox _fee = new() { Suffix = "FCFA", TextAlign = HorizontalAlignment.Right, SelectAllOnFocus = true, Text = "0" };
     private readonly InputBox _discount = new() { Suffix = "FCFA", TextAlign = HorizontalAlignment.Right, SelectAllOnFocus = true, Text = "0" };
     private readonly InputBox _promo = new() { PlaceholderText = "BIENVENUE10", CharacterCasingUpper = true };
-    private readonly FlatButton _promoCheck = new() { Text = string.Empty, IconGlyph = Icons.Check, Kind = ButtonKind.Secondary };
+    private readonly FlatButton _promoCheck = new()
+    {
+        Text = string.Empty, IconGlyph = Icons.Check, Kind = ButtonKind.Secondary,
+        AccessibleName = "Valider le code promo", AccessibleDescription = "Vérifier le code promotionnel saisi"
+    };
     private readonly TextLabel _promoMessage = new() { Font = Theme.F(9f), Wrap = true };
     private readonly InputBox _points = new() { TextAlign = HorizontalAlignment.Right, SelectAllOnFocus = true, Text = "0", Suffix = "pts" };
     private readonly InputBox _notes = new() { PlaceholderText = "Remarques sur le dépôt (visibles par le personnel uniquement)" };

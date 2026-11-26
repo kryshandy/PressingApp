@@ -27,6 +27,11 @@ builder.Services.AddControllersWithViews(options =>
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Un seul hop : le visiteur ne peut pas imposer une chaîne de proxys fabrication.
+    o.ForwardLimit = 1;
+    // Le site transmet X-Forwarded-For mais pas X-Forwarded-Proto : ne pas exiger les deux en nombre égal.
+    o.RequireHeaderSymmetry = false;
+    // X-Real-IP n'est pas utilisé. Les autres sources que la boucle locale et PRESSING_TRUSTED_PROXIES sont ignorées.
     foreach (var raw in (Environment.GetEnvironmentVariable("PRESSING_TRUSTED_PROXIES") ?? "")
                  .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
     {
@@ -49,6 +54,10 @@ builder.Services.AddAntiforgery(o =>
     o.Cookie.Name = "pressing.af";
     o.Cookie.HttpOnly = true;
     o.Cookie.SameSite = SameSiteMode.Lax;
+    // Secure dès que la requête est HTTPS (y compris derrière un proxy de confiance via X-Forwarded-Proto),
+    // sans bloquer le développement en HTTP local. Domaine laissé vide = cookie limité à l'hôte courant.
+    o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    o.Cookie.Path = "/";
 });
 
 builder.Services
@@ -58,7 +67,8 @@ builder.Services
         options.Cookie.Name = "pressing.auth";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // voir le cookie anti-falsification ci-dessus.
+        options.Cookie.Path = "/";
         options.LoginPath = "/compte/connexion";
         options.LogoutPath = "/compte/deconnexion";
         options.AccessDeniedPath = "/compte/connexion";

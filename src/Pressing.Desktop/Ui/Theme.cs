@@ -1,6 +1,7 @@
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Globalization;
+using Pressing.Client;
 using Pressing.Core;
 
 namespace Pressing.Desktop.Ui;
@@ -280,20 +281,8 @@ public static class Theme
     // ---- Saisie / formats ----------------------------------------------------------------
     private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
 
-    /// <summary>Lit un montant saisi à la française (« 12 500 », « 1500,50 », « 1 500 FCFA »).</summary>
-    public static bool TryParseAmount(string? text, out decimal value)
-    {
-        value = 0;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return false;
-        }
-
-        string cleaned = new(text.Where(c => char.IsDigit(c) || c is ',' or '.' or '-').ToArray());
-        cleaned = cleaned.Replace(',', '.');
-        return decimal.TryParse(cleaned, NumberStyles.Number | NumberStyles.AllowLeadingSign,
-            CultureInfo.InvariantCulture, out value);
-    }
+    /// <summary>Lit un montant saisi à la française (« 12 500 », « 1500,50 », « 1.500,50 », « 1 500 FCFA »).</summary>
+    public static bool TryParseAmount(string? text, out decimal value) => AmountParser.TryParseAmount(text, out value);
 
     public static string AmountText(decimal value) =>
         Math.Round(value, 0, MidpointRounding.AwayFromZero).ToString("0", Fr);

@@ -572,6 +572,31 @@ internal static class SelfTest
             });
         }
 
+        await Step("Listes déroulantes : fermeture répétée sans objet libéré", async () =>
+        {
+            using SelectBox box = new();
+            hostForm.Controls.Add(box);
+            box.SetItems(new object[] { "Chemise", "Pantalon" }, 0);
+
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+            typeof(SelectBox).GetMethod("OpenDropDown", flags)!.Invoke(box, null);
+            FieldInfo dropField = typeof(SelectBox).GetField("_drop", flags)!;
+            ToolStripDropDown drop = (ToolStripDropDown)dropField.GetValue(box)!;
+            Check(drop.Visible, "liste non ouverte");
+
+            drop.Close();
+            Check(dropField.GetValue(box) is null, "référence de liste conservée après fermeture");
+            Check(!drop.IsDisposed, "liste libérée pendant la fermeture");
+
+            // Une sélection peut provoquer une seconde fermeture (appel explicite + fermeture automatique).
+            drop.Close();
+            Check(!drop.IsDisposed, "liste libérée avant la seconde fermeture");
+
+            await Task.Delay(50);
+            Check(drop.IsDisposed, "liste non libérée après traitement");
+            hostForm.Controls.Remove(box);
+        });
+
         await Step("Session expirée : événement Unauthorized", async () =>
         {
             using PressingApiClient expired = new(apiUrl) { Token = "jeton-invalide" };

@@ -322,8 +322,15 @@ input.input-validation-error, textarea.input-validation-error { border-color: va
 .track-form { margin-bottom: 2rem; }
 
 .flash { display: flex; align-items: flex-start; gap: .75rem; padding: 1rem 1.15rem; border-radius: 12px; margin-bottom: 1.25rem; border: 1px solid; font-size: .95rem; }
-.flash p { margin: 0; }
+.flash[hidden] { display: none; } /* l'attribut hidden doit gagner sur display:flex */
+.flash p { margin: 0; flex: 1 1 auto; }
 .flash .icon { margin-top: 2px; }
+.flash-close {
+    flex: 0 0 auto; margin: -4px -6px 0 0; padding: 5px; border: 0; border-radius: 8px;
+    background: transparent; color: inherit; opacity: .7; cursor: pointer; line-height: 0;
+}
+.flash-close .icon { margin: 0; }
+.flash-close:hover, .flash-close:focus-visible { opacity: 1; background: rgba(0, 0, 0, .07); outline: 2px solid currentColor; outline-offset: 1px; }
 .flash-success { background: #EAF3EE; border-color: #BFD8CB; color: #25503F; }
 .flash-error { background: #FBEDE9; border-color: #EBC3B8; color: #8A2E1C; }
 .flash-info { background: #FBF4E6; border-color: #E8D5AC; color: #6B4F1E; }
