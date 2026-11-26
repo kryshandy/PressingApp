@@ -155,7 +155,7 @@ public class ReceiptService
                     {
                         foreach (Payment payment in order.Payments.OrderBy(p => p.PaidAt))
                         {
-                            left.Item().Text($"{payment.PaidAt:dd/MM/yyyy HH:mm} · {payment.Method.Label()} · {Money(payment.Amount, shop.Currency)}").FontSize(7.5f);
+                            left.Item().Text(PaymentLine(payment, shop.Currency)).FontSize(7.5f);
                         }
                     }
                 });
@@ -174,7 +174,7 @@ public class ReceiptService
                         r.RelativeItem().Text("TOTAL").Bold().FontSize(9);
                         r.ConstantItem(80).AlignRight().Text(Money(order.Total, shop.Currency)).Bold().FontSize(10);
                     });
-                    TotalRow(totals, "Payé", order.PaidAmount, shop.Currency);
+                    TotalRow(totals, "Payé (net)", NetPaid(order), shop.Currency);
                     totals.Item().Row(r =>
                     {
                         r.RelativeItem().Text("SOLDE").Bold().FontSize(8.5f).FontColor(order.Balance > 0 ? "#b45309" : "#15803d");
@@ -221,6 +221,19 @@ public class ReceiptService
             });
         });
     }
+
+    /// <summary>Ligne de paiement ; un remboursement est libellé « Remboursement » avec un montant négatif.</summary>
+    public static string PaymentLine(Payment payment, string currency)
+    {
+        string when = payment.PaidAt.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture);
+        return payment.Type == PaymentType.Refund
+            ? $"{when} · Remboursement · {payment.Method.Label()} · {Money(-payment.Amount, currency)}"
+            : $"{when} · {payment.Method.Label()} · {Money(payment.Amount, currency)}";
+    }
+
+    /// <summary>Total payé net des remboursements.</summary>
+    public static decimal NetPaid(Order order) =>
+        order.Payments.Sum(p => p.Type == PaymentType.Refund ? -p.Amount : p.Amount);
 
     private static void TotalRow(ColumnDescriptor column, string label, decimal value, string currency)
     {
