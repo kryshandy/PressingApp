@@ -35,10 +35,7 @@ public class PaymentService
         CurrentUser user,
         CancellationToken ct = default)
     {
-        if (amount <= 0)
-        {
-            throw new InvalidOperationException("Le montant doit être supérieur à zéro.");
-        }
+        InputLimits.RequirePositiveAmount(amount, "Le montant");
 
         if (order.Status == OrderStatus.Cancelled)
         {
@@ -172,6 +169,8 @@ public class PaymentService
         CurrentUser user,
         CancellationToken ct = default)
     {
+        InputLimits.RequirePositiveAmount(amount, "Le montant du remboursement");
+
         Order order = await _db.Orders
             .Include(o => o.Client)
             .Include(o => o.Items)
