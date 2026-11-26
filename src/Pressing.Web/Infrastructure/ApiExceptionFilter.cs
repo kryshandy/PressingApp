@@ -63,9 +63,8 @@ public sealed class ApiExceptionFilter : IAsyncExceptionFilter
             {
                 // PRG : on n'affiche jamais la page « Réessayer » sur un POST, sinon « recharger » rejoue l'envoi.
                 var tempData = _tempDataFactory.GetTempData(http);
-                RetryForm.Save(tempData, http);
-                tempData["Error"] =
-                    "Le service est momentanément indisponible. Vos informations sont conservées : réessayez dans un instant.";
+                var saved = RetryForm.Save(tempData, http);
+                tempData["Error"] = RetryForm.UnavailableMessage(saved);
                 context.Result = new RedirectResult(RetryForm.SafeGetPath(http));
                 context.ExceptionHandled = true;
                 return;

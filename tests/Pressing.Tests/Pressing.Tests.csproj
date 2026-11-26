@@ -19,6 +19,8 @@
     <ProjectReference Include="..\..\src\Pressing.Core\Pressing.Core.csproj" />
     <ProjectReference Include="..\..\src\Pressing.Api\Pressing.Api.csproj" />
     <ProjectReference Include="..\..\src\Pressing.Client\Pressing.Client.csproj" />
+    <!-- Alias : Api et Web déclarent chacun une classe Program (WebApplicationFactory<Program> vise l'API). -->
+    <ProjectReference Include="..\..\src\Pressing.Web\Pressing.Web.csproj" Aliases="web" />
   </ItemGroup>
 
   <ItemGroup>
