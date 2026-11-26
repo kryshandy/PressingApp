@@ -42,9 +42,10 @@ public static class OrderEndpoints
 
         group.MapGet("/ticket/{ticket}", async (string ticket, OrderService orders, CancellationToken ct) =>
         {
-            PagedResult<OrderSummaryDto> found = await orders.SearchAsync(search: ticket, pageSize: 5, ct: ct);
+            string wanted = (ticket ?? string.Empty).Trim().ToUpperInvariant();
+            PagedResult<OrderSummaryDto> found = await orders.SearchAsync(search: wanted, pageSize: 5, ct: ct);
             OrderSummaryDto? match = found.Items.FirstOrDefault(o =>
-                string.Equals(o.TicketNumber, ticket, StringComparison.OrdinalIgnoreCase));
+                string.Equals(o.TicketNumber.ToUpperInvariant(), wanted, StringComparison.Ordinal));
             if (match is null) return Results.NotFound(new { message = "Commande introuvable." });
             OrderDto? order = await orders.GetAsync(match.Id, ct);
             return order is null

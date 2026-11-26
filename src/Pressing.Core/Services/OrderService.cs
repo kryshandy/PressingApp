@@ -46,6 +46,8 @@ public class OrderService
             throw new InvalidOperationException("Ajoutez au moins un article à la commande.");
         }
 
+        InputLimits.RequireAmountInRange(request.DepositAmount, "L'acompte");
+
         Client client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == request.ClientId, ct)
             ?? throw new KeyNotFoundException("Client introuvable.");
         if (!client.IsActive)
@@ -65,11 +67,6 @@ public class OrderService
             request.ClientId,
             strictPromotion: true,
             ct);
-
-        if (request.DepositAmount < 0)
-        {
-            throw new InvalidOperationException("L'acompte ne peut pas être négatif.");
-        }
 
         if (request.DepositAmount > quote.Total + 0.005m)
         {
@@ -306,6 +303,8 @@ public class OrderService
         CurrentUser user,
         CancellationToken ct = default)
     {
+        EnsureManualStatus(status);
+
         Order order = await QueryFull().FirstOrDefaultAsync(o => o.Id == orderId, ct)
             ?? throw new KeyNotFoundException("Commande introuvable.");
 
@@ -317,7 +316,7 @@ public class OrderService
         OrderItem item = order.Items.FirstOrDefault(i => i.Id == itemId)
             ?? throw new KeyNotFoundException("Article introuvable.");
 
-        if (item.Status is ItemStatus.PickedUp or ItemStatus.Cancelled)
+        if (IsStatusLocked(item))
         {
             throw new InvalidOperationException("Cet article ne peut plus changer de statut.");
         }
@@ -341,6 +340,8 @@ public class OrderService
         CurrentUser user,
         CancellationToken ct = default)
     {
+        EnsureManualStatus(status);
+
         Order order = await QueryFull().FirstOrDefaultAsync(o => o.Id == orderId, ct)
             ?? throw new KeyNotFoundException("Commande introuvable.");
 
@@ -350,7 +351,7 @@ public class OrderService
         }
 
         bool wasReady = order.Status == OrderStatus.Ready;
-        foreach (OrderItem item in order.Items.Where(i => i.Status is not (ItemStatus.PickedUp or ItemStatus.Cancelled)))
+        foreach (OrderItem item in order.Items.Where(i => !IsStatusLocked(i)).ToList())
         {
             item.Status = status;
         }
@@ -384,15 +385,24 @@ public class OrderService
             throw new InvalidOperationException("Sélectionnez au moins un article à retirer.");
         }
 
+        if (request.Items.Any(l => l.Quantity <= 0))
+        {
+            throw new InvalidOperationException("Les quantités à retirer doivent être supérieures à zéro.");
+        }
+
+        InputLimits.RequireAmountInRange(request.PaymentAmount, "Le montant du paiement");
+
         bool allowBalance = await _settings.GetBoolAsync(SettingsKeys.AllowPickupWithBalance, false, ct);
         var selected = new List<(OrderItem Item, int Quantity)>();
 
-        foreach (PickupItemRequest line in request.Items)
+        // Une même ligne d'article peut apparaître plusieurs fois : on additionne avant de valider.
+        foreach (var group in request.Items.GroupBy(l => l.OrderItemId))
         {
-            OrderItem item = order.Items.FirstOrDefault(i => i.Id == line.OrderItemId)
+            OrderItem item = order.Items.FirstOrDefault(i => i.Id == group.Key)
                 ?? throw new KeyNotFoundException("Article introuvable dans cette commande.");
 
-            if (line.Quantity <= 0 || line.Quantity > item.RemainingQuantity)
+            long quantity = group.Sum(l => (long)l.Quantity);
+            if (quantity > item.RemainingQuantity)
             {
                 throw new InvalidOperationException($"Quantité invalide pour {item.Category?.Name}.");
             }
@@ -402,7 +412,7 @@ public class OrderService
                 throw new InvalidOperationException($"L'article {item.Category?.Name} n'est pas encore prêt.");
             }
 
-            selected.Add((item, line.Quantity));
+            selected.Add((item, (int)quantity));
         }
 
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
@@ -513,10 +523,41 @@ public class OrderService
         {
             if (order.PaidAmount > 0)
             {
-                PaymentMethod method = order.Payments.LastOrDefault()?.Method ?? PaymentMethod.Cash;
-                await _payments.RefundCoreAsync(
-                    order, order.PaidAmount, method, null,
-                    $"Remboursement — annulation : {reason}", user, ct);
+                // Un remboursement par mode d'origine : net = paiements - remboursements déjà faits de ce mode.
+                var perMethod = order.Payments
+                    .GroupBy(p => p.Method)
+                    .Select(g => new
+                    {
+                        Method = g.Key,
+                        Net = g.Sum(p => p.Type == PaymentType.Payment ? p.Amount : -p.Amount)
+                    })
+                    .Where(x => x.Net > 0)
+                    .ToList();
+
+                string refundNote = $"Remboursement — annulation : {reason.Trim()}";
+                PaymentMethod lastMethod = PaymentMethod.Cash;
+                foreach (var entry in perMethod)
+                {
+                    decimal amount = Math.Min(entry.Net, order.PaidAmount);
+                    if (amount <= 0) break;
+                    await _payments.RefundCoreAsync(order, amount, entry.Method, null, refundNote, user, ct);
+                    lastMethod = entry.Method;
+                }
+
+                // Écart historique éventuel entre l'historique des paiements et le montant encaissé : on solde le reste.
+                if (order.PaidAmount > 0)
+                {
+                    await _payments.RefundCoreAsync(order, order.PaidAmount, lastMethod, null, refundNote, user, ct);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(order.PromotionCode))
+            {
+                Promotion? promotion = await _promotions.GetEntityAsync(order.PromotionCode, ct);
+                if (promotion is not null)
+                {
+                    promotion.UsedCount = Math.Max(0, promotion.UsedCount - 1);
+                }
             }
 
             if (order.LoyaltyPointsRedeemed > 0)
@@ -593,10 +634,12 @@ public class OrderService
             return null;
         }
 
+        string ticketKey = ticket.Trim().ToUpperInvariant();
+
         Order? order = await _db.Orders.AsNoTracking()
             .Include(o => o.Client)
             .Include(o => o.Items).ThenInclude(i => i.Category)
-            .FirstOrDefaultAsync(o => o.TicketNumber == ticket.Trim(), ct);
+            .FirstOrDefaultAsync(o => o.TicketNumber == ticketKey, ct);
 
         if (order is null ||
             (order.Client.PhoneNormalized != normalized &&
@@ -664,6 +707,19 @@ public class OrderService
         }
     }
 
+    /// <summary>Seuls Déposé / En cours / Prêt se règlent à la main ; retrait et annulation ont leurs propres circuits.</summary>
+    private static void EnsureManualStatus(ItemStatus status)
+    {
+        if (status is not (ItemStatus.Deposited or ItemStatus.InProgress or ItemStatus.Ready))
+        {
+            throw new InvalidOperationException("Utilisez le retrait ou l'annulation pour ce statut.");
+        }
+    }
+
+    /// <summary>Article retiré (même partiellement) ou annulé : son statut ne se change plus à la main.</summary>
+    private static bool IsStatusLocked(OrderItem item) =>
+        item.Status is ItemStatus.PickedUp or ItemStatus.Cancelled || item.PickedUpQuantity > 0;
+
     private static void RecomputeStatus(Order order)
     {
         if (order.Status == OrderStatus.Cancelled)
@@ -724,7 +780,8 @@ public class OrderService
             throw new InvalidOperationException("Ajoutez au moins un article.");
         }
 
-        if (manualDiscount < 0) throw new InvalidOperationException("La remise ne peut pas être négative.");
+        InputLimits.RequireAmountInRange(manualDiscount, "La remise");
+        InputLimits.RequireAmountInRange(deliveryFee, "Les frais de livraison");
         if (loyaltyPoints < 0) throw new InvalidOperationException("Les points fidélité ne peuvent pas être négatifs.");
 
         int[] categoryIds = items.Select(i => i.CategoryId).Distinct().ToArray();
@@ -739,9 +796,9 @@ public class OrderService
         var lines = new List<LineData>();
         foreach (CreateOrderItemRequest request in items)
         {
-            if (request.Quantity <= 0)
+            if (request.Quantity < 1 || request.Quantity > InputLimits.MaxQuantity)
             {
-                throw new InvalidOperationException("Chaque article doit avoir une quantité supérieure à zéro.");
+                throw new ArgumentException($"Chaque article doit avoir une quantité comprise entre 1 et {InputLimits.MaxQuantity}.");
             }
 
             if (!categories.TryGetValue(request.CategoryId, out Category? category) || !category.IsActive)
@@ -754,10 +811,7 @@ public class OrderService
                 ?? throw new InvalidOperationException($"Aucun tarif actif pour {category.Name} ({request.ServiceType.Label()}).");
 
             decimal unitPrice = request.UnitPrice ?? price.Price;
-            if (unitPrice < 0)
-            {
-                throw new InvalidOperationException("Le prix unitaire ne peut pas être négatif.");
-            }
+            InputLimits.RequireAmountInRange(unitPrice, "Le prix unitaire");
 
             bool express = globalExpress || request.IsExpress;
             int days = express ? expressDays : (price.EstimatedDays > 0 ? price.EstimatedDays : defaultDays);
@@ -803,6 +857,11 @@ public class OrderService
             {
                 throw new InvalidOperationException(validation.Message);
             }
+        }
+
+        if (manualDiscount > baseAmount - promotionDiscount + 0.005m)
+        {
+            throw new InvalidOperationException("La remise manuelle ne peut pas dépasser le montant restant après la promotion.");
         }
 
         decimal remainingBeforeLoyalty = Math.Max(0, baseAmount - manualDiscount - promotionDiscount);
