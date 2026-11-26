@@ -35,6 +35,12 @@ public static class Theme
     /// <summary>Sélection de ligne : bleu translucide (composé sur la surface pour GDI).</summary>
     public static readonly Color SelectionBack = Mix(Surface, Blue, 0.30f);
 
+    /// <summary>Couleurs de la hiérarchie typographique (DESIGN.md §3).</summary>
+    public static readonly Color TitleText = ColorTranslator.FromHtml("#F1F5F9");
+    public static readonly Color Figure = ColorTranslator.FromHtml("#F8FAFC");
+    public static readonly Color ScrollThumb = ColorTranslator.FromHtml("#334155");
+    public static readonly Color ScrollThumbHot = ColorTranslator.FromHtml("#475569");
+
     // ---- DPI -----------------------------------------------------------------------------
     /// <summary>Facteur d'échelle (1.0 = 96 dpi). Initialisé au démarrage par <see cref="InitializeDpi"/>.</summary>
     public static float Scale { get; private set; } = 1f;
@@ -112,6 +118,63 @@ public static class Theme
             return font;
         }
     }
+
+    private static string? _semiFamily;
+    private static readonly Dictionary<float, Font> SemiCache = new();
+
+    /// <summary>Famille « Semibold » (titres) : Segoe UI Variable / Segoe UI Semibold, sinon gras.</summary>
+    public static string? SemiboldFamily => _semiFamily ??= DetectOrEmpty("Segoe UI Variable Text Semibold", "Segoe UI Semibold");
+
+    private static string DetectOrEmpty(params string[] names)
+    {
+        using InstalledFontCollection fonts = new();
+        foreach (string name in names)
+        {
+            if (fonts.Families.Any(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                return name;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>Police semi-grasse (titres de page et de carte, libellés de champ).</summary>
+    public static Font Semi(float size)
+    {
+        if (string.IsNullOrEmpty(SemiboldFamily))
+        {
+            return F(size, FontStyle.Bold);
+        }
+
+        lock (SemiCache)
+        {
+            if (!SemiCache.TryGetValue(size, out Font? font))
+            {
+                font = new Font(SemiboldFamily, size * FontScale, FontStyle.Regular, GraphicsUnit.Point);
+                SemiCache[size] = font;
+            }
+
+            return font;
+        }
+    }
+
+    // ---- Charte de mise en page (DESIGN.md §1) ------------------------------------------
+    /// <summary>Gouttière de page (bords gauche/droit communs à l'en-tête global, au titre et aux cartes) : 32 px.</summary>
+    public static int PageGutter => S(32);
+
+    /// <summary>Gouttière entre colonnes de la grille de 12 et espacement vertical entre blocs : 24 px.</summary>
+    public static int Gap => S(24);
+
+    /// <summary>Padding interne des cartes : 24 px.</summary>
+    public static int CardPadding => S(24);
+
+    /// <summary>Hauteur standard des boutons et des champs : 40 px.</summary>
+    public static int ControlHeight => S(40);
+
+    public static Font PageTitle => Semi(22f);
+    public static Font CardTitle => Semi(12f);
+    public static Font FieldLabel => Semi(8.5f);
 
     public static Font Body => F(10f);
     public static Font BodyBold => F(10f, FontStyle.Bold);

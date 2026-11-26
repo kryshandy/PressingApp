@@ -15,7 +15,11 @@ public interface ITintRow
     Color? GetTint(string columnName);
 }
 
-/// <summary>DataGridView sombre, sans bordure lourde, lignes de 36 px, double tampon.</summary>
+/// <summary>
+/// DataGridView sombre : en-tête 40 px, lignes 44 px, colonnes réparties sur la largeur (Fill + FillWeight +
+/// MinimumWidth, colonnes numériques à largeur fixe), JAMAIS de barre horizontale ni de barre native :
+/// défilement à la molette et fine barre thémée dessinée par-dessus la grille quand les lignes débordent.
+/// </summary>
 public sealed class ThemedGrid : DataGridView
 {
     public ThemedGrid()
@@ -29,15 +33,15 @@ public sealed class ThemedGrid : DataGridView
         EnableHeadersVisualStyles = false;
         ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
         ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-        ColumnHeadersHeight = Theme.S(38);
+        ColumnHeadersHeight = Theme.S(40);
         ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
         {
             BackColor = Theme.SurfaceAlt,
             ForeColor = Theme.TextMuted,
             SelectionBackColor = Theme.SurfaceAlt,
             SelectionForeColor = Theme.TextMuted,
-            Font = Theme.F(8.5f, FontStyle.Bold),
-            Padding = new Padding(Theme.S(10), 0, Theme.S(10), 0),
+            Font = Theme.FieldLabel,
+            Padding = new Padding(Theme.S(12), 0, Theme.S(12), 0),
             Alignment = DataGridViewContentAlignment.MiddleLeft,
             WrapMode = DataGridViewTriState.False
         };
@@ -48,7 +52,7 @@ public sealed class ThemedGrid : DataGridView
             SelectionBackColor = Theme.SelectionBack,
             SelectionForeColor = Color.White,
             Font = Theme.F(10f),
-            Padding = new Padding(Theme.S(10), 0, Theme.S(10), 0),
+            Padding = new Padding(Theme.S(12), 0, Theme.S(12), 0),
             WrapMode = DataGridViewTriState.False
         };
         AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle
@@ -58,17 +62,17 @@ public sealed class ThemedGrid : DataGridView
             SelectionForeColor = Color.White
         };
         RowHeadersVisible = false;
-        RowTemplate.Height = Theme.S(36);
+        RowTemplate.Height = Theme.S(44);
         AllowUserToAddRows = false;
         AllowUserToDeleteRows = false;
         AllowUserToResizeRows = false;
-        AllowUserToResizeColumns = true;
+        AllowUserToResizeColumns = false;
         AllowUserToOrderColumns = false;
         MultiSelect = false;
         SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         ReadOnly = true;
         AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-        ScrollBars = ScrollBars.Both;
+        ScrollBars = ScrollBars.None;
         ShowCellToolTips = true;
         StandardTab = true;
         TabStop = true;
@@ -107,29 +111,204 @@ public sealed class ThemedGrid : DataGridView
         return null;
     }
 
-    /// <summary>Quand la grille n'a pas de défilement propre, la molette fait défiler le conteneur parent.</summary>
-    protected override void OnMouseWheel(MouseEventArgs e)
-    {
-        if (!VerticalScrollBar.Visible)
-        {
-            for (Control? c = Parent; c is not null; c = c.Parent)
-            {
-                if (c is ScrollableControl { AutoScroll: true, VerticalScroll.Visible: true } sc)
-                {
-                    int target = Math.Clamp(sc.VerticalScroll.Value - e.Delta / 120 * Theme.S(70),
-                        sc.VerticalScroll.Minimum, sc.VerticalScroll.Maximum);
-                    sc.AutoScrollPosition = new Point(sc.HorizontalScroll.Value, target);
-                    if (e is HandledMouseEventArgs handled)
-                    {
-                        handled.Handled = true;
-                    }
+    // ---- Colonnes facultatives (écrans étroits) -----------------------------------------------
+    private readonly List<string> _optional = new();
 
-                    return;
-                }
+    /// <summary>
+    /// Colonnes masquées automatiquement, dans cet ordre, quand la largeur ne suffit pas pour afficher toutes les
+    /// colonnes sans troncature (jamais de barre horizontale) ; elles réapparaissent quand la place revient.
+    /// </summary>
+    public void SetOptional(params string[] names)
+    {
+        _optional.Clear();
+        _optional.AddRange(names);
+        FitColumns();
+    }
+
+    private int RequiredWidth() => Columns.Cast<DataGridViewColumn>().Where(c => c.Visible)
+        .Sum(c => c.AutoSizeMode == DataGridViewAutoSizeColumnMode.None ? c.Width : c.MinimumWidth);
+
+    private void FitColumns()
+    {
+        if (_optional.Count == 0 || Width <= 0)
+        {
+            return;
+        }
+
+        int available = ClientSize.Width - 2;
+        foreach (string name in _optional)
+        {
+            if (Columns[name] is { } c)
+            {
+                c.Visible = true;
             }
         }
 
-        base.OnMouseWheel(e);
+        foreach (string name in _optional)
+        {
+            if (RequiredWidth() <= available)
+            {
+                break;
+            }
+
+            if (Columns[name] is { } c)
+            {
+                c.Visible = false;
+            }
+        }
+
+        Invalidate();
+    }
+
+    protected override void OnSizeChanged(EventArgs e)
+    {
+        base.OnSizeChanged(e);
+        FitColumns();
+        if (HorizontalScrollingOffset != 0)
+        {
+            HorizontalScrollingOffset = 0;
+        }
+
+        Invalidate();
+    }
+
+    // ---- Défilement sans barre native -----------------------------------------------------
+    private bool _dragThumb;
+    private int _dragY;
+    private int _dragFirst;
+
+    private int VisibleRows => Math.Max(1, (Height - ColumnHeadersHeight) / Math.Max(1, RowTemplate.Height));
+
+    private bool CanScroll => Rows.Count > VisibleRows;
+
+    private Rectangle ThumbRect
+    {
+        get
+        {
+            if (!CanScroll)
+            {
+                return Rectangle.Empty;
+            }
+
+            int top = ColumnHeadersHeight + Theme.S(4);
+            int track = Math.Max(1, Height - top - Theme.S(4));
+            int thumb = Math.Max(Theme.S(32), track * VisibleRows / Rows.Count);
+            int max = Math.Max(1, Rows.Count - VisibleRows);
+            int first = Math.Max(0, FirstDisplayedScrollingRowIndex);
+            int y = top + (track - thumb) * Math.Min(first, max) / max;
+            return new Rectangle(Width - Theme.S(9), y, Theme.S(5), thumb);
+        }
+    }
+
+    private void ScrollRowsTo(int first)
+    {
+        if (!CanScroll)
+        {
+            return;
+        }
+
+        first = Math.Clamp(first, 0, Rows.Count - VisibleRows);
+        if (first != FirstDisplayedScrollingRowIndex)
+        {
+            try
+            {
+                FirstDisplayedScrollingRowIndex = first;
+            }
+            catch (InvalidOperationException)
+            {
+                // grille pas encore affichée
+            }
+
+            Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// La molette fait défiler les lignes ; quand la grille n'a rien à faire défiler (ou est en butée), le message
+    /// n'est pas traité et Windows le transmet à la page (zone défilante parente).
+    /// </summary>
+    protected override void OnMouseWheel(MouseEventArgs e)
+    {
+        if (CanScroll)
+        {
+            int before = FirstDisplayedScrollingRowIndex;
+            int step = Math.Max(1, SystemInformation.MouseWheelScrollLines);
+            ScrollRowsTo(before - Math.Sign(e.Delta) * step);
+            if (FirstDisplayedScrollingRowIndex != before && e is HandledMouseEventArgs handled)
+            {
+                handled.Handled = true;
+            }
+        }
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        Rectangle thumb = ThumbRect;
+        if (!thumb.IsEmpty && e.Button == MouseButtons.Left && e.X >= Width - Theme.S(14) && e.Y > ColumnHeadersHeight)
+        {
+            if (e.Y >= thumb.Top && e.Y <= thumb.Bottom)
+            {
+                _dragThumb = true;
+                _dragY = e.Y;
+                _dragFirst = FirstDisplayedScrollingRowIndex;
+            }
+            else
+            {
+                ScrollRowsTo(FirstDisplayedScrollingRowIndex + (e.Y < thumb.Top ? -VisibleRows : VisibleRows));
+            }
+
+            return;
+        }
+
+        base.OnMouseDown(e);
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (_dragThumb)
+        {
+            Rectangle thumb = ThumbRect;
+            int track = Height - ColumnHeadersHeight - Theme.S(8) - thumb.Height;
+            if (track > 0)
+            {
+                ScrollRowsTo(_dragFirst + (e.Y - _dragY) * (Rows.Count - VisibleRows) / track);
+            }
+
+            return;
+        }
+
+        base.OnMouseMove(e);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        if (_dragThumb)
+        {
+            _dragThumb = false;
+            Invalidate();
+            return;
+        }
+
+        base.OnMouseUp(e);
+    }
+
+    protected override void OnScroll(ScrollEventArgs e)
+    {
+        base.OnScroll(e);
+        Invalidate();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        Rectangle thumb = ThumbRect;
+        if (!thumb.IsEmpty)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using GraphicsPath path = Theme.RoundedRect(thumb, thumb.Width / 2);
+            using SolidBrush brush = new(_dragThumb ? Theme.ScrollThumbHot : Theme.Mix(Theme.Surface, Theme.ScrollThumbHot, 0.85f));
+            e.Graphics.FillPath(brush, path);
+        }
     }
 
     protected override void OnCellFormatting(DataGridViewCellFormattingEventArgs e)
@@ -152,9 +331,9 @@ public sealed class ThemedGrid : DataGridView
             if (e.Graphics is not null)
             {
                 Size text = TextRenderer.MeasureText(pill.Text, Theme.F(8.5f, FontStyle.Bold), new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
-                int w = Math.Min(e.CellBounds.Width - Theme.S(12), text.Width + Theme.S(24));
-                int h = Theme.S(24);
-                Rectangle rect = new(e.CellBounds.X + Theme.S(10), e.CellBounds.Y + (e.CellBounds.Height - h) / 2, Math.Max(w, Theme.S(20)), h);
+                int w = Math.Min(e.CellBounds.Width - Theme.S(24), Math.Max(Theme.S(92), text.Width + Theme.S(24)));
+                int h = Theme.S(26);
+                Rectangle rect = new(e.CellBounds.X + Theme.S(12), e.CellBounds.Y + (e.CellBounds.Height - h) / 2, Math.Max(w, Theme.S(20)), h);
                 Color under = e.State.HasFlag(DataGridViewElementStates.Selected)
                     ? Theme.SelectionBack
                     : e.CellStyle?.BackColor ?? Theme.Surface;
@@ -169,8 +348,12 @@ public sealed class ThemedGrid : DataGridView
     }
 
     // ---- Colonnes ------------------------------------------------------------------------
+    /// <summary>
+    /// Colonne de texte : largeur proportionnelle (<paramref name="weight"/>) bornée par <paramref name="minWidth"/>,
+    /// ou largeur fixe si <paramref name="fixedWidth"/> &gt; 0 (montants, quantités, dates).
+    /// </summary>
     public DataGridViewTextBoxColumn AddText(string name, string header, string property, float weight = 100,
-        bool right = false, int minWidth = 60, string? format = null)
+        bool right = false, int minWidth = 60, string? format = null, int fixedWidth = 0)
     {
         DataGridViewTextBoxColumn col = new()
         {
@@ -193,39 +376,42 @@ public sealed class ThemedGrid : DataGridView
             col.DefaultCellStyle.Format = format;
         }
 
+        if (fixedWidth > 0)
+        {
+            col.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            col.Width = Theme.S(fixedWidth);
+            col.MinimumWidth = Math.Min(col.MinimumWidth, col.Width);
+            col.Resizable = DataGridViewTriState.False;
+        }
+
         Columns.Add(col);
         return col;
     }
 
     /// <summary>Colonne de pastilles : la ligne liée doit implémenter <see cref="IPillRow"/>.</summary>
-    public DataGridViewTextBoxColumn AddPill(string name, string header, float weight = 100, int minWidth = 100)
+    public DataGridViewTextBoxColumn AddPill(string name, string header, float weight = 100, int minWidth = 100, int fixedWidth = 0)
     {
-        DataGridViewTextBoxColumn col = AddText(name, header, string.Empty, weight, false, minWidth);
+        DataGridViewTextBoxColumn col = AddText(name, header, string.Empty, weight, false, minWidth, null, fixedWidth);
         col.DataPropertyName = string.Empty;
         return col;
     }
 }
 
-/// <summary>Carte arrondie contenant une grille et un message « aucun résultat » centré.</summary>
+/// <summary>
+/// Carte arrondie contenant une grille et un état vide soigné (icône + phrase centrées).
+/// <see cref="AutoHeightRows"/> : la hauteur préférée suit le nombre de lignes (grilles dans une page défilante).
+/// </summary>
 public sealed class GridCard : RoundedPanel
 {
-    private readonly Label _empty;
+    private readonly EmptyState _empty;
 
     public GridCard(string emptyText = "Aucun élément à afficher.")
     {
-        Padding = new Padding(Theme.S(1));
+        Padding = new Padding(1);
         Dock = DockStyle.Fill;
+        Margin = Padding.Empty;
         Grid = new ThemedGrid { Dock = DockStyle.Fill };
-        _empty = new Label
-        {
-            Text = emptyText,
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleCenter,
-            ForeColor = Theme.TextMuted,
-            Font = Theme.F(10.5f),
-            BackColor = Theme.Surface,
-            Visible = false
-        };
+        _empty = new EmptyState(emptyText) { Visible = true };
         Controls.Add(Grid);
         Controls.Add(_empty);
         _empty.BringToFront();
@@ -242,6 +428,31 @@ public sealed class GridCard : RoundedPanel
         set => _empty.Text = value;
     }
 
+    /// <summary>Si &gt; 0 : hauteur préférée = en-tête + nombre de lignes (au moins cette valeur, au plus <see cref="MaxRows"/>).</summary>
+    public int AutoHeightRows { get; set; }
+
+    public int MaxRows { get; set; } = 12;
+
+    public override Size GetPreferredSize(Size proposedSize)
+    {
+        int rows = AutoHeightRows > 0
+            ? Math.Clamp(Grid.Rows.Count, AutoHeightRows, Math.Max(AutoHeightRows, MaxRows))
+            : Math.Max(3, Math.Min(Grid.Rows.Count, MaxRows));
+        return new Size(proposedSize.Width, 2 + Grid.ColumnHeadersHeight + rows * Grid.RowTemplate.Height);
+    }
+
+    protected override void OnLayout(LayoutEventArgs levent)
+    {
+        base.OnLayout(levent);
+        if (_empty is null || Grid is null)
+        {
+            return;
+        }
+
+        int top = 1 + Grid.ColumnHeadersHeight;
+        _empty.SetBounds(1, top, Math.Max(0, Width - 2), Math.Max(0, Height - top - 1));
+    }
+
     public void UpdateEmpty()
     {
         bool empty = Grid.Rows.Count == 0;
@@ -250,5 +461,54 @@ public sealed class GridCard : RoundedPanel
         {
             _empty.BringToFront();
         }
+
+        if (AutoHeightRows > 0)
+        {
+            this.RequestPageLayout();
+        }
+    }
+}
+
+/// <summary>État vide : icône discrète et phrase centrées (grilles, listes).</summary>
+public sealed class EmptyState : Control
+{
+    public EmptyState(string text)
+    {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        Text = text;
+        BackColor = Theme.Surface;
+    }
+
+    public string Glyph { get; set; } = Icons.Inbox;
+
+    protected override void OnTextChanged(EventArgs e)
+    {
+        base.OnTextChanged(e);
+        Invalidate();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        g.Clear(BackColor);
+        TextFormatFlags center = TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
+        int textWidth = Math.Max(10, Width - Theme.S(48));
+        Size text = TextRenderer.MeasureText(Text, Theme.F(10f), new Size(textWidth, int.MaxValue), center | TextFormatFlags.WordBreak);
+        int icon = Height >= Theme.S(110) ? Theme.S(40) : 0;
+        int total = icon + (icon > 0 ? Theme.S(12) : 0) + text.Height;
+        int y = Math.Max(Theme.S(4), (Height - total) / 2);
+        if (icon > 0)
+        {
+            Rectangle circle = new((Width - icon) / 2, y, icon, icon);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using SolidBrush brush = new(Theme.SurfaceAlt);
+            g.FillEllipse(brush, circle);
+            TextRenderer.DrawText(g, Glyph, Theme.Icon(13f), circle, Theme.TextFaint,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            y += icon + Theme.S(12);
+        }
+
+        TextRenderer.DrawText(g, Text, Theme.F(10f), new Rectangle(Theme.S(24), y, textWidth, text.Height), Theme.TextMuted,
+            center | TextFormatFlags.WordBreak);
     }
 }

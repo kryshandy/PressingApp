@@ -10,20 +10,49 @@ public static class Native
     [DllImport("dwmapi.dll", PreserveSig = true)]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
+    /// <summary>
+    /// Barre de titre en mode sombre : <c>DWMWA_USE_IMMERSIVE_DARK_MODE</c> (20, ou 19 sur les anciens Windows 10)
+    /// puis, sous Windows 11, couleur de légende = fond de l'application (35) et texte clair (36).
+    /// </summary>
     public static void DarkTitleBar(Form form)
     {
         try
         {
             int on = 1;
-            DwmSetWindowAttribute(form.Handle, 20, ref on, sizeof(int));
-            int caption = ColorTranslator.ToWin32(Theme.Sidebar);
+            if (DwmSetWindowAttribute(form.Handle, 20, ref on, sizeof(int)) != 0)
+            {
+                DwmSetWindowAttribute(form.Handle, 19, ref on, sizeof(int));
+            }
+
+            int caption = ColorTranslator.ToWin32(Theme.Background);
             DwmSetWindowAttribute(form.Handle, 35, ref caption, sizeof(int));
             int text = ColorTranslator.ToWin32(Theme.Text);
             DwmSetWindowAttribute(form.Handle, 36, ref text, sizeof(int));
+            int border = ColorTranslator.ToWin32(Theme.Border);
+            DwmSetWindowAttribute(form.Handle, 34, ref border, sizeof(int));
         }
         catch
         {
             // Windows plus ancien : la barre de titre reste standard.
+        }
+    }
+}
+
+/// <summary>Barres de défilement natives résiduelles (zones de texte multilignes) : thème sombre de l'Explorateur.</summary>
+public static class NativeScroll
+{
+    [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+    private static extern int SetWindowTheme(IntPtr hwnd, string? appName, string? idList);
+
+    public static void Darken(Control control)
+    {
+        try
+        {
+            SetWindowTheme(control.Handle, "DarkMode_Explorer", null);
+        }
+        catch
+        {
+            // sans importance
         }
     }
 }
@@ -113,13 +142,21 @@ public static class UiRun
     }
 }
 
-/// <summary>Fenêtre modale sombre : en-tête, corps, pied avec boutons, message d'erreur inline.</summary>
+/// <summary>
+/// Fenêtre modale sombre (DESIGN.md) : largeur fixe cohérente (480 · 560 · 760 px), en-tête (titre 16 pt), corps
+/// avec gouttière de 32 px et blocs espacés de 16 px, pied avec message d'erreur à gauche et boutons alignés à
+/// droite (Secondary puis Primary). La hauteur s'ajuste au contenu ; au-delà de l'écran, le corps défile sans
+/// barre native. Les dialogues ajoutent leurs blocs à <see cref="Body"/> avec <c>Dock = Top</c> (le dernier ajouté
+/// est en haut, comme d'habitude) ; un bloc <c>Dock = Fill</c> prend la hauteur restante.
+/// </summary>
 public class DialogForm : Form
 {
-    private readonly Label _title;
-    private readonly Label _subtitle;
+    private readonly DialogHeader _header;
     private readonly Label _error;
     private readonly FlowLayoutPanel _buttons;
+    private readonly Panel _footer;
+    private readonly ScrollViewport _viewport;
+    private readonly int _requestedHeight;
 
     public DialogForm(string title, string? subtitle, int width, int height)
     {
@@ -134,65 +171,39 @@ public class DialogForm : Form
         StartPosition = FormStartPosition.CenterParent;
         Text = title;
         KeyPreview = true;
+        int logicalWidth = width <= 500 ? 480 : width <= 620 ? 560 : 760;
+        _requestedHeight = height;
         Rectangle area = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1920, 1080);
-        ClientSize = new Size(Math.Min(Theme.S(width), area.Width - Theme.S(40)), Math.Min(Theme.S(height), area.Height - Theme.S(110)));
+        ClientSize = new Size(Math.Min(Theme.S(logicalWidth), area.Width - Theme.S(40)), Math.Min(Theme.S(height), area.Height - Theme.S(110)));
 
-        Panel header = new()
-        {
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            Padding = new Padding(Theme.S(28), Theme.S(22), Theme.S(28), Theme.S(8)),
-            BackColor = Theme.Background
-        };
-        _subtitle = new Label
-        {
-            Text = subtitle ?? string.Empty,
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            MaximumSize = new Size(Theme.S(width - 56), 0),
-            Font = Theme.F(10f),
-            ForeColor = Theme.TextMuted,
-            Visible = !string.IsNullOrEmpty(subtitle),
-            Padding = new Padding(0, Theme.S(4), 0, 0)
-        };
-        _title = new Label
-        {
-            Text = title,
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            Font = Theme.F(16f, FontStyle.Bold),
-            ForeColor = Theme.Text
-        };
-        header.Controls.Add(_subtitle);
-        header.Controls.Add(_title);
+        _header = new DialogHeader(title, subtitle) { Dock = DockStyle.Top };
 
-        Body = new Panel
+        Body = new DialogBody();
+        _viewport = new ScrollViewport
         {
             Dock = DockStyle.Fill,
-            AutoScroll = true,
-            Padding = new Padding(Theme.S(28), Theme.S(12), Theme.S(28), Theme.S(12)),
-            BackColor = Theme.Background
+            Content = Body,
+            Padding = new Padding(Theme.PageGutter, Theme.S(8), Theme.PageGutter, Theme.S(24))
         };
 
+        _footer = new Panel { Dock = DockStyle.Bottom, Height = Theme.S(80), BackColor = Theme.Sidebar };
+        Panel line = new() { Dock = DockStyle.Top, Height = 1, BackColor = Theme.Border };
         TableLayoutPanel footer = new()
         {
-            Dock = DockStyle.Bottom,
-            Height = Theme.S(76),
+            Dock = DockStyle.Fill,
             ColumnCount = 2,
             RowCount = 1,
-            Padding = new Padding(Theme.S(28), Theme.S(16), Theme.S(28), Theme.S(16)),
+            Padding = new Padding(Theme.PageGutter, Theme.S(19), Theme.PageGutter, Theme.S(20)),
             BackColor = Theme.Sidebar
         };
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        _error = new Label
+        _error = new TextLabel
         {
             Dock = DockStyle.Fill,
             ForeColor = Theme.Red,
             Font = Theme.F(9.5f),
             TextAlign = ContentAlignment.MiddleLeft,
-            AutoEllipsis = true,
             Margin = new Padding(0, 0, Theme.S(12), 0)
         };
         _buttons = new FlowLayoutPanel
@@ -206,14 +217,15 @@ public class DialogForm : Form
         };
         footer.Controls.Add(_error, 0, 0);
         footer.Controls.Add(_buttons, 1, 0);
+        _footer.Controls.Add(footer);
+        _footer.Controls.Add(line);
 
-        Controls.Add(Body);
-        Controls.Add(footer);
-        Controls.Add(header);
-        header.BringToFront();
-        Body.BringToFront();
+        Controls.Add(_viewport);
+        Controls.Add(_footer);
+        Controls.Add(_header);
+        _viewport.BringToFront();
 
-        Secondary = new FlatButton { Text = "Annuler", Kind = ButtonKind.Secondary, DialogResult = DialogResult.Cancel, Margin = new Padding(0, 0, Theme.S(10), 0) };
+        Secondary = new FlatButton { Text = "Annuler", Kind = ButtonKind.Secondary, DialogResult = DialogResult.Cancel, Margin = new Padding(0, 0, Theme.S(8), 0) };
         Primary = new FlatButton { Text = "Valider", Kind = ButtonKind.Primary, Margin = Padding.Empty };
         _buttons.Controls.Add(Primary);
         _buttons.Controls.Add(Secondary);
@@ -221,7 +233,8 @@ public class DialogForm : Form
         AcceptButton = Primary;
     }
 
-    public Panel Body { get; }
+    /// <summary>Corps du dialogue (blocs empilés, 16 px d'écart).</summary>
+    public DialogBody Body { get; }
 
     public FlatButton Primary { get; }
 
@@ -230,12 +243,35 @@ public class DialogForm : Form
     /// <summary>Ajoute un bouton supplémentaire à gauche des boutons standards.</summary>
     protected FlatButton AddExtraButton(string text, ButtonKind kind = ButtonKind.Secondary, string icon = "")
     {
-        FlatButton button = new() { Text = text, Kind = kind, IconGlyph = icon, Margin = new Padding(0, 0, Theme.S(10), 0) };
+        FlatButton button = new() { Text = text, Kind = kind, IconGlyph = icon, Margin = new Padding(0, 0, Theme.S(8), 0) };
         _buttons.Controls.Add(button);
         return button;
     }
 
     public void ShowError(string? message) => _error.Text = message ?? string.Empty;
+
+    /// <summary>Ajuste la hauteur de la fenêtre au contenu (bornée par l'écran).</summary>
+    protected void FitToContent()
+    {
+        Rectangle area = Screen.FromControl(this).WorkingArea;
+        int width = ClientSize.Width;
+        int headerHeight = _header.GetPreferredSize(new Size(width, 0)).Height;
+        int bodyHeight = Body.HasFill
+            ? Theme.S(_requestedHeight) - headerHeight - _footer.Height
+            : Body.GetPreferredSize(new Size(width - _viewport.Padding.Horizontal, 0)).Height + _viewport.Padding.Vertical;
+        int total = headerHeight + bodyHeight + _footer.Height;
+        ClientSize = new Size(width, Math.Clamp(total, Theme.S(180), area.Height - Theme.S(80)));
+    }
+
+    protected override void OnLoad(EventArgs e)
+    {
+        FitToContent();
+        base.OnLoad(e);
+        if (StartPosition == FormStartPosition.CenterParent && Owner is not null)
+        {
+            CenterToParent();
+        }
+    }
 
     protected override void OnHandleCreated(EventArgs e)
     {
@@ -247,6 +283,109 @@ public class DialogForm : Form
     {
         base.OnShown(e);
         Activate();
+    }
+
+    private sealed class DialogHeader : LayoutControl
+    {
+        private readonly TextLabel _title;
+        private readonly TextLabel _subtitle;
+
+        public DialogHeader(string title, string? subtitle)
+        {
+            BackColor = Theme.Background;
+            _title = new TextLabel { Text = title, Font = Theme.Semi(16f), ForeColor = Theme.TitleText };
+            _subtitle = new TextLabel { Text = subtitle ?? string.Empty, Font = Theme.F(10f), ForeColor = Theme.TextMuted, Wrap = true };
+            Controls.Add(_title);
+            Controls.Add(_subtitle);
+        }
+
+        private int SubtitleHeight(int width) => _subtitle.Text.Length == 0 ? 0
+            : Theme.S(4) + _subtitle.GetPreferredSize(new Size(Math.Max(10, width - 2 * Theme.PageGutter), 0)).Height;
+
+        public override Size GetPreferredSize(Size proposedSize)
+        {
+            int width = proposedSize.Width > 0 ? proposedSize.Width : Width;
+            return new Size(width, Theme.S(28) + _title.Font.Height + SubtitleHeight(width) + Theme.S(16));
+        }
+
+        protected override void OnLayout(LayoutEventArgs levent)
+        {
+            int wanted = GetPreferredSize(new Size(Width, 0)).Height;
+            if (Height != wanted && Width > 0)
+            {
+                Height = wanted;
+            }
+
+            base.OnLayout(levent);
+        }
+
+        protected override void Arrange()
+        {
+            int x = Theme.PageGutter;
+            int w = Math.Max(10, Width - 2 * x);
+            _title.SetBounds(x, Theme.S(28), w, _title.Font.Height);
+            _subtitle.Visible = _subtitle.Text.Length > 0;
+            _subtitle.SetBounds(x, Theme.S(28) + _title.Font.Height + Theme.S(4), w, Math.Max(0, SubtitleHeight(Width) - Theme.S(4)));
+        }
+    }
+}
+
+/// <summary>
+/// Corps d'un dialogue : empile ses enfants comme <c>Dock = Top</c> (le dernier ajouté en haut), 16 px d'écart,
+/// chacun à sa hauteur préférée ; un enfant <c>Dock = Fill</c> prend la hauteur restante.
+/// </summary>
+public sealed class DialogBody : LayoutControl
+{
+    public int Gap { get; set; } = Theme.S(16);
+
+    private IEnumerable<Control> Ordered => Controls.Cast<Control>().Reverse().Where(LayoutUtil.IsShown);
+
+    /// <summary>Vrai si un bloc doit remplir la hauteur (grille).</summary>
+    public bool HasFill => Controls.Cast<Control>().Any(c => c.Tag as string == "fill" || c.Dock == DockStyle.Fill);
+
+    private static bool IsFill(Control c) => c.Tag as string == "fill" || c.Dock == DockStyle.Fill;
+
+    private static int HeightOf(Control c, int width) =>
+        c is LayoutControl or TableLayoutPanel or TextLabel or RoundedPanel { AutoSize: true } || c.AutoSize || c is FieldBox
+            ? LayoutUtil.PreferredHeight(c, width)
+            : c.Height;
+
+    protected override void OnControlAdded(ControlEventArgs e)
+    {
+        base.OnControlAdded(e);
+        if (e.Control is { } c)
+        {
+            if (c.Dock == DockStyle.Fill)
+            {
+                c.Tag ??= "fill";
+            }
+
+            c.Dock = DockStyle.None;
+            c.Margin = Padding.Empty;
+        }
+    }
+
+    public override Size GetPreferredSize(Size proposedSize)
+    {
+        int width = proposedSize.Width > 0 ? proposedSize.Width : Width;
+        List<Control> list = Ordered.ToList();
+        int height = list.Sum(c => IsFill(c) ? Math.Max(c.MinimumSize.Height, Theme.S(120)) : HeightOf(c, width));
+        return new Size(width, height + Math.Max(0, list.Count - 1) * Gap);
+    }
+
+    protected override void Arrange()
+    {
+        List<Control> list = Ordered.ToList();
+        int fixedHeight = list.Where(c => !IsFill(c)).Sum(c => HeightOf(c, Width)) + Math.Max(0, list.Count - 1) * Gap;
+        int fills = list.Count(IsFill);
+        int fillHeight = fills == 0 ? 0 : Math.Max(Theme.S(120), (Height - fixedHeight) / fills);
+        int y = 0;
+        foreach (Control c in list)
+        {
+            int h = IsFill(c) ? fillHeight : HeightOf(c, Width);
+            c.SetBounds(0, y, Width, h);
+            y += h + Gap;
+        }
     }
 }
 
@@ -296,28 +435,38 @@ public sealed class MessageDialog : DialogForm
             Primary.DialogResult = DialogResult.OK;
         }
 
-        TableLayoutPanel layout = new() { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Theme.Background };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(64)));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        IconBadge badge = new(glyph, accent) { Anchor = AnchorStyles.Top | AnchorStyles.Left, Margin = new Padding(0, Theme.S(4), 0, 0) };
-        Label text = new()
-        {
-            Text = message,
-            Dock = DockStyle.Fill,
-            Font = Theme.F(10.5f),
-            ForeColor = Theme.Text,
-            Padding = new Padding(0, Theme.S(6), 0, 0)
-        };
-        layout.Controls.Add(badge, 0, 0);
-        layout.Controls.Add(text, 1, 0);
-        Body.Controls.Add(layout);
+        Body.Controls.Add(new MessageBlock(new IconBadge(glyph, accent), message));
+    }
 
-        // Hauteur adaptée au message.
-        int textWidth = Theme.S(480) - Theme.S(56) - Theme.S(64);
-        Size measured = TextRenderer.MeasureText(message, Theme.F(10.5f), new Size(textWidth, int.MaxValue),
-            TextFormatFlags.WordBreak | TextFormatFlags.NoPadding);
-        int extra = Math.Max(0, measured.Height - Theme.S(64));
-        ClientSize = new Size(ClientSize.Width, Math.Min(Theme.S(520), ClientSize.Height + extra));
+    /// <summary>Pastille à gauche, message (retour à la ligne) à droite, alignés en haut.</summary>
+    private sealed class MessageBlock : LayoutControl
+    {
+        private readonly IconBadge _badge;
+        private readonly TextLabel _text;
+
+        public MessageBlock(IconBadge badge, string message)
+        {
+            _badge = badge;
+            _text = new TextLabel { Text = message, Wrap = true, Font = Theme.F(10.5f), ForeColor = Theme.Text };
+            Controls.Add(badge);
+            Controls.Add(_text);
+        }
+
+        private int TextLeft => _badge.Width + Theme.S(16);
+
+        public override Size GetPreferredSize(Size proposedSize)
+        {
+            int width = proposedSize.Width > 0 ? proposedSize.Width : Width;
+            int text = _text.GetPreferredSize(new Size(Math.Max(10, width - TextLeft), 0)).Height;
+            return new Size(width, Math.Max(_badge.Height, text + Theme.S(12)));
+        }
+
+        protected override void Arrange()
+        {
+            _badge.Location = Point.Empty;
+            int text = _text.GetPreferredSize(new Size(Math.Max(10, Width - TextLeft), 0)).Height;
+            _text.SetBounds(TextLeft, Math.Max(0, (_badge.Height - text) / 2), Math.Max(10, Width - TextLeft), text);
+        }
     }
 }
 

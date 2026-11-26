@@ -15,7 +15,7 @@ public class RoundedPanel : Panel
     }
 
     [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-    public int Radius { get; set; } = 14;
+    public int Radius { get; set; } = 12;
 
     [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Color BorderColor { get; set; } = Theme.Border;
@@ -46,7 +46,7 @@ public class RoundedPanel : Panel
     }
 }
 
-/// <summary>Carte de chiffre clé : titre discret, grande valeur, note, filet d'accent (dessinée à la main).</summary>
+/// <summary>Carte de chiffre clé : libellé discret, grande valeur (22 pt), note, filet d'accent (dessinée à la main).</summary>
 public sealed class StatCard : RoundedPanel
 {
     private readonly string _title;
@@ -60,9 +60,8 @@ public sealed class StatCard : RoundedPanel
         _value = value;
         _note = note;
         _accent = accent;
-        Dock = DockStyle.Fill;
-        Margin = new Padding(Theme.S(6));
-        MinimumSize = new Size(Theme.S(120), Theme.S(100));
+        Margin = Padding.Empty;
+        MinimumSize = new Size(Theme.S(120), Theme.S(96));
     }
 
     public void Set(string value, string? note = null)
@@ -82,34 +81,36 @@ public sealed class StatCard : RoundedPanel
         Invalidate();
     }
 
+    private static Font TitleFont => Theme.FieldLabel;
+    private static Font ValueFont => Theme.Semi(20f);
+    private static Font NoteFont => Theme.F(9f);
+
+    public override Size GetPreferredSize(Size proposedSize) =>
+        new(proposedSize.Width, Theme.S(20) * 2 + TitleFont.Height + Theme.S(6) + ValueFont.Height + Theme.S(4) + NoteFont.Height);
+
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
         Graphics g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        Rectangle bar = new(Theme.S(10), Theme.S(16), Theme.S(4), Math.Max(Theme.S(10), Height - Theme.S(32)));
+        int pad = Theme.S(20);
+        int contentHeight = TitleFont.Height + Theme.S(6) + ValueFont.Height + Theme.S(4) + NoteFont.Height;
+        int y = Math.Max(pad, (Height - contentHeight) / 2);
+        Rectangle bar = new(pad, y + Theme.S(2), Theme.S(4), contentHeight - Theme.S(4));
         using (GraphicsPath path = Theme.RoundedRect(bar, Theme.S(2)))
         using (SolidBrush brush = new(_accent))
         {
             g.FillPath(brush, path);
         }
 
-        int left = Theme.S(26);
-        int width = Math.Max(10, Width - left - Theme.S(12));
-        TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter;
-        Font titleFont = Theme.F(8.5f, FontStyle.Bold);
-        Font valueFont = Theme.F(19f, FontStyle.Bold);
-        Font noteFont = Theme.F(9f);
-        int titleHeight = titleFont.Height;
-        int valueHeight = valueFont.Height;
-        int noteHeight = noteFont.Height;
-        int gap = Math.Max(Theme.S(2), (Height - Theme.S(28) - titleHeight - valueHeight - noteHeight) / 2);
-        int y = Theme.S(14);
-        TextRenderer.DrawText(g, _title, titleFont, new Rectangle(left, y, width, titleHeight), Theme.TextMuted, flags);
-        y += titleHeight + gap;
-        TextRenderer.DrawText(g, _value, valueFont, new Rectangle(left, y, width, valueHeight), Theme.Text, flags);
-        y += valueHeight + gap;
-        TextRenderer.DrawText(g, _note, noteFont, new Rectangle(left, y, width, noteHeight), Theme.TextMuted, flags);
+        int left = pad + Theme.S(16);
+        int width = Math.Max(10, Width - left - pad);
+        TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix;
+        TextRenderer.DrawText(g, _title, TitleFont, new Rectangle(left, y, width, TitleFont.Height), Theme.TextMuted, flags);
+        y += TitleFont.Height + Theme.S(6);
+        TextRenderer.DrawText(g, _value, ValueFont, new Rectangle(left, y, width, ValueFont.Height), Theme.Figure, flags);
+        y += ValueFont.Height + Theme.S(4);
+        TextRenderer.DrawText(g, _note, NoteFont, new Rectangle(left, y, width, NoteFont.Height), Theme.TextMuted, flags);
     }
 }
 
@@ -177,96 +178,98 @@ public static class PillPainter
     }
 }
 
-/// <summary>Libellé au-dessus d'un contrôle de saisie.</summary>
-public sealed class FieldBox : TableLayoutPanel
+/// <summary>Libellé (8.5 pt, majuscules) au-dessus d'un contrôle de saisie, 6 px d'écart ; aide facultative dessous.</summary>
+public sealed class FieldBox : LayoutControl
 {
+    private readonly Label? _hint;
+
     public FieldBox(string label, Control control, string? hint = null)
     {
-        ColumnCount = 1;
-        RowCount = hint is null ? 2 : 3;
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        Dock = DockStyle.Fill;
-        Margin = new Padding(0, 0, Theme.S(12), Theme.S(12));
-        ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        RowStyles.Add(new RowStyle(SizeType.AutoSize));
-
-        Caption = new Label
+        Caption = new TextLabel
         {
-            Text = label,
-            AutoSize = true,
-            Font = Theme.F(9f, FontStyle.Bold),
-            ForeColor = Theme.TextMuted,
-            Margin = new Padding(0, 0, 0, Theme.S(6))
+            Text = label.ToUpper(System.Globalization.CultureInfo.GetCultureInfo("fr-FR")),
+            Font = Theme.FieldLabel,
+            ForeColor = Theme.TextMuted
         };
         Control = control;
-        control.Dock = DockStyle.Fill;
-        control.Margin = Padding.Empty;
-        Controls.Add(Caption, 0, 0);
-        Controls.Add(control, 0, 1);
+        LayoutUtil.Prepare(control);
+        Controls.Add(Caption);
+        Controls.Add(control);
         if (hint is not null)
         {
-            RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            Controls.Add(new Label
-            {
-                Text = hint,
-                AutoSize = true,
-                Font = Theme.F(8.5f),
-                ForeColor = Theme.TextFaint,
-                Margin = new Padding(0, Theme.S(4), 0, 0)
-            }, 0, 2);
+            _hint = new TextLabel { Text = hint, Font = Theme.F(8.5f), ForeColor = Theme.TextFaint };
+            Controls.Add(_hint);
         }
     }
 
     public Label Caption { get; }
 
     public Control Control { get; }
+
+    private int ControlHeight(int width) => Control is ToggleBox or Label ? Control.GetPreferredSize(new Size(width, 0)).Height : Control.Height;
+
+    public override Size GetPreferredSize(Size proposedSize)
+    {
+        int width = proposedSize.Width > 0 ? proposedSize.Width : Width;
+        int height = Caption.Font.Height + Theme.S(6) + ControlHeight(width);
+        if (_hint is not null)
+        {
+            height += Theme.S(4) + _hint.Font.Height;
+        }
+
+        return new Size(width, height);
+    }
+
+    protected override void Arrange()
+    {
+        Caption.SetBounds(0, 0, Width, Caption.Font.Height);
+        int y = Caption.Font.Height + Theme.S(6);
+        int h = ControlHeight(Width);
+        Control.SetBounds(0, y, Width, h);
+        _hint?.SetBounds(0, y + h + Theme.S(4), Width, _hint.Font.Height);
+    }
 }
 
-/// <summary>Barre de pagination « ‹ Page 2 / 5 › — 123 résultats ».</summary>
-public sealed class PagerBar : TableLayoutPanel
+/// <summary>Pied de liste : « ‹ Page 2 / 5 › » à gauche, « 123 résultats » à droite (mêmes bords que la carte).</summary>
+public sealed class PagerBar : LayoutControl
 {
     private readonly FlatButton _prev;
     private readonly FlatButton _next;
-    private readonly Label _info;
+    private readonly TextLabel _info;
+    private readonly TextLabel _total;
 
     public PagerBar()
     {
-        ColumnCount = 4;
-        RowCount = 1;
-        Height = Theme.S(48);
-        Dock = DockStyle.Bottom;
-        ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        _prev = new FlatButton { Kind = ButtonKind.Secondary, IconGlyph = Icons.ChevronLeft, Height = Theme.S(34), Anchor = AnchorStyles.Left };
-        _next = new FlatButton { Kind = ButtonKind.Secondary, IconGlyph = Icons.ChevronRight, Height = Theme.S(34), Anchor = AnchorStyles.Left };
-        _info = new Label
-        {
-            AutoSize = true,
-            Font = Theme.F(9.5f),
-            ForeColor = Theme.TextMuted,
-            Anchor = AnchorStyles.Left,
-            Margin = new Padding(Theme.S(12), 0, Theme.S(12), 0)
-        };
-        Label total = new() { AutoSize = true, Font = Theme.F(9.5f), ForeColor = Theme.TextMuted, Anchor = AnchorStyles.Right };
-        TotalLabel = total;
+        Height = Theme.S(40);
+        _prev = new FlatButton { Kind = ButtonKind.Secondary, IconGlyph = Icons.ChevronLeft, AutoSize = false, Height = Theme.S(36) };
+        _next = new FlatButton { Kind = ButtonKind.Secondary, IconGlyph = Icons.ChevronRight, AutoSize = false, Height = Theme.S(36) };
+        _info = new TextLabel { Font = Theme.F(9.5f), ForeColor = Theme.TextMuted, TextAlign = ContentAlignment.MiddleCenter };
+        _total = new TextLabel { Font = Theme.F(9.5f), ForeColor = Theme.TextMuted, TextAlign = ContentAlignment.MiddleRight };
         _prev.Click += (_, _) => PageRequested?.Invoke(this, Page - 1);
         _next.Click += (_, _) => PageRequested?.Invoke(this, Page + 1);
-        Controls.Add(_prev, 0, 0);
-        Controls.Add(_info, 1, 0);
-        Controls.Add(_next, 2, 0);
-        Controls.Add(total, 3, 0);
+        Controls.Add(_prev);
+        Controls.Add(_info);
+        Controls.Add(_next);
+        Controls.Add(_total);
         Visible = false;
     }
-
-    private Label TotalLabel { get; }
 
     public int Page { get; private set; } = 1;
 
     public event EventHandler<int>? PageRequested;
+
+    public override Size GetPreferredSize(Size proposedSize) => new(proposedSize.Width, Theme.S(40));
+
+    protected override void Arrange()
+    {
+        int b = Theme.S(36);
+        int y = (Height - b) / 2;
+        _prev.SetBounds(0, y, b, b);
+        int infoWidth = TextRenderer.MeasureText("Page 999 / 999", _info.Font).Width + Theme.S(8);
+        _info.SetBounds(b, 0, infoWidth, Height);
+        _next.SetBounds(b + infoWidth, y, b, b);
+        _total.SetBounds(Width / 2, 0, Width / 2, Height);
+    }
 
     public void Update(int page, int totalPages, int totalItems, string noun = "résultat")
     {
@@ -275,7 +278,7 @@ public sealed class PagerBar : TableLayoutPanel
         _prev.Enabled = Page > 1;
         _next.Enabled = Page < totalPages;
         _info.Text = $"Page {Page} / {totalPages}";
-        TotalLabel.Text = totalItems + " " + noun + (totalItems > 1 ? "s" : string.Empty);
+        _total.Text = totalItems + " " + noun + (totalItems > 1 ? "s" : string.Empty);
         Visible = totalItems > 0;
     }
 }

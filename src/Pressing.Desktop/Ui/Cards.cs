@@ -1,77 +1,63 @@
 namespace Pressing.Desktop.Ui;
 
-/// <summary>Carte avec titre (et sous-titre / actions facultatifs) autour d'un contenu.</summary>
+/// <summary>
+/// Carte avec titre (12 pt semi-gras), sous-titre et actions facultatifs, padding de 24 px, 16 px entre le titre et
+/// le contenu. Mise en page manuelle : la hauteur préférée = en-tête + contenu (pour <see cref="GridRow"/> /
+/// <see cref="VStack"/>) ; si la carte est plus haute, le contenu s'étire.
+/// <paramref name="flushContent"/> : le contenu (grille) touche les bords gauche/droit de la carte.
+/// </summary>
 public sealed class TitledCard : RoundedPanel
 {
     private readonly Label _title;
     private readonly Label _subtitle;
-    private readonly FlowLayoutPanel _actions;
+    private readonly ActionBar _actions;
+    private readonly bool _flush;
 
     public TitledCard(string title, Control content, string? subtitle = null, bool flushContent = false, bool autoHeight = false)
     {
-        Dock = autoHeight ? DockStyle.Top : DockStyle.Fill;
-        if (autoHeight)
+        _flush = flushContent;
+        AutoHeight = autoHeight;
+        Margin = Padding.Empty;
+        Padding = Padding.Empty;
+        _title = new TextLabel
         {
-            AutoSize = true;
-            AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        }
-
-        Margin = new Padding(Theme.S(6));
-        Padding = new Padding(Theme.S(flushContent ? 1 : 20), Theme.S(18), Theme.S(flushContent ? 1 : 20), Theme.S(flushContent ? 8 : 18));
-
-        TableLayoutPanel layout = new() { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, BackColor = Color.Transparent };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(autoHeight ? new RowStyle(SizeType.AutoSize) : new RowStyle(SizeType.Percent, 100));
-        if (autoHeight)
-        {
-            layout.Dock = DockStyle.Top;
-            layout.AutoSize = true;
-            layout.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        }
-
-
-        TableLayoutPanel head = new()
-        {
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            ColumnCount = 2,
-            RowCount = 1,
-            Margin = new Padding(flushContent ? Theme.S(19) : 0, 0, flushContent ? Theme.S(19) : 0, Theme.S(12))
+            Text = title,
+            AutoSize = false,
+            AutoEllipsis = true,
+            Font = Theme.CardTitle,
+            ForeColor = Theme.Text,
+            BackColor = Color.Transparent,
+            UseMnemonic = false
         };
-        head.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        head.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        TableLayoutPanel texts = new() { AutoSize = true, ColumnCount = 1, Dock = DockStyle.Fill, Margin = Padding.Empty };
-        _title = new Label { Text = title, AutoSize = true, Font = Theme.F(12f, FontStyle.Bold), ForeColor = Theme.Text, Margin = Padding.Empty };
-        _subtitle = new Label
+        _subtitle = new TextLabel
         {
             Text = subtitle ?? string.Empty,
-            AutoSize = true,
+            AutoSize = false,
+            AutoEllipsis = true,
             Font = Theme.F(9f),
             ForeColor = Theme.TextMuted,
-            Visible = !string.IsNullOrEmpty(subtitle),
-            Margin = new Padding(0, Theme.S(2), 0, 0)
+            BackColor = Color.Transparent,
+            UseMnemonic = false
         };
-        texts.Controls.Add(_title, 0, 0);
-        texts.Controls.Add(_subtitle, 0, 1);
-        _actions = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.Right, Margin = Padding.Empty };
-        head.Controls.Add(texts, 0, 0);
-        head.Controls.Add(_actions, 1, 0);
-
+        _actions = new ActionBar { ButtonHeight = Theme.S(32), MaxVisible = 3 };
         if (flushContent && content is RoundedPanel inner)
         {
             inner.DrawBorder = false;
+            inner.Radius = 0;
         }
 
-        content.Dock = autoHeight ? DockStyle.Top : DockStyle.Fill;
-        content.Margin = Padding.Empty;
-        layout.Controls.Add(head, 0, 0);
-        layout.Controls.Add(content, 0, 1);
-        Controls.Add(layout);
+        LayoutUtil.Prepare(content);
+        Controls.Add(_title);
+        Controls.Add(_subtitle);
+        Controls.Add(_actions);
+        Controls.Add(content);
         Content = content;
     }
 
     public Control Content { get; }
+
+    /// <summary>Hauteur de la carte = hauteur du contenu (sinon le contenu remplit la carte).</summary>
+    public bool AutoHeight { get; set; }
 
     public string Subtitle
     {
@@ -79,11 +65,89 @@ public sealed class TitledCard : RoundedPanel
         set
         {
             _subtitle.Text = value;
-            _subtitle.Visible = !string.IsNullOrEmpty(value);
+            PerformLayout();
         }
     }
 
-    public void AddAction(Control control) => _actions.Controls.Add(control);
+    public string TitleText
+    {
+        get => _title.Text;
+        set => _title.Text = value;
+    }
+
+    public void AddAction(Control control)
+    {
+        if (control is FlatButton { AutoSize: true } b)
+        {
+            b.Height = Theme.S(32);
+        }
+
+        _actions.Add(control);
+        PerformLayout();
+    }
+
+    private bool HasHeader => _title.Text.Length > 0 || _actions.Controls.Count > 1;
+
+    private int HeaderHeight(int width)
+    {
+        if (!HasHeader)
+        {
+            return 0;
+        }
+
+        int text = _title.Font.Height + (_subtitle.Text.Length > 0 ? Theme.S(2) + _subtitle.Font.Height : 0);
+        int actions = _actions.GetPreferredSize(Size.Empty).Height;
+        return Math.Max(text, actions);
+    }
+
+    private Padding Inner => new(
+        _flush ? 1 : Theme.CardPadding,
+        Theme.CardPadding,
+        _flush ? 1 : Theme.CardPadding,
+        _flush ? Theme.S(8) : Theme.CardPadding);
+
+    public override Size GetPreferredSize(Size proposedSize)
+    {
+        int width = proposedSize.Width > 0 ? proposedSize.Width : Width;
+        Padding inner = Inner;
+        int header = HeaderHeight(width - 2 * Theme.CardPadding);
+        int contentWidth = Math.Max(1, width - inner.Horizontal);
+        int content = LayoutUtil.IsShown(Content) ? LayoutUtil.PreferredHeight(Content, contentWidth) : 0;
+        return new Size(width, inner.Top + header + (header > 0 ? Theme.S(16) : 0) + content + inner.Bottom);
+    }
+
+    protected override void OnLayout(LayoutEventArgs levent)
+    {
+        base.OnLayout(levent);
+        if (Width <= 0 || Height <= 0 || _title is null || Content is null)
+        {
+            return;
+        }
+
+        Padding inner = Inner;
+        int headerWidth = Width - 2 * Theme.CardPadding;
+        int header = HeaderHeight(headerWidth);
+        int y = inner.Top;
+        if (header > 0)
+        {
+            Size actions = _actions.GetPreferredSize(Size.Empty);
+            int actionsWidth = Math.Min(actions.Width, headerWidth / 2 + Theme.S(60));
+            _actions.SetBounds(Width - Theme.CardPadding - actionsWidth, y + (header - actions.Height) / 2, actionsWidth, actions.Height);
+            int textWidth = Math.Max(10, headerWidth - (actionsWidth > 0 ? actionsWidth + Theme.S(16) : 0));
+            int textHeight = _title.Font.Height + (_subtitle.Text.Length > 0 ? Theme.S(2) + _subtitle.Font.Height : 0);
+            int ty = y + (header - textHeight) / 2;
+            _title.SetBounds(Theme.CardPadding, ty, textWidth, _title.Font.Height);
+            _subtitle.Visible = _subtitle.Text.Length > 0;
+            _subtitle.SetBounds(Theme.CardPadding, ty + _title.Font.Height + Theme.S(2), textWidth, _subtitle.Font.Height);
+            y += header + Theme.S(16);
+        }
+
+        _title.Visible = header > 0;
+        int contentWidth = Math.Max(1, Width - inner.Horizontal);
+        int available = Math.Max(0, Height - y - inner.Bottom);
+        int height = AutoHeight ? Math.Min(available, LayoutUtil.PreferredHeight(Content, contentWidth)) : available;
+        Content.SetBounds(inner.Left, y, contentWidth, Math.Max(available, height));
+    }
 }
 
 public static class ControlExtensions
@@ -100,67 +164,113 @@ public static class ControlExtensions
     }
 }
 
-/// <summary>Liste « libellé … valeur » (fiches de détail, totaux).</summary>
-public sealed class InfoList : TableLayoutPanel
+/// <summary>Liste « libellé … valeur » (fiches de détail, totaux) : libellé à gauche, valeur alignée à droite.</summary>
+public sealed class InfoList : LayoutControl
 {
     private readonly bool _wrap;
-    private int _row;
+    private readonly List<(Label? Key, Control Value)> _rows = new();
 
     public InfoList(bool wrapValues = true)
     {
         _wrap = wrapValues;
         Dock = DockStyle.Top;
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        ColumnCount = 2;
-        Margin = Padding.Empty;
-        ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
     }
 
     public void Clear()
     {
+        foreach ((Label? key, Control value) in _rows)
+        {
+            key?.Dispose();
+            value.Dispose();
+        }
+
+        _rows.Clear();
         Controls.Clear();
-        RowStyles.Clear();
-        _row = 0;
+        PerformLayout();
+        this.RequestPageLayout();
     }
 
     public Label Add(string key, string value, Color? color = null, bool bold = false, float size = 10f)
     {
-        RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        Label k = new()
+        Label k = new TextLabel
         {
             Text = key,
-            AutoSize = true,
+            AutoSize = false,
             Font = Theme.F(size),
             ForeColor = Theme.TextMuted,
-            Margin = new Padding(0, Theme.S(4), Theme.S(16), Theme.S(4)),
-            Anchor = AnchorStyles.Left | AnchorStyles.Top
+            BackColor = Color.Transparent,
+            UseMnemonic = false
         };
-        Label v = new()
+        Label v = new TextLabel
         {
+            Wrap = _wrap,
             Text = value,
-            AutoSize = true,
-            MaximumSize = _wrap ? new Size(Theme.S(230), 0) : Size.Empty,
-            Font = Theme.F(size, bold ? FontStyle.Bold : FontStyle.Regular),
+            AutoSize = false,
+            Font = bold ? Theme.Semi(size) : Theme.F(size),
             ForeColor = color ?? Theme.Text,
+            BackColor = Color.Transparent,
             TextAlign = ContentAlignment.TopRight,
-            Margin = new Padding(0, Theme.S(4), 0, Theme.S(4)),
-            Anchor = AnchorStyles.Right | AnchorStyles.Top
+            UseMnemonic = false
         };
-        Controls.Add(k, 0, _row);
-        Controls.Add(v, 1, _row);
-        _row++;
+        v.TextChanged += (_, _) => PerformLayout();
+        _rows.Add((k, v));
+        Controls.Add(k);
+        Controls.Add(v);
+        PerformLayout();
+        this.RequestPageLayout();
         return v;
     }
 
     public void AddSeparator()
     {
-        RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.S(13)));
-        Panel line = new() { Height = 1, Anchor = AnchorStyles.Left | AnchorStyles.Right, BackColor = Theme.Border, Margin = new Padding(0, Theme.S(6), 0, 0) };
-        Controls.Add(line, 0, _row);
-        SetColumnSpan(line, 2);
-        _row++;
+        Panel line = new() { Height = 1, BackColor = Theme.Border };
+        _rows.Add((null, line));
+        Controls.Add(line);
+        PerformLayout();
+    }
+
+    private const TextFormatFlags Flags = TextFormatFlags.NoPadding | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix;
+
+    private (int KeyWidth, int RowHeight, int ValueHeight) Measure(Label key, Label value, int width)
+    {
+        int keyWidth = Math.Min(width / 2, TextRenderer.MeasureText(key.Text, key.Font, new Size(int.MaxValue, int.MaxValue), Flags).Width + Theme.S(2));
+        int valueWidth = Math.Max(Theme.S(40), width - keyWidth - Theme.S(16));
+        Size v = TextRenderer.MeasureText(value.Text, value.Font, new Size(valueWidth, int.MaxValue), _wrap ? Flags : Flags & ~TextFormatFlags.WordBreak);
+        int valueHeight = _wrap ? v.Height : value.Font.Height;
+        return (keyWidth, Math.Max(key.Font.Height, valueHeight) + Theme.S(10), valueHeight);
+    }
+
+    public override Size GetPreferredSize(Size proposedSize)
+    {
+        int width = proposedSize.Width > 0 ? proposedSize.Width : Math.Max(Width, Theme.S(200));
+        int height = 0;
+        foreach ((Label? key, Control value) in _rows)
+        {
+            height += key is null ? Theme.S(13) : Measure(key, (Label)value, width).RowHeight;
+        }
+
+        return new Size(width, height);
+    }
+
+    protected override void Arrange()
+    {
+        int y = 0;
+        foreach ((Label? key, Control value) in _rows)
+        {
+            if (key is null)
+            {
+                value.SetBounds(0, y + Theme.S(6), Width, 1);
+                y += Theme.S(13);
+                continue;
+            }
+
+            (int keyWidth, int rowHeight, int valueHeight) = Measure(key, (Label)value, Width);
+            key.SetBounds(0, y + Theme.S(5), keyWidth, key.Font.Height);
+            int valueLeft = keyWidth + Theme.S(16);
+            value.SetBounds(valueLeft, y + Theme.S(5) + (key.Font.Height > valueHeight ? (key.Font.Height - valueHeight) / 2 : 0),
+                Width - valueLeft, valueHeight + Theme.S(2));
+            y += rowHeight;
+        }
     }
 }
 
@@ -175,6 +285,12 @@ public sealed class ScrollPanel : Panel
     }
 
     protected override Point ScrollToControl(Control activeControl) => DisplayRectangle.Location;
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        NativeScroll.Darken(this);
+    }
 }
 
 /// <summary>

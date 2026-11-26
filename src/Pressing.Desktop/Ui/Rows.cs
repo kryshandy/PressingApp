@@ -113,6 +113,9 @@ public sealed class ClientRow : IPillRow, ITintRow
     {
         "web" => Source.WebAccessEnabled ? ("Accès web", Theme.Blue) : null,
         "state" when !Source.IsActive => ("Inactif", Theme.Slate),
+        "status" when !Source.IsActive => ("Inactif", Theme.Slate),
+        "status" when Source.WebAccessEnabled => ("Accès web", Theme.Blue),
+        "status" => ("Actif", Theme.Green),
         _ => null
     };
 

@@ -7,7 +7,7 @@ namespace Pressing.Desktop.Ui;
 /// <summary>Champ de saisie arrondi (TextBox sans bordure dans un cadre dessiné) avec icône et suffixe facultatifs.</summary>
 public class InputBox : Control
 {
-    private readonly TextBox _box;
+    private readonly CueTextBox _box;
     private bool _focused;
     private string _icon = string.Empty;
     private string _suffix = string.Empty;
@@ -21,7 +21,7 @@ public class InputBox : Control
         BackColor = Theme.SurfaceAlt;
         ForeColor = Theme.Text;
         Font = Theme.Body;
-        _box = new TextBox
+        _box = new CueTextBox
         {
             BorderStyle = BorderStyle.None,
             BackColor = Theme.SurfaceAlt,
@@ -46,10 +46,11 @@ public class InputBox : Control
         set => _box.Text = value ?? string.Empty;
     }
 
+    /// <summary>Texte d'aide affiché (dessiné au thème) quand le champ est vide.</summary>
     public string PlaceholderText
     {
-        get => _box.PlaceholderText;
-        set => _box.PlaceholderText = value;
+        get => _box.Cue;
+        set => _box.Cue = value;
     }
 
     public bool ReadOnly
@@ -93,7 +94,7 @@ public class InputBox : Control
             _multiline = value;
             _box.Multiline = value;
             _box.AcceptsReturn = value;
-            _box.ScrollBars = value ? ScrollBars.Vertical : ScrollBars.None;
+            _box.ScrollBars = ScrollBars.None;
             if (value && Height < Theme.S(80))
             {
                 Height = Theme.S(96);
@@ -466,7 +467,16 @@ public sealed class SelectBox : Control
     }
 }
 
-/// <summary>Case à cocher dessinée (carré arrondi + coche) avec libellé.</summary>
+/// <summary>Style de <see cref="ToggleBox"/>.</summary>
+public enum ToggleStyle
+{
+    /// <summary>Interrupteur (par défaut).</summary>
+    Switch,
+    /// <summary>Case carrée dessinée au thème.</summary>
+    Check
+}
+
+/// <summary>Interrupteur (ou case) dessiné au thème avec libellé — jamais la case à cocher native de Windows.</summary>
 public sealed class ToggleBox : Control
 {
     private bool _checked;
@@ -485,6 +495,8 @@ public sealed class ToggleBox : Control
 
     public event EventHandler? CheckedChanged;
 
+    public ToggleStyle Style { get; set; } = ToggleStyle.Switch;
+
     public bool Checked
     {
         get => _checked;
@@ -501,10 +513,12 @@ public sealed class ToggleBox : Control
         }
     }
 
+    private int MarkWidth => Style == ToggleStyle.Switch ? Theme.S(36) : Theme.S(20);
+
     public override Size GetPreferredSize(Size proposedSize)
     {
         Size text = TextRenderer.MeasureText(Text, Font, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
-        return new Size(Theme.S(32) + text.Width, Math.Max(Theme.S(28), text.Height + Theme.S(6)));
+        return new Size(MarkWidth + (Text.Length > 0 ? Theme.S(10) + text.Width : 0) + 2, Math.Max(Theme.S(28), text.Height + Theme.S(6)));
     }
 
     protected override void OnTextChanged(EventArgs e)
@@ -518,22 +532,51 @@ public sealed class ToggleBox : Control
         Graphics g = e.Graphics;
         g.Clear(Theme.BackOf(this));
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        int size = Theme.S(20);
-        Rectangle box = new(1, (Height - size) / 2, size, size);
-        using GraphicsPath path = Theme.RoundedRect(box, Theme.S(5));
-        using SolidBrush fill = new(_checked ? Theme.Accent : Theme.SurfaceAlt);
-        g.FillPath(fill, path);
-        using Pen pen = new(_checked ? Theme.Accent : _hover || Focused ? Theme.AccentHover : Theme.Border, 1.4f);
-        g.DrawPath(pen, path);
-        TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine |
-                                TextFormatFlags.NoPrefix;
-        if (_checked)
+        bool hot = (_hover || Focused) && Enabled;
+        if (Style == ToggleStyle.Switch)
         {
-            TextRenderer.DrawText(g, Icons.Check, Theme.Icon(9f), box, Theme.OnAccent, flags | TextFormatFlags.HorizontalCenter);
+            int h = Theme.S(20);
+            Rectangle track = new(1, (Height - h) / 2, MarkWidth - 2, h);
+            using (GraphicsPath path = Theme.RoundedRect(track, h / 2))
+            {
+                Color fill = !Enabled ? Theme.Mix(Theme.SurfaceAlt, Theme.Border, 0.4f)
+                    : _checked ? (hot ? Theme.AccentHover : Theme.Accent)
+                    : hot ? Theme.SurfaceHover : Theme.Border;
+                using SolidBrush brush = new(fill);
+                g.FillPath(brush, path);
+                if (Focused && ShowFocusCues)
+                {
+                    using Pen focus = new(Theme.Alpha(Theme.Blue, 200), 1.5f);
+                    g.DrawPath(focus, path);
+                }
+            }
+
+            int knob = h - Theme.S(6);
+            int x = _checked ? track.Right - knob - Theme.S(3) : track.Left + Theme.S(3);
+            using SolidBrush knobBrush = new(_checked ? Theme.OnAccent : Theme.Text);
+            g.FillEllipse(knobBrush, x, track.Top + Theme.S(3), knob, knob);
+        }
+        else
+        {
+            int size = Theme.S(20);
+            Rectangle box = new(1, (Height - size) / 2, size, size);
+            using GraphicsPath path = Theme.RoundedRect(box, Theme.S(5));
+            using SolidBrush fill = new(_checked ? Theme.Accent : Theme.SurfaceAlt);
+            g.FillPath(fill, path);
+            using Pen pen = new(_checked ? Theme.Accent : hot ? Theme.AccentHover : Theme.Border, 1.4f);
+            g.DrawPath(pen, path);
+            if (_checked)
+            {
+                TextRenderer.DrawText(g, Icons.Check, Theme.Icon(9f), box, Theme.OnAccent,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            }
         }
 
-        TextRenderer.DrawText(g, Text, Font, new Rectangle(size + Theme.S(12), 0, Math.Max(1, Width - size - Theme.S(12)), Height),
-            Enabled ? Theme.Text : Theme.TextFaint, flags | TextFormatFlags.EndEllipsis);
+        TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine |
+                                TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis;
+        int left = MarkWidth + Theme.S(10);
+        TextRenderer.DrawText(g, Text, Font, new Rectangle(left, 0, Math.Max(1, Width - left), Height),
+            Enabled ? Theme.Text : Theme.TextFaint, flags);
     }
 
     protected override void OnClick(EventArgs e)
@@ -903,5 +946,99 @@ public sealed class StepperBox : Control
         _minus.SetBounds(0, 0, b, Height);
         _plus.SetBounds(Width - b, 0, b, Height);
         _value.SetBounds(b, 0, Math.Max(1, Width - 2 * b), Height);
+    }
+}
+
+/// <summary>
+/// TextBox dont le texte d'aide (placeholder) est dessiné au thème quand le champ est vide — à l'écran (WM_PAINT)
+/// comme dans les captures (WM_PRINT / WM_PRINTCLIENT), y compris pendant la saisie tant que rien n'est tapé.
+/// </summary>
+internal sealed class CueTextBox : TextBox
+{
+    private const int WmPaint = 0x000F;
+    private const int WmPrint = 0x0317;
+    private const int WmPrintClient = 0x0318;
+    private string _cue = string.Empty;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool HideCaret(IntPtr hWnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ShowCaret(IntPtr hWnd);
+
+    public string Cue
+    {
+        get => _cue;
+        set
+        {
+            _cue = value ?? string.Empty;
+            Invalidate();
+        }
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        base.WndProc(ref m);
+        if (m.Msg is not (WmPaint or WmPrint or WmPrintClient) || _cue.Length == 0 || !IsHandleCreated || TextLength > 0)
+        {
+            return;
+        }
+
+        if (m.Msg == WmPaint)
+        {
+            bool caret = Focused && HideCaret(Handle);
+            using (Graphics g = CreateGraphics())
+            {
+                DrawCue(g);
+            }
+
+            if (caret)
+            {
+                ShowCaret(Handle);
+            }
+        }
+        else if ((m.Msg == WmPrintClient || m.Msg == WmPrint) && m.WParam != IntPtr.Zero)
+        {
+            using Graphics g = Graphics.FromHdc(m.WParam);
+            DrawCue(g);
+        }
+    }
+
+    private void DrawCue(Graphics g)
+    {
+        TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis;
+        flags |= Multiline ? TextFormatFlags.WordBreak | TextFormatFlags.Top : TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter;
+        flags |= TextAlign switch
+        {
+            HorizontalAlignment.Right => TextFormatFlags.Right,
+            HorizontalAlignment.Center => TextFormatFlags.HorizontalCenter,
+            _ => TextFormatFlags.Left
+        };
+        Rectangle r = ClientRectangle;
+        r.Inflate(-Theme.S(1), 0);
+        if (!Multiline)
+        {
+            r.X += Theme.S(1);
+        }
+
+        TextRenderer.DrawText(g, _cue, Font, r, Theme.TextFaint, BackColor, flags);
+    }
+
+    protected override void OnTextChanged(EventArgs e)
+    {
+        base.OnTextChanged(e);
+        Invalidate();
+    }
+
+    protected override void OnGotFocus(EventArgs e)
+    {
+        base.OnGotFocus(e);
+        Invalidate();
+    }
+
+    protected override void OnLostFocus(EventArgs e)
+    {
+        base.OnLostFocus(e);
+        Invalidate();
     }
 }

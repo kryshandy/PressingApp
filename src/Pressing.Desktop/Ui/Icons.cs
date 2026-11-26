@@ -41,5 +41,7 @@ public static class Icons
     public const string Gift = "";
     public const string Refund = "";
     public const string Clock = "";
+    public const string More = "";
+    public const string Inbox = "";
     public const string Coming = "";
 }

@@ -62,6 +62,15 @@ public class FlatButton : Button
         set { _busy = value; Cursor = value ? Cursors.WaitCursor : Cursors.Hand; Invalidate(); }
     }
 
+    /// <summary>Déclenche le clic même si le bouton est masqué (menu « Plus d'actions »).</summary>
+    public void RaiseClick()
+    {
+        if (Enabled)
+        {
+            OnClick(EventArgs.Empty);
+        }
+    }
+
     protected override void OnClick(EventArgs e)
     {
         if (_busy)
