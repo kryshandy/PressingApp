@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Pressing.Core.Options;
+using Pressing.Core.Security;
 
 namespace Pressing.Core.Data;
 
@@ -30,6 +31,45 @@ public class DatabaseInitializer
         if (_options.SeedDemoData)
         {
             await DbSeeder.SeedDemoAsync(_db, ct);
+        }
+
+        await RenormalizePhonesAsync(ct);
+    }
+
+    /// <summary>
+    /// Recalcule PhoneNormalized avec la règle courante (bases créées avec une ancienne règle).
+    /// Idempotent : ne touche que les clients dont la valeur diffère. Si deux clients aboutissent au même
+    /// numéro canonique (index unique), le second est laissé tel quel pour ne pas bloquer le démarrage.
+    /// </summary>
+    private async Task RenormalizePhonesAsync(CancellationToken ct)
+    {
+        var clients = await _db.Clients.ToListAsync(ct);
+        var taken = new HashSet<string>(clients.Select(c => c.PhoneNormalized));
+        bool changed = false;
+
+        foreach (var client in clients)
+        {
+            string expected = PhoneNormalizer.Normalize(client.Phone);
+            if (expected == client.PhoneNormalized)
+            {
+                continue;
+            }
+
+            if (taken.Contains(expected))
+            {
+                continue;
+            }
+
+            taken.Remove(client.PhoneNormalized);
+            taken.Add(expected);
+            client.PhoneNormalized = expected;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            // Mise à jour en deux temps possible si des échanges de valeurs existent : les collisions sont ignorées plus haut.
+            await _db.SaveChangesAsync(ct);
         }
     }
 }
