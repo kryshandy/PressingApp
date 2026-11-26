@@ -47,12 +47,12 @@ public sealed class FrmMain : Form, IAppHost
         ForeColor = Theme.Text;
         KeyPreview = true;
         Rectangle area = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1920, 1080);
-        MinimumSize = new Size(Math.Min(Theme.S(1180), area.Width), Math.Min(Theme.S(720), area.Height));
+        MinimumSize = new Size(Math.Min(Theme.S(1280), area.Width), Math.Min(Theme.S(760), area.Height));
         StartPosition = FormStartPosition.CenterScreen;
         WindowState = FormWindowState.Maximized;
 
         TableLayoutPanel root = new() { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Theme.Background };
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(252)));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(240)));
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.Controls.Add(BuildSidebar(), 0, 0);
 
@@ -60,8 +60,8 @@ public sealed class FrmMain : Form, IAppHost
         _search = new InputBox
         {
             IconGlyph = Icons.Search,
-            PlaceholderText = "Ticket ou client…  (F3)",
-            Width = Theme.S(400),
+            PlaceholderText = "Rechercher un ticket, un client…  (F3)",
+            Width = Theme.S(420),
             Anchor = AnchorStyles.Left,
             Margin = Padding.Empty
         };
@@ -249,30 +249,14 @@ public sealed class FrmMain : Form, IAppHost
         area.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.S(72)));
         area.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        Panel header = new() { Dock = DockStyle.Fill, BackColor = Theme.Background, Margin = Padding.Empty, Padding = new Padding(Theme.S(28), 0, Theme.S(24), 0) };
-        Panel line = new() { Dock = DockStyle.Bottom, Height = 1, BackColor = Theme.Border };
-
-        TableLayoutPanel bar = new() { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1, BackColor = Theme.Background };
-        bar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(400)));
-        bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        bar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        _search.Dock = DockStyle.None;
-        bar.Controls.Add(_search, 0, 0);
-        _bell.Margin = new Padding(0, 0, Theme.S(8), 0);
-        bar.Controls.Add(_bell, 2, 0);
-        UserChip chip = new(_session.Staff) { Anchor = AnchorStyles.Right, Margin = new Padding(0, 0, Theme.S(8), 0) };
+        UserChip chip = new(_session.Staff);
         chip.Click += (_, _) => Navigate(NavRegistry.Account);
-        bar.Controls.Add(chip, 3, 0);
-        FlatButton logout = new() { Kind = ButtonKind.Secondary, IconGlyph = Icons.Logout, Text = string.Empty, Anchor = AnchorStyles.Right, Margin = Padding.Empty };
+        FlatButton logout = new() { Kind = ButtonKind.Secondary, IconGlyph = Icons.Logout, Text = string.Empty, AutoSize = false, Size = new Size(Theme.S(40), Theme.S(40)) };
         logout.Click += (_, _) => Logout();
-        bar.Controls.Add(logout, 4, 0);
         new ToolTip().SetToolTip(logout, "Se déconnecter");
         new ToolTip().SetToolTip(_bell, "Notifications");
+        ShellHeader header = new(_search, _bell, chip, logout) { Dock = DockStyle.Fill, Margin = Padding.Empty };
 
-        header.Controls.Add(bar);
-        header.Controls.Add(line);
         area.Controls.Add(header, 0, 0);
         area.Controls.Add(_content, 0, 1);
         return area;
@@ -521,6 +505,66 @@ public sealed class FrmMain : Form, IAppHost
         base.OnHandleCreated(e);
         Native.DarkTitleBar(this);
     }
+
+    /// <summary>Auto-test : autorise une fenêtre plus grande que l'écran (captures à 1600×900 sur un petit écran).</summary>
+    internal static bool AllowOversize { get; set; }
+
+    protected override void WndProc(ref Message m)
+    {
+        base.WndProc(ref m);
+        if (m.Msg == 0x0024 && AllowOversize && m.LParam != IntPtr.Zero)
+        {
+            // MINMAXINFO.ptMaxTrackSize (x, y) aux octets 32 et 36.
+            System.Runtime.InteropServices.Marshal.WriteInt32(m.LParam, 32, 10000);
+            System.Runtime.InteropServices.Marshal.WriteInt32(m.LParam, 36, 10000);
+        }
+    }
+}
+
+/// <summary>
+/// En-tête global : recherche à gauche et actions (cloche, utilisateur, déconnexion) à droite, posées exactement
+/// sur la gouttière de page (32 px) pour coïncider avec les bords du titre et des cartes ; filet en bas.
+/// </summary>
+internal sealed class ShellHeader : LayoutControl
+{
+    private readonly Control _search;
+    private readonly Control _bell;
+    private readonly Control _chip;
+    private readonly Control _logout;
+
+    public ShellHeader(Control search, Control bell, Control chip, Control logout)
+    {
+        BackColor = Theme.Background;
+        _search = search;
+        _bell = bell;
+        _chip = chip;
+        _logout = logout;
+        foreach (Control c in new[] { search, bell, chip, logout })
+        {
+            LayoutUtil.Prepare(c);
+            Controls.Add(c);
+        }
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        using Pen pen = new(Theme.Border);
+        e.Graphics.DrawLine(pen, Theme.PageGutter, Height - 1, Width - Theme.PageGutter, Height - 1);
+    }
+
+    protected override void Arrange()
+    {
+        int g = Theme.PageGutter;
+        int mid = Height / 2;
+        int right = Width - g;
+        _logout.SetBounds(right - _logout.Width, mid - _logout.Height / 2, _logout.Width, _logout.Height);
+        right = _logout.Left - Theme.S(8);
+        _chip.SetBounds(right - _chip.Width, mid - _chip.Height / 2, _chip.Width, _chip.Height);
+        right = _chip.Left - Theme.S(8);
+        _bell.SetBounds(right - _bell.Width, mid - _bell.Height / 2, _bell.Width, _bell.Height);
+        int searchWidth = Math.Min(Theme.S(420), Math.Max(Theme.S(200), _bell.Left - g - Theme.S(24)));
+        _search.SetBounds(g, mid - _search.Height / 2, searchWidth, _search.Height);
+    }
 }
 
 /// <summary>En-tête de la barre latérale : logo + nom de la boutique.</summary>
@@ -556,7 +600,7 @@ internal sealed class BellButton : Control
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable | ControlStyles.StandardClick, true);
         TabStop = true;
-        Size = new Size(Theme.S(44), Theme.S(40));
+        Size = new Size(Theme.S(40), Theme.S(40));
         Cursor = Cursors.Hand;
     }
 
@@ -612,7 +656,7 @@ internal sealed class UserChip : Control
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.StandardClick, true);
         _staff = staff;
         Cursor = Cursors.Hand;
-        Size = new Size(Theme.S(230), Theme.S(48));
+        Size = new Size(Theme.S(210), Theme.S(44));
     }
 
     protected override void OnPaint(PaintEventArgs e)

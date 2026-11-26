@@ -31,62 +31,43 @@ public sealed class FrmLogin : Form
         MaximizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
         Rectangle area = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1920, 1080);
-        ClientSize = new Size(Math.Min(Theme.S(1000), (int)(area.Width * 0.94)), Math.Min(Theme.S(640), (int)(area.Height * 0.92)));
+        ClientSize = new Size(Math.Min(Theme.S(1040), (int)(area.Width * 0.94)), Math.Min(Theme.S(640), (int)(area.Height * 0.92)));
         KeyPreview = true;
 
-        TableLayoutPanel root = new() { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Theme.Background };
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46));
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 54));
+        TableLayoutPanel root = new() { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, BackColor = Theme.Background, Margin = Padding.Empty };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         root.Controls.Add(new BrandPanel { Dock = DockStyle.Fill, Margin = Padding.Empty }, 0, 0);
 
-        // ---- Formulaire ----
+        // ---- Formulaire : colonne de 400 px centrée ; titre, champs et bouton sur le même bord gauche ----
         Panel right = new() { Dock = DockStyle.Fill, BackColor = Theme.Background, Margin = Padding.Empty };
-        TableLayoutPanel form = new()
-        {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 1,
-            Width = Theme.S(380),
-            Anchor = AnchorStyles.None,
-            BackColor = Theme.Background
-        };
-        form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(380)));
-
-        Label title = UiKit.Label("Connexion", Theme.F(24f, FontStyle.Bold));
-        Label subtitle = UiKit.Muted("Espace réservé au personnel du pressing.", 10.5f);
-        subtitle.Margin = new Padding(0, Theme.S(4), 0, Theme.S(28));
+        TextLabel title = new() { Text = "Connexion", Font = Theme.Semi(24f), ForeColor = Theme.TitleText };
+        TextLabel subtitle = new() { Text = "Espace réservé au personnel du pressing.", Font = Theme.F(10.5f), ForeColor = Theme.TextMuted, Wrap = true };
 
         _username = new InputBox { PlaceholderText = "ex. admin", IconGlyph = Icons.Account, Text = LastUser.Read() };
         _password = new InputBox { PlaceholderText = "Votre mot de passe", IconGlyph = Icons.Key, PasswordChar = '•' };
-        FieldBox userField = new("Identifiant", _username) { Margin = new Padding(0, 0, 0, Theme.S(14)) };
-        FieldBox passField = new("Mot de passe", _password) { Margin = new Padding(0, 0, 0, Theme.S(6)) };
+        FieldBox userField = new("Identifiant", _username);
+        FieldBox passField = new("Mot de passe", _password);
 
-        _error = new Label
+        _error = new TextLabel
         {
-            AutoSize = false,
-            Height = Theme.S(44),
-            Dock = DockStyle.Fill,
-            ForeColor = Theme.Red,
+            Wrap = true,
+            ForeColor = notice is null ? Theme.Red : Theme.Amber,
             Font = Theme.F(9.5f),
             Text = notice ?? string.Empty,
-            Margin = new Padding(0, Theme.S(4), 0, Theme.S(4)),
-            TextAlign = ContentAlignment.MiddleLeft
+            Visible = notice is not null
         };
-        if (notice is not null)
-        {
-            _error.ForeColor = Theme.Amber;
-        }
 
-        _signIn = new FlatButton { Text = "Se connecter", Kind = ButtonKind.Primary, AutoSize = false, Dock = DockStyle.Fill, Height = Theme.S(46), Margin = Padding.Empty, Font = Theme.F(11f, FontStyle.Bold) };
+        _signIn = new FlatButton { Text = "Se connecter", Kind = ButtonKind.Primary, AutoSize = false, Height = Theme.S(48), Font = Theme.F(11f, FontStyle.Bold) };
 
         // État du serveur
         TableLayoutPanel statusRow = new()
         {
             ColumnCount = 3,
             RowCount = 1,
-            Dock = DockStyle.Fill,
             AutoSize = true,
-            Margin = new Padding(0, Theme.S(26), 0, 0)
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = Padding.Empty
         };
         statusRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         statusRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -95,24 +76,28 @@ public sealed class FrmLogin : Form
         _status = new Label
         {
             AutoSize = true,
-            MaximumSize = new Size(Theme.S(250), 0),
+            MaximumSize = new Size(Theme.S(260), 0),
             Font = Theme.F(9.5f),
             ForeColor = Theme.TextMuted,
             Text = "Vérification du serveur…",
-            Anchor = AnchorStyles.Left
+            Anchor = AnchorStyles.Left,
+            Margin = Padding.Empty
         };
-        _retry = new FlatButton { Text = "Réessayer", Kind = ButtonKind.Secondary, Height = Theme.S(34), Visible = false, Anchor = AnchorStyles.Right, Margin = Padding.Empty };
+        _retry = new FlatButton { Text = "Réessayer", Kind = ButtonKind.Secondary, Height = Theme.S(32), Visible = false, Anchor = AnchorStyles.Right, Margin = Padding.Empty };
         statusRow.Controls.Add(_dot, 0, 0);
         statusRow.Controls.Add(_status, 1, 0);
         statusRow.Controls.Add(_retry, 2, 0);
 
-        form.Controls.Add(title, 0, 0);
-        form.Controls.Add(subtitle, 0, 1);
-        form.Controls.Add(userField, 0, 2);
-        form.Controls.Add(passField, 0, 3);
-        form.Controls.Add(_error, 0, 4);
-        form.Controls.Add(_signIn, 0, 5);
-        form.Controls.Add(statusRow, 0, 6);
+        VStack form = new VStack(16)
+            .Add(title)
+            .Add(subtitle)
+            .Add(userField)
+            .Add(passField)
+            .Add(_error)
+            .Add(_signIn, StackSize.Fixed, 48)
+            .Add(new SectionRule())
+            .Add(statusRow);
+        form.Gap = Theme.S(16);
         right.Controls.Add(form);
         right.Resize += (_, _) => CenterForm(right, form);
         Shown += (_, _) => CenterForm(right, form);
@@ -142,7 +127,9 @@ public sealed class FrmLogin : Form
 
     private static void CenterForm(Control container, Control form)
     {
-        form.Location = new Point(Math.Max(0, (container.Width - form.Width) / 2), Math.Max(0, (container.Height - form.Height) / 2));
+        int width = Math.Min(Theme.S(400), Math.Max(Theme.S(240), container.Width - 2 * Theme.S(48)));
+        int height = form.GetPreferredSize(new Size(width, 0)).Height;
+        form.SetBounds(Math.Max(0, (container.Width - width) / 2), Math.Max(0, (container.Height - height) / 2), width, height);
     }
 
     protected override void OnHandleCreated(EventArgs e)
@@ -237,6 +224,11 @@ public sealed class FrmLogin : Form
     {
         _error.ForeColor = Theme.Red;
         _error.Text = message;
+        _error.Visible = message.Length > 0;
+        if (_error.Parent is { } form && form.Parent is { } container)
+        {
+            CenterForm(container, form);
+        }
     }
 }
 
