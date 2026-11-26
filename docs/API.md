@@ -8,7 +8,11 @@ Ce document est **la référence** entre l'API (`src/Pressing.Api`), la biblioth
 
 - Base : `http://localhost:5180` (variable `PRESSING_PUBLIC_API_URL`).
 - JSON en camelCase, **énumérations sérialisées en texte** (`"WashAndIron"`, `"Ready"`…) via `JsonStringEnumConverter`.
-- Dates : `DateTime` local, format ISO 8601.
+- Dates : `DateTime` en heure locale du serveur, format ISO 8601. Elles peuvent comporter un décalage (`+01:00`) :
+  les clients doivent les traiter comme de l'heure locale (ne pas convertir en UTC).
+- IP des clients : derrière le site web ou un reverse proxy, l'en-tête `X-Forwarded-For` n'est pris en compte que
+  si l'appelant est de confiance (boucle locale, ou adresses listées dans `PRESSING_TRUSTED_PROXIES`) ; la limitation
+  de débit (`429`) porte sur cette adresse.
 - Authentification : `Authorization: Bearer <jwt>`. Le jeton contient la revendication `token_type` = `staff` ou `client`.
 - Erreurs : `application/problem+json` (`ProblemDetails`) — le message lisible est dans `detail`
   (ou `message` pour les routes d'authentification / publiques).
@@ -74,8 +78,8 @@ Ce document est **la référence** entre l'API (`src/Pressing.Api`), la biblioth
 | GET | `/api/orders/ticket/{ticket}` | StaffOnly | | `OrderDto` · 404 |
 | POST | `/api/orders/quote` | StaffOnly | `OrderQuoteRequest` | `OrderQuoteDto` |
 | POST | `/api/orders` | StaffOnly | `CreateOrderRequest` | `201 OrderDto` |
-| PUT | `/api/orders/{id}/items/{itemId}/status` | StaffOnly | `UpdateItemStatusRequest` | `OrderDto` |
-| PUT | `/api/orders/{id}/status` | StaffOnly | `UpdateItemStatusRequest` (tous les articles) | `OrderDto` |
+| PUT | `/api/orders/{id}/items/{itemId}/status` | StaffOnly | `UpdateItemStatusRequest` — `status` ∈ `Deposited`, `InProgress`, `Ready` uniquement | `OrderDto` |
+| PUT | `/api/orders/{id}/status` | StaffOnly | `UpdateItemStatusRequest` (tous les articles modifiables) — mêmes valeurs | `OrderDto` |
 | POST | `/api/orders/{id}/payments` | StaffOnly | `AddPaymentRequest` | `PaymentDto` |
 | POST | `/api/orders/{id}/refunds` | ManagerOrAdmin | `RefundRequest` | `PaymentDto` |
 | POST | `/api/orders/{id}/pickup` | StaffOnly | `PickupRequest` (retrait total ou partiel + encaissement) | `OrderDto` |
@@ -133,4 +137,15 @@ Ce document est **la référence** entre l'API (`src/Pressing.Api`), la biblioth
 - `PaidAmount` = somme des paiements − remboursements ; solde = `Total − PaidAmount`.
 - Statut de commande déduit des statuts des articles (Déposé → En traitement → Prêt → Partiellement retiré → Terminé).
 - Retrait partiel possible ; retrait avec solde impayé refusé sauf si le paramètre `Orders.AllowPickupWithBalance` vaut `true`.
+- Changement de statut manuel : seuls `Deposited`, `InProgress` et `Ready` sont acceptés (`PickedUp` passe par le retrait,
+  `Cancelled` par l'annulation → 400 « Utilisez le retrait ou l'annulation pour ce statut. »). Un article retiré (même
+  partiellement) ou annulé ne peut plus être modifié (400) ; la route « tous les articles » les ignore. Le retour
+  `Ready` → `InProgress` reste possible tant que rien n'a été retiré.
+- Retrait : les lignes `PickupRequest.Items` portant le même `orderItemId` sont additionnées ; chaque quantité doit être > 0 et le total ne peut dépasser le restant.
+- Annulation : un remboursement est généré par mode de paiement d'origine (net des remboursements déjà faits) ; le code promotionnel utilisé est libéré (`UsedCount` − 1).
+- Téléphones : forme canonique ivoirienne (chiffres uniquement, sans `00` ni `225` devant un numéro à 10 chiffres) ;
+  « +225 05 55 66 77 88 », « 00225 0555667788 » et « 05 55 66 77 88 » désignent le même client.
+- Limites de saisie (400) : quantité 1..1000, prix unitaire, frais de livraison, remise, acompte, paiements et remboursements 0..10 000 000 (paiements/remboursements > 0).
+  La remise manuelle ne peut pas dépasser le montant restant après promotion.
+- Tickets : comparaison insensible à la casse et aux espaces de bordure.
 - Toutes les opérations sensibles sont journalisées dans `AuditLogs`.
