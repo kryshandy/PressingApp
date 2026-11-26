@@ -28,7 +28,9 @@ public sealed class ThemedGrid : DataGridView
         AutoGenerateColumns = false;
         BackgroundColor = Theme.Surface;
         BorderStyle = BorderStyle.None;
-        CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+        // Bordures dessinées à la main dans OnCellPainting : en mode sombre WinForms, le rendu natif ajoute des
+        // traits verticaux entre les cellules même en « SingleHorizontal ».
+        CellBorderStyle = DataGridViewCellBorderStyle.None;
         GridColor = Theme.Mix(Theme.Surface, Theme.Border, 0.55f);
         EnableHeadersVisualStyles = false;
         ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
@@ -322,29 +324,68 @@ public sealed class ThemedGrid : DataGridView
         }
     }
 
+    /// <summary>
+    /// Fond de la ligne entière peint avant les cellules : aucun interstice entre deux cellules ne laisse
+    /// apparaître un trait vertical plus sombre.
+    /// </summary>
+    protected override void OnRowPrePaint(DataGridViewRowPrePaintEventArgs e)
+    {
+        base.OnRowPrePaint(e);
+        if (e.RowIndex < 0 || e.RowIndex >= Rows.Count)
+        {
+            return;
+        }
+
+        DataGridViewRow row = Rows[e.RowIndex];
+        bool selected = e.State.HasFlag(DataGridViewElementStates.Selected);
+        DataGridViewCellStyle style = row.InheritedStyle;
+        using SolidBrush fill = new(selected ? style.SelectionBackColor : style.BackColor);
+        Rectangle bounds = new(e.RowBounds.X, e.RowBounds.Y, Math.Max(e.RowBounds.Width, ClientSize.Width), e.RowBounds.Height);
+        e.Graphics.FillRectangle(fill, bounds);
+        e.PaintParts &= ~(DataGridViewPaintParts.Background | DataGridViewPaintParts.SelectionBackground);
+    }
+
     protected override void OnCellPainting(DataGridViewCellPaintingEventArgs e)
     {
-        if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && Rows[e.RowIndex].DataBoundItem is IPillRow pills &&
+        if (e.RowIndex < 0 || e.ColumnIndex < 0 || e.Graphics is null)
+        {
+            base.OnCellPainting(e);
+            return;
+        }
+
+        bool selected = e.State.HasFlag(DataGridViewElementStates.Selected);
+        Color back = selected
+            ? e.CellStyle?.SelectionBackColor ?? Theme.SelectionBack
+            : e.CellStyle?.BackColor ?? Theme.Surface;
+        using (SolidBrush fill = new(back))
+        {
+            // +1 px : recouvre la jointure avec la cellule suivante (qui repeint son propre fond par-dessus).
+            e.Graphics.FillRectangle(fill, e.CellBounds.X, e.CellBounds.Y, e.CellBounds.Width + 1, e.CellBounds.Height);
+        }
+
+        if (Rows[e.RowIndex].DataBoundItem is IPillRow pills &&
             pills.GetPill(Columns[e.ColumnIndex].Name) is { } pill)
         {
-            e.Paint(e.ClipBounds, DataGridViewPaintParts.Background | DataGridViewPaintParts.Border | DataGridViewPaintParts.SelectionBackground);
-            if (e.Graphics is not null)
             {
                 Size text = TextRenderer.MeasureText(pill.Text, Theme.F(8.5f, FontStyle.Bold), new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding);
                 int w = Math.Min(e.CellBounds.Width - Theme.S(24), Math.Max(Theme.S(92), text.Width + Theme.S(24)));
                 int h = Theme.S(26);
                 Rectangle rect = new(e.CellBounds.X + Theme.S(12), e.CellBounds.Y + (e.CellBounds.Height - h) / 2, Math.Max(w, Theme.S(20)), h);
-                Color under = e.State.HasFlag(DataGridViewElementStates.Selected)
-                    ? Theme.SelectionBack
-                    : e.CellStyle?.BackColor ?? Theme.Surface;
-                PillPainter.Draw(e.Graphics, rect, pill.Text, pill.Color, Theme.F(8.5f, FontStyle.Bold), under);
+                PillPainter.Draw(e.Graphics, rect, pill.Text, pill.Color, Theme.F(8.5f, FontStyle.Bold), back);
             }
-
-            e.Handled = true;
-            return;
+        }
+        else
+        {
+            e.Paint(e.CellBounds, DataGridViewPaintParts.ContentForeground);
         }
 
-        base.OnCellPainting(e);
+        using (Pen line = new(GridColor))
+        {
+            int y = e.CellBounds.Bottom - 1;
+            e.Graphics.DrawLine(line, e.CellBounds.Left, y, e.CellBounds.Right, y);
+        }
+
+        e.Handled = true;
     }
 
     // ---- Colonnes ------------------------------------------------------------------------
