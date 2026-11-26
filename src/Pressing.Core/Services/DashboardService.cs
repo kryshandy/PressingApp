@@ -44,7 +44,7 @@ public class DashboardService
         int activeOrders = orders.Count(o => o.Status is not (OrderStatus.Completed or OrderStatus.Cancelled));
         int readyOrders = orders.Count(o => o.Status == OrderStatus.Ready);
         int overdueOrders = orders.Count(o =>
-            o.Status is not (OrderStatus.Completed or OrderStatus.Cancelled) && o.DueDate < now);
+            o.Status is not (OrderStatus.Completed or OrderStatus.Cancelled) && o.DueDate.Date < today);
         decimal outstanding = orders
             .Where(o => o.Status != OrderStatus.Cancelled)
             .Sum(o => Math.Max(0, o.Total - o.PaidAmount));
