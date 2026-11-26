@@ -12,33 +12,21 @@ public sealed class OutstandingView : BaseView
     private readonly StatCard _orders = new("Commandes concernées", "—", Theme.Blue);
     private readonly StatCard _oldest = new("Plus ancien impayé", "—", Theme.Red);
     private readonly GridCard _card = new("Aucun impayé : tous les comptes sont à jour.");
-    private readonly Label _limit = new() { AutoSize = true, ForeColor = Theme.Amber, Font = Theme.F(9.5f), Visible = false, Margin = new Padding(0, Theme.S(6), 0, 0) };
+    private readonly TextLabel _limit = new() { ForeColor = Theme.Amber, Font = Theme.F(9.5f), Visible = false };
 
     public OutstandingView(IAppHost host) : base(host)
     {
         PageHeader header = new("Impayés", "Double-cliquez sur une commande pour encaisser le solde");
         header.AddAction("Actualiser", ButtonKind.Secondary, Icons.Refresh, async (_, _) => await RunAsync(RefreshAsync));
 
-        TableLayoutPanel stats = new() { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
-        for (int i = 0; i < 3; i++)
-        {
-            stats.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 3));
-        }
-
-        stats.Controls.Add(_total, 0, 0);
-        stats.Controls.Add(_orders, 1, 0);
-        stats.Controls.Add(_oldest, 2, 0);
-        Panel statsWrap = new() { Height = Theme.S(116), Margin = Padding.Empty, Padding = new Padding(0, 0, 0, Theme.S(8)) };
-        statsWrap.Controls.Add(stats);
-
         ThemedGrid grid = _card.Grid;
-        grid.AddText("ticket", "TICKET", nameof(OrderRow.Ticket), 17, minWidth: 130);
-        grid.AddText("client", "CLIENT", nameof(OrderRow.Client), 22, minWidth: 130);
-        grid.AddText("created", "DÉPOSÉE LE", nameof(OrderRow.Created), 12, minWidth: 100);
-        grid.AddText("due", "PRÉVUE LE", nameof(OrderRow.Due), 12, minWidth: 100);
-        grid.AddText("total", "TOTAL", nameof(OrderRow.Total), 12, true, 100);
-        grid.AddText("balance", "RESTE À PAYER", nameof(OrderRow.Balance), 14, true, 120);
-        grid.AddPill("status", "STATUT", 14, 130);
+        grid.AddText("ticket", "TICKET", nameof(OrderRow.Ticket), fixedWidth: 164);
+        grid.AddText("client", "CLIENT", nameof(OrderRow.Client), 100, minWidth: 150);
+        grid.AddText("created", "DÉPOSÉE LE", nameof(OrderRow.Created), fixedWidth: 120);
+        grid.AddText("due", "PRÉVUE LE", nameof(OrderRow.Due), fixedWidth: 120);
+        grid.AddText("total", "TOTAL", nameof(OrderRow.Total), right: true, fixedWidth: 120);
+        grid.AddText("balance", "RESTE À PAYER", nameof(OrderRow.Balance), right: true, fixedWidth: 148);
+        grid.AddPill("status", "STATUT", fixedWidth: 148);
         grid.CellDoubleClick += (_, e) => OpenRow(e.RowIndex);
         grid.KeyDown += (_, e) =>
         {
@@ -49,7 +37,12 @@ public sealed class OutstandingView : BaseView
             }
         };
 
-        Controls.Add(UiKit.Rows((header, false), (statsWrap, false), (_card, true), (_limit, false)));
+        TitledCard list = new("Soldes à encaisser", _card, "Double-clic ou Entrée pour ouvrir la commande", flushContent: true) { MinimumSize = new Size(0, Theme.S(360)) };
+        VStack page = new VStack()
+            .Add(new GridRow().Add(_total, 4).Add(_orders, 4).Add(_oldest, 4))
+            .Add(list, StackSize.Fill)
+            .Add(_limit);
+        SetPage(header, page, scroll: true);
     }
 
     public override string Title => "Impayés";

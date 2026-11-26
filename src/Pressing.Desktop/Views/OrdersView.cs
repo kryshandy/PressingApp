@@ -34,11 +34,11 @@ public sealed class OrdersView : BaseView
     private readonly InputBox _search = new() { IconGlyph = Icons.Search, PlaceholderText = "Ticket, nom ou téléphone du client…" };
     private readonly SelectBox _status = new();
     private readonly SelectBox _period = new();
-    private readonly DateBox _from = new() { Width = Theme.S(150) };
-    private readonly DateBox _to = new() { Width = Theme.S(150) };
+    private readonly DateBox _from = new();
+    private readonly DateBox _to = new();
     private readonly ToggleBox _onlyReady = new() { Text = "Prêtes uniquement" };
     private readonly ToggleBox _onlyUnpaid = new() { Text = "Impayées uniquement" };
-    private readonly FlowLayoutPanel _customDates = new() { AutoSize = true, WrapContents = false, Visible = false, Margin = new Padding(0, 0, Theme.S(16), 0) };
+    private readonly GridRow _customDates = new() { Visible = false };
     private readonly GridCard _card = new("Aucune commande ne correspond à ces critères.");
     private readonly PagerBar _pager = new();
     private readonly System.Windows.Forms.Timer _debounce = new() { Interval = 450 };
@@ -69,53 +69,21 @@ public sealed class OrdersView : BaseView
         _from.Value = DateTime.Today.AddDays(-30);
         _to.Value = DateTime.Today;
 
-        TableLayoutPanel filters = new()
-        {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 3,
-            RowCount = 2,
-            Margin = Padding.Empty,
-            Padding = new Padding(0, 0, 0, Theme.S(12))
-        };
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(210)));
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(210)));
-        _search.Margin = new Padding(0, 0, Theme.S(12), Theme.S(10));
-        _status.Margin = new Padding(0, 0, Theme.S(12), Theme.S(10));
-        _period.Margin = new Padding(0, 0, 0, Theme.S(10));
-        _search.Dock = _status.Dock = _period.Dock = DockStyle.Fill;
-        filters.Controls.Add(_search, 0, 0);
-        filters.Controls.Add(_status, 1, 0);
-        filters.Controls.Add(_period, 2, 0);
-
-        _customDates.Controls.Add(UiKit.Muted("Du  "));
-        _customDates.Controls.Add(_from);
-        _customDates.Controls.Add(UiKit.Muted("   au  "));
-        _customDates.Controls.Add(_to);
-        foreach (Control c in _customDates.Controls)
-        {
-            c.Anchor = AnchorStyles.Left;
-        }
-
-        FlowLayoutPanel toggles = new() { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false, Margin = Padding.Empty, Dock = DockStyle.Fill };
-        _onlyReady.Margin = new Padding(0, 0, Theme.S(24), 0);
-        _onlyUnpaid.Margin = new Padding(0, 0, Theme.S(24), 0);
-        toggles.Controls.Add(_customDates);
-        toggles.Controls.Add(_onlyReady);
-        toggles.Controls.Add(_onlyUnpaid);
-        filters.Controls.Add(toggles, 0, 1);
-        filters.SetColumnSpan(toggles, 3);
+        // Barre de filtres sur une ligne : recherche (6 colonnes) puis statut et période (3 + 3).
+        GridRow filters = new GridRow().Add(_search, 6).Add(_status, 3).Add(_period, 3);
+        _customDates.Add(new Control(), 6).Add(new InlineField("Du", _from, labelPercent: 18), 3).Add(new InlineField("au", _to, labelPercent: 18), 3);
+        VStack toolbar = new VStack(12).Add(filters).Add(_customDates);
 
         ThemedGrid grid = _card.Grid;
-        grid.AddText("ticket", "TICKET", nameof(OrderRow.Ticket), 18, minWidth: 150);
-        grid.AddText("client", "CLIENT", nameof(OrderRow.Client), 22, minWidth: 110);
-        grid.AddText("due", "PRÉVUE LE", nameof(OrderRow.Due), 12, minWidth: 100);
-        grid.AddText("items", "ARTICLES", nameof(OrderRow.Items), 16, minWidth: 90);
-        grid.AddText("total", "TOTAL", nameof(OrderRow.Total), 12, true, 96);
-        grid.AddText("balance", "RESTE", nameof(OrderRow.Balance), 12, true, 96);
-        grid.AddPill("status", "STATUT", 15, 120);
-        grid.AddPill("express", "", 9, 86);
+        grid.AddText("ticket", "TICKET", nameof(OrderRow.Ticket), fixedWidth: 164);
+        grid.AddText("client", "CLIENT", nameof(OrderRow.Client), 58, minWidth: 130);
+        grid.AddText("due", "PRÉVUE LE", nameof(OrderRow.Due), fixedWidth: 108);
+        grid.AddText("items", "ARTICLES", nameof(OrderRow.Items), 42, minWidth: 110);
+        grid.AddText("total", "TOTAL", nameof(OrderRow.Total), right: true, fixedWidth: 112);
+        grid.AddText("balance", "RESTE", nameof(OrderRow.Balance), right: true, fixedWidth: 112);
+        grid.AddPill("status", "STATUT", fixedWidth: 140);
+        grid.AddPill("express", "", fixedWidth: 100);
+        grid.SetOptional("express", "items", "due");
         grid.CellDoubleClick += (_, e) => OpenSelected(e.RowIndex);
         grid.KeyDown += (_, e) =>
         {
@@ -126,7 +94,10 @@ public sealed class OrdersView : BaseView
             }
         };
 
-        Controls.Add(UiKit.Rows((header, false), (filters, false), (_card, true), (_pager, false)));
+        TitledCard list = new("Résultats", _card, "Double-clic ou Entrée pour ouvrir une commande", flushContent: true);
+        list.AddAction(_onlyReady);
+        list.AddAction(_onlyUnpaid);
+        SetPage(header, new VStack(16).Add(list, StackSize.Fill).Add(_pager), toolbar: toolbar);
 
         _pager.PageRequested += async (_, page) =>
         {

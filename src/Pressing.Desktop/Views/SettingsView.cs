@@ -18,10 +18,10 @@ public sealed class SettingsView : BaseView
 {
     private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
 
-    // ---- Onglets dessinés --------------------------------------------------------------
+    // ---- Navigation verticale des sections (colonne de 3) ------------------------------------
     private sealed class SectionTabs : Control
     {
-        private readonly List<(string Key, string Text)> _tabs = new();
+        private readonly List<(string Key, string Text, string Glyph)> _tabs = new();
         private int _selected;
         private int _hover = -1;
 
@@ -29,19 +29,22 @@ public sealed class SettingsView : BaseView
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
                      ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
-            Height = Theme.S(46);
-            Font = Theme.F(10f, FontStyle.Bold);
+            Font = Theme.F(10f);
             Cursor = Cursors.Hand;
             TabStop = false;
         }
+
+        private static int ItemHeight => Theme.S(44);
+
+        private static int Inset => Theme.S(8);
 
         public event EventHandler? SelectedChanged;
 
         public string SelectedKey => _tabs.Count == 0 ? string.Empty : _tabs[_selected].Key;
 
-        public void Add(string key, string text)
+        public void Add(string key, string text, string glyph = "")
         {
-            _tabs.Add((key, text));
+            _tabs.Add((key, text, glyph));
             Invalidate();
         }
 
@@ -56,46 +59,71 @@ public sealed class SettingsView : BaseView
             }
         }
 
-        private List<Rectangle> Rects()
-        {
-            List<Rectangle> rects = new();
-            int x = 0;
-            foreach ((string _, string text) in _tabs)
-            {
-                int width = TextRenderer.MeasureText(text, Font, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.NoPadding).Width + Theme.S(36);
-                rects.Add(new Rectangle(x, 0, width, Height - 1));
-                x += width;
-            }
+        public override Size GetPreferredSize(Size proposedSize) =>
+            new(proposedSize.Width, _tabs.Count * ItemHeight + 2 * Inset);
 
-            return rects;
-        }
+        private Rectangle ItemRect(int i) => new(Inset, Inset + i * ItemHeight, Width - 2 * Inset, ItemHeight);
 
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
             g.Clear(Theme.BackOf(this));
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            using (Pen line = new(Theme.Border))
+            Rectangle card = new(0, 0, Width - 1, Height - 1);
+            using (GraphicsPath path = Theme.RoundedRect(card, Theme.S(12)))
+            using (SolidBrush back = new(Theme.Surface))
+            using (Pen border = new(Theme.Border))
             {
-                g.DrawLine(line, 0, Height - 1, Width, Height - 1);
+                g.FillPath(back, path);
+                g.DrawPath(border, path);
             }
 
-            List<Rectangle> rects = Rects();
-            for (int i = 0; i < rects.Count; i++)
+            TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine |
+                                    TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
+            for (int i = 0; i < _tabs.Count; i++)
             {
+                Rectangle r = ItemRect(i);
                 bool active = i == _selected;
-                Color color = active ? Theme.Accent : i == _hover ? Theme.Text : Theme.TextMuted;
-                TextRenderer.DrawText(g, _tabs[i].Text, Font, rects[i], color,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+                if (active || i == _hover)
+                {
+                    using GraphicsPath p = Theme.RoundedRect(r, Theme.S(8));
+                    using SolidBrush b = new(active ? Theme.Mix(Theme.Surface, Theme.Accent, 0.14f) : Theme.SurfaceHover);
+                    g.FillPath(b, p);
+                }
+
                 if (active)
                 {
-                    using SolidBrush brush = new(Theme.Accent);
-                    g.FillRectangle(brush, rects[i].X + Theme.S(12), Height - Theme.S(3), rects[i].Width - Theme.S(24), Theme.S(3));
+                    using SolidBrush bar = new(Theme.Accent);
+                    using GraphicsPath p = Theme.RoundedRect(new Rectangle(r.X, r.Y + Theme.S(10), Theme.S(3), r.Height - Theme.S(20)), Theme.S(2));
+                    g.FillPath(bar, p);
                 }
+
+                Color color = active ? Theme.Accent : i == _hover ? Theme.Text : Theme.TextMuted;
+                int x = r.X + Theme.S(16);
+                if (_tabs[i].Glyph.Length > 0)
+                {
+                    TextRenderer.DrawText(g, _tabs[i].Glyph, Theme.Icon(11f), new Rectangle(x, r.Y, Theme.S(20), r.Height), color,
+                        flags | TextFormatFlags.HorizontalCenter);
+                    x += Theme.S(32);
+                }
+
+                TextRenderer.DrawText(g, _tabs[i].Text, active ? Theme.Semi(10f) : Font, new Rectangle(x, r.Y, Math.Max(1, r.Right - x - Theme.S(8)), r.Height),
+                    active ? Theme.Text : color, flags);
             }
         }
 
-        private int HitTest(Point p) => Rects().FindIndex(r => r.Contains(p));
+        private int HitTest(Point p)
+        {
+            for (int i = 0; i < _tabs.Count; i++)
+            {
+                if (ItemRect(i).Contains(p))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
@@ -125,6 +153,35 @@ public sealed class SettingsView : BaseView
             }
 
             base.OnMouseClick(e);
+        }
+    }
+
+    /// <summary>Affiche la section visible à sa hauteur préférée (la page défile, jamais la section).</summary>
+    private sealed class SectionHost : LayoutControl
+    {
+        private Control? Current => Controls.Cast<Control>().FirstOrDefault(LayoutUtil.IsShown);
+
+        protected override void OnControlAdded(ControlEventArgs e)
+        {
+            base.OnControlAdded(e);
+            if (e.Control is not null)
+            {
+                LayoutUtil.Prepare(e.Control);
+            }
+        }
+
+        public override Size GetPreferredSize(Size proposedSize)
+        {
+            int width = proposedSize.Width > 0 ? proposedSize.Width : Width;
+            return new Size(width, Current is { } c ? LayoutUtil.PreferredHeight(c, width) : 0);
+        }
+
+        protected override void Arrange()
+        {
+            if (Current is { } c)
+            {
+                c.SetBounds(0, 0, Width, Math.Max(Height, LayoutUtil.PreferredHeight(c, Width)));
+            }
         }
     }
 
@@ -242,11 +299,11 @@ public sealed class SettingsView : BaseView
     private readonly HashSet<string> _loadedTabs = new();
     private readonly SectionTabs _tabs = new();
     private readonly FlatButton _save = new() { Text = "Enregistrer", Kind = ButtonKind.Primary, IconGlyph = Icons.Save };
-    private readonly Label _loyaltyExample = new() { AutoSize = true, ForeColor = Theme.TextMuted, Font = Theme.F(9.5f), MaximumSize = new Size(Theme.S(760), 0), Margin = new Padding(0, Theme.S(4), 0, 0) };
+    private readonly TextLabel _loyaltyExample = new() { Wrap = true, ForeColor = Theme.TextMuted, Font = Theme.F(9.5f) };
     private readonly InfoList _emailInfo = new();
-    private readonly Label _emailWarning = new() { AutoSize = true, ForeColor = Theme.Amber, Font = Theme.F(9.5f), MaximumSize = new Size(Theme.S(760), 0), Margin = new Padding(0, Theme.S(8), 0, 0), Visible = false };
+    private readonly TextLabel _emailWarning = new() { Wrap = true, ForeColor = Theme.Amber, Font = Theme.F(9.5f), Visible = false };
     private readonly FlatButton _testEmail = new() { Text = "Envoyer un e-mail de test", Kind = ButtonKind.Secondary, IconGlyph = Icons.Mail };
-    private readonly SelectBox _emailFilter = new() { Width = Theme.S(200) };
+    private readonly SelectBox _emailFilter = new() { Width = Theme.S(180), Height = Theme.S(32) };
     private readonly GridCard _emailLog = new("Aucun e-mail dans le journal.");
     private readonly PagerBar _emailPager = new();
     private readonly FlatButton _retry = new() { Text = "Réessayer", Kind = ButtonKind.Secondary, IconGlyph = Icons.Refresh, Enabled = false };
@@ -264,6 +321,7 @@ public sealed class SettingsView : BaseView
     private int _auditPageNumber = 1;
     private int _auditVersion;
     private string? _lastBackupFolder;
+    private PageLayout? _layout;
 
     public SettingsView(IAppHost host) : base(host)
     {
@@ -277,20 +335,20 @@ public sealed class SettingsView : BaseView
             header.AddControl(_save);
         }
 
-        _tabs.Add(TabShop, "Boutique");
-        _tabs.Add(TabOrders, "Commandes");
-        _tabs.Add(TabLoyalty, "Fidélité");
-        _tabs.Add(TabEmails, "E-mails");
-        _tabs.Add(TabReceipts, "Reçus");
+        _tabs.Add(TabShop, "Boutique", Icons.Settings);
+        _tabs.Add(TabOrders, "Commandes", Icons.Orders);
+        _tabs.Add(TabLoyalty, "Fidélité", Icons.Gift);
+        _tabs.Add(TabEmails, "E-mails", Icons.Mail);
+        _tabs.Add(TabReceipts, "Reçus", Icons.Print);
         if (admin)
         {
-            _tabs.Add(TabBackups, "Sauvegardes");
-            _tabs.Add(TabAudit, "Journal d'audit");
+            _tabs.Add(TabBackups, "Sauvegardes", Icons.Save);
+            _tabs.Add(TabAudit, "Journal d'audit", Icons.Clock);
         }
 
         _backupResultCard = new TitledCard("Dernière sauvegarde", _backupInfo, "Vérifiée automatiquement après création", false, true) { Visible = false };
 
-        Panel host2 = new() { Dock = DockStyle.Fill, BackColor = Theme.Background };
+        SectionHost host2 = new();
         _pages[TabShop] = BuildShopPage();
         _pages[TabOrders] = BuildOrdersPage();
         _pages[TabLoyalty] = BuildLoyaltyPage();
@@ -304,27 +362,22 @@ public sealed class SettingsView : BaseView
 
         foreach (Control page in _pages.Values)
         {
-            page.Dock = DockStyle.Fill;
             page.Visible = false;
             host2.Controls.Add(page);
         }
 
         _pages[TabShop].Visible = true;
-        _tabs.Dock = DockStyle.Fill;
-        Panel tabsWrap = new() { Height = Theme.S(46 + 12), Padding = new Padding(0, 0, 0, Theme.S(12)), BackColor = Theme.Background };
-        tabsWrap.Controls.Add(_tabs);
 
-        List<(Control Control, bool Fill)> rows = new() { (header, false) };
+        // Navigation des sections (3 colonnes, collante) + formulaire (9 colonnes) ; la page défile.
+        VStack form = new();
         if (!admin)
         {
-            Label notice = UiKit.Notice("Lecture seule : seuls les administrateurs peuvent modifier les paramètres.", Theme.Amber);
-            notice.Margin = new Padding(0, 0, 0, Theme.S(10));
-            rows.Add((notice, false));
+            form.Add(new TextLabel { Text = "Lecture seule : seuls les administrateurs peuvent modifier les paramètres.", ForeColor = Theme.Amber, Font = Theme.F(9.5f), Wrap = true });
         }
 
-        rows.Add((tabsWrap, false));
-        rows.Add((host2, true));
-        Controls.Add(UiKit.Rows(rows.ToArray()));
+        form.Add(host2);
+        GridRow body = new GridRow { StackBelow = 900 }.Add(_tabs, 3).Add(form, 9).Sticky(_tabs);
+        _layout = SetPage(header, body, scroll: true);
 
         if (!admin)
         {
@@ -391,29 +444,19 @@ public sealed class SettingsView : BaseView
     }
 
     // ---- Construction des pages -------------------------------------------------------------
-    private static ScrollPanel ScrollPage(params Control[] cards)
+    private static VStack ScrollPage(params Control[] cards)
     {
-        TableLayoutPanel page = new()
+        VStack page = new();
+        foreach (Control card in cards)
         {
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 1,
-            Margin = Padding.Empty
-        };
-        page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        for (int i = 0; i < cards.Length; i++)
-        {
-            page.Controls.Add(cards[i], 0, i);
+            page.Add(card);
         }
 
-        ScrollPanel scroll = new();
-        scroll.Controls.Add(page);
-        return scroll;
+        return page;
     }
 
     private static TitledCard Card(string title, string subtitle, Control content) =>
-        new(title, content, subtitle, false, true) { Margin = new Padding(0, 0, 0, Theme.S(14)) };
+        new(title, content, subtitle, false, true);
 
     private InputBox TextField(string key, string label, string placeholder = "", string suffix = "", bool right = false)
     {
@@ -431,7 +474,7 @@ public sealed class SettingsView : BaseView
 
     private ToggleBox Toggle(string key, string label, string text)
     {
-        ToggleBox box = new() { Text = text, Margin = new Padding(0, Theme.S(2), 0, Theme.S(6)) };
+        ToggleBox box = new() { Text = text };
         _fields.Add(new Field
         {
             Key = key,
@@ -445,7 +488,7 @@ public sealed class SettingsView : BaseView
 
     private StepperBox Stepper(string key, string label, int min, int max)
     {
-        StepperBox box = new() { Minimum = min, Maximum = max, Width = Theme.S(180), Anchor = AnchorStyles.Left };
+        StepperBox box = new() { Minimum = min, Maximum = max };
         _fields.Add(new Field
         {
             Key = key,
@@ -569,26 +612,24 @@ public sealed class SettingsView : BaseView
         toggles.Add(Toggle(SettingsKeys.EmailOrderReady, "Commande prête", "Prévenir le client lorsque sa commande est prête"));
         toggles.Add(Toggle(SettingsKeys.EmailReceipt, "Reçu", "Envoyer le reçu par e-mail après paiement"));
 
-        Panel config = new() { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Color.Transparent };
-        _testEmail.Margin = new Padding(0, Theme.S(12), 0, 0);
-        config.Controls.Add(Stack(_emailInfo, _emailWarning, _testEmail));
+        ActionBar testBar = new(alignRight: false);
+        testBar.Add(_testEmail);
+        VStack config = new VStack(16).Add(_emailInfo).Add(_emailWarning).Add(testBar);
 
         // Journal
         ThemedGrid grid = _emailLog.Grid;
-        grid.AddText("created", "DATE", nameof(EmailRow.Created), 14, minWidth: 130);
-        grid.AddText("to", "DESTINATAIRE", nameof(EmailRow.To), 20, minWidth: 140);
-        grid.AddText("subject", "OBJET", nameof(EmailRow.Subject), 24, minWidth: 140);
-        grid.AddText("template", "MODÈLE", nameof(EmailRow.Template), 12, minWidth: 100);
-        grid.AddPill("status", "STATUT", 11, 100);
-        grid.AddText("attempts", "ESSAIS", nameof(EmailRow.Attempts), 6, true, 60);
-        grid.AddText("error", "ERREUR", nameof(EmailRow.Error), 20, minWidth: 100);
+        grid.AddText("created", "DATE", nameof(EmailRow.Created), fixedWidth: 148);
+        grid.AddText("to", "DESTINATAIRE", nameof(EmailRow.To), 30, minWidth: 140);
+        grid.AddText("subject", "OBJET", nameof(EmailRow.Subject), 40, minWidth: 140);
+        grid.AddText("template", "MODÈLE", nameof(EmailRow.Template), 20, minWidth: 100);
+        grid.AddPill("status", "STATUT", fixedWidth: 120);
+        grid.AddText("attempts", "ESSAIS", nameof(EmailRow.Attempts), right: true, fixedWidth: 80);
+        grid.AddText("error", "ERREUR", nameof(EmailRow.Error), 20, minWidth: 90);
+        grid.SetOptional("template", "attempts", "error");
         grid.SelectionChanged += (_, _) => _retry.Enabled = grid.SelectedItem<EmailRow>() is { Source.Status: EmailStatus.Failed or EmailStatus.Pending };
-        _emailPager.Dock = DockStyle.Bottom;
-        Panel logHost = new() { Height = Theme.S(12 * 36 + 40 + 56), BackColor = Color.Transparent };
-        _emailLog.Dock = DockStyle.Fill;
-        logHost.Controls.Add(_emailLog);
-        logHost.Controls.Add(_emailPager);
-        _emailLog.BringToFront();
+        _emailLog.AutoHeightRows = 5;
+        _emailLog.MaxRows = LogPageSize;
+        VStack logHost = new VStack(16).Add(_emailLog).Add(new Padded(_emailPager, new Padding(Theme.CardPadding - 1, 0, Theme.CardPadding - 1, 0)));
 
         _emailFilter.SetChoices(new[]
         {
@@ -599,9 +640,7 @@ public sealed class SettingsView : BaseView
             new Choice<EmailStatus?>(EmailStatus.Simulated, "Simulés")
         }, null);
 
-        TitledCard logCard = new("Journal des e-mails", logHost, "Les e-mails en échec peuvent être renvoyés.", false, true) { Margin = new Padding(0, 0, 0, Theme.S(14)) };
-        _retry.Margin = new Padding(Theme.S(10), 0, 0, 0);
-        _emailFilter.Margin = Padding.Empty;
+        TitledCard logCard = new("Journal des e-mails", logHost, "Les e-mails en échec peuvent être renvoyés.", true, true);
         logCard.AddAction(_emailFilter);
         logCard.AddAction(_retry);
 
@@ -653,48 +692,43 @@ public sealed class SettingsView : BaseView
     private Control BuildBackupsPage()
     {
         ThemedGrid grid = _backupList.Grid;
-        grid.AddText("file", "FICHIER", nameof(BackupRow.FileName), 30, minWidth: 200);
-        grid.AddText("created", "CRÉÉE LE", nameof(BackupRow.Created), 18, minWidth: 140);
-        grid.AddText("size", "TAILLE", nameof(BackupRow.Size), 12, true, 90);
-        grid.AddPill("integrity", "INTÉGRITÉ", 14, 120);
-        grid.AddText("folder", "DOSSIER", nameof(BackupRow.Folder), 38, minWidth: 160);
+        grid.AddText("file", "FICHIER", nameof(BackupRow.FileName), 45, minWidth: 200);
+        grid.AddText("created", "CRÉÉE LE", nameof(BackupRow.Created), fixedWidth: 148);
+        grid.AddText("size", "TAILLE", nameof(BackupRow.Size), right: true, fixedWidth: 96);
+        grid.AddPill("integrity", "INTÉGRITÉ", fixedWidth: 128);
+        grid.AddText("folder", "DOSSIER", nameof(BackupRow.Folder), 55, minWidth: 140);
+        grid.SetOptional("folder");
 
-        FlowLayoutPanel actions = new() { AutoSize = true, WrapContents = false, Margin = Padding.Empty, Dock = DockStyle.Top };
-        _backupNow.Margin = new Padding(0, 0, Theme.S(10), 0);
-        _openFolder.Margin = Padding.Empty;
-        actions.Controls.Add(_backupNow);
-        actions.Controls.Add(_openFolder);
-        Label help = UiKit.Muted("Une copie complète de la base de données est créée puis son intégrité est vérifiée automatiquement.");
-        help.Margin = new Padding(0, Theme.S(10), 0, 0);
-        help.MaximumSize = new Size(Theme.S(900), 0);
-        Panel actionHost = new() { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = Color.Transparent };
-        actionHost.Controls.Add(Stack(actions, help));
-
-        Panel listHost = new() { Height = Theme.S(320), BackColor = Color.Transparent };
-        _backupList.Dock = DockStyle.Fill;
-        listHost.Controls.Add(_backupList);
-        _backupResultCard.Margin = new Padding(0, 0, 0, Theme.S(14));
+        ActionBar actions = new(alignRight: false);
+        actions.Add(_backupNow);
+        actions.Add(_openFolder);
+        TextLabel help = new() { Text = "Une copie complète de la base de données est créée puis son intégrité est vérifiée automatiquement.", Wrap = true, ForeColor = Theme.TextMuted, Font = Theme.F(9.5f) };
+        VStack actionHost = new VStack(16).Add(help).Add(actions);
+        _backupList.AutoHeightRows = 4;
+        _backupList.MaxRows = 10;
+        TitledCard listCard = new("Sauvegardes existantes", _backupList, "Les plus récentes en premier.", true, true);
 
         return ScrollPage(
             Card("Sauvegarde de la base", "Protégez vos données avant toute opération importante.", actionHost),
             _backupResultCard,
-            Card("Sauvegardes existantes", "Les plus récentes en premier.", listHost));
+            listCard);
     }
 
     private Control BuildAuditPage()
     {
         ThemedGrid grid = _auditList.Grid;
-        grid.AddText("when", "DATE", nameof(AuditRow.When), 14, minWidth: 130);
-        grid.AddText("actor", "AUTEUR", nameof(AuditRow.Actor), 14, minWidth: 100);
-        grid.AddText("action", "ACTION", nameof(AuditRow.Action), 11, minWidth: 100);
-        grid.AddText("entity", "ENTITÉ", nameof(AuditRow.Entity), 14, minWidth: 110);
-        grid.AddText("details", "DÉTAILS", nameof(AuditRow.Details), 38, minWidth: 180);
-        grid.AddText("ip", "ADRESSE IP", nameof(AuditRow.Ip), 11, minWidth: 100);
-
-        _auditSearch.Margin = new Padding(0, 0, 0, Theme.S(12));
-        TableLayoutPanel layout = UiKit.Rows((_auditSearch, false), (_auditList, true), (_auditPager, false));
-        _auditPager.Dock = DockStyle.Fill;
-        return layout;
+        grid.AddText("when", "DATE", nameof(AuditRow.When), fixedWidth: 148);
+        grid.AddText("actor", "AUTEUR", nameof(AuditRow.Actor), 18, minWidth: 100);
+        grid.AddText("action", "ACTION", nameof(AuditRow.Action), 16, minWidth: 100);
+        grid.AddText("entity", "ENTITÉ", nameof(AuditRow.Entity), 18, minWidth: 100);
+        grid.AddText("details", "DÉTAILS", nameof(AuditRow.Details), 48, minWidth: 160);
+        grid.AddText("ip", "ADRESSE IP", nameof(AuditRow.Ip), fixedWidth: 120);
+        grid.SetOptional("ip", "entity");
+        _auditList.AutoHeightRows = 8;
+        _auditList.MaxRows = AuditPageSize;
+        TitledCard card = new("Journal d'audit", new VStack(16).Add(_auditList).Add(new Padded(_auditPager, new Padding(Theme.CardPadding - 1, 0, Theme.CardPadding - 1, 0))),
+            "Toutes les opérations sensibles, les plus récentes en premier.", true, true);
+        return new VStack(16).Add(new GridRow().Add(_auditSearch, 8)).Add(card);
     }
 
     // ---- Données ---------------------------------------------------------------------------------
@@ -725,6 +759,9 @@ public sealed class SettingsView : BaseView
         {
             page.Visible = pageKey == key;
         }
+
+        _layout?.Viewport?.ScrollTo(0);
+        _tabs.RequestPageLayout();
 
         _save.Visible = Session.IsAdmin && key is not (TabBackups or TabAudit);
         if (Alive)

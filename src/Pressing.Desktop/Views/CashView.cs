@@ -22,17 +22,17 @@ public sealed class CashView : BaseView
 
     private readonly SelectBox _period = new();
     private readonly SelectBox _method = new();
-    private readonly InputBox _search = new() { IconGlyph = Icons.Search, PlaceholderText = "Ticket, référence ou client…" };
-    private readonly DateBox _from = new() { Width = Theme.S(150) };
-    private readonly DateBox _to = new() { Width = Theme.S(150) };
-    private readonly FlowLayoutPanel _customDates = new() { AutoSize = true, WrapContents = false, Visible = false, Margin = Padding.Empty };
+    private readonly InputBox _search = new() { IconGlyph = Icons.Search, PlaceholderText = "Filtrer les paiements : ticket, référence ou client…" };
+    private readonly DateBox _from = new();
+    private readonly DateBox _to = new();
+    private readonly GridRow _customDates = new() { Visible = false };
     private readonly StatCard _received = new("Encaissé", "—", Theme.Green);
     private readonly StatCard _refunded = new("Remboursé", "—", Theme.Red);
     private readonly StatCard _net = new("Total net", "—", Theme.Accent);
     private readonly StatCard _count = new("Opérations", "—", Theme.Blue);
-    private readonly FlowLayoutPanel _methods = new() { AutoSize = true, WrapContents = true, Margin = Padding.Empty, Dock = DockStyle.Fill };
+    private readonly UniformRow _methods = new();
     private readonly GridCard _card = new("Aucun paiement sur cette période.");
-    private readonly Label _limit = new() { AutoSize = true, ForeColor = Theme.Amber, Font = Theme.F(9.5f), Visible = false, Margin = new Padding(0, Theme.S(6), 0, 0) };
+    private readonly TextLabel _limit = new() { ForeColor = Theme.Amber, Font = Theme.F(9.5f), Visible = false };
     private readonly System.Windows.Forms.Timer _debounce = new() { Interval = 450 };
     private int _version;
 
@@ -56,62 +56,19 @@ public sealed class CashView : BaseView
         _from.Value = DateTime.Today.AddDays(-7);
         _to.Value = DateTime.Today;
 
-        TableLayoutPanel filters = new()
-        {
-            AutoSize = true,
-            ColumnCount = 4,
-            Margin = Padding.Empty,
-            Padding = new Padding(0, 0, 0, Theme.S(12))
-        };
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(210)));
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(200)));
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        _period.Dock = DockStyle.Fill;
-        _period.Margin = new Padding(0, 0, Theme.S(12), 0);
-        _method.Dock = DockStyle.Fill;
-        _method.Margin = new Padding(0, 0, Theme.S(12), 0);
-        _search.Dock = DockStyle.Fill;
-        _search.Margin = Padding.Empty;
-        _customDates.Controls.Add(_from);
-        _customDates.Controls.Add(UiKit.Muted("  au  "));
-        _customDates.Controls.Add(_to);
-        _customDates.Margin = new Padding(0, 0, Theme.S(12), 0);
-        foreach (Control c in _customDates.Controls)
-        {
-            c.Anchor = AnchorStyles.Left;
-        }
-
-        filters.Controls.Add(_period, 0, 0);
-        filters.Controls.Add(_customDates, 1, 0);
-        filters.Controls.Add(_method, 2, 0);
-        filters.Controls.Add(_search, 3, 0);
-
-        TableLayoutPanel stats = new() { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Height = Theme.S(112), AutoSize = false, Margin = Padding.Empty };
-        for (int i = 0; i < 4; i++)
-        {
-            stats.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-        }
-
-        stats.Controls.Add(_received, 0, 0);
-        stats.Controls.Add(_refunded, 1, 0);
-        stats.Controls.Add(_net, 2, 0);
-        stats.Controls.Add(_count, 3, 0);
-        stats.Margin = new Padding(Theme.S(-6), 0, Theme.S(-6), 0);
-        Panel statsWrap = new() { Height = Theme.S(116), Padding = new Padding(Theme.S(0)), Margin = Padding.Empty };
-        statsWrap.Controls.Add(stats);
-        stats.Dock = DockStyle.Fill;
-
-        _methods.Padding = new Padding(Theme.S(6), Theme.S(6), 0, Theme.S(6));
+        GridRow filters = new GridRow().Add(_search, 6).Add(_period, 3).Add(_method, 3);
+        _customDates.Add(new Control(), 6).Add(new InlineField("Du", _from, labelPercent: 18), 3).Add(new InlineField("au", _to, labelPercent: 18), 3);
+        VStack toolbar = new VStack(12).Add(filters).Add(_customDates);
 
         ThemedGrid grid = _card.Grid;
-        grid.AddText("date", "DATE", nameof(PaymentRow.Date), 16, minWidth: 130);
-        grid.AddText("ticket", "TICKET", nameof(PaymentRow.Ticket), 17, minWidth: 130);
-        grid.AddText("type", "TYPE", nameof(PaymentRow.Type), 14, minWidth: 110);
-        grid.AddText("method", "MODE", nameof(PaymentRow.Method), 14, minWidth: 100);
-        grid.AddText("reference", "RÉFÉRENCE", nameof(PaymentRow.Reference), 17, minWidth: 100);
-        grid.AddText("staff", "ENCAISSÉ PAR", nameof(PaymentRow.Staff), 14, minWidth: 100);
-        grid.AddText("amount", "MONTANT", nameof(PaymentRow.Amount), 14, true, 110);
+        grid.AddText("date", "DATE", nameof(PaymentRow.Date), fixedWidth: 152);
+        grid.AddText("ticket", "TICKET", nameof(PaymentRow.Ticket), fixedWidth: 164);
+        grid.AddText("type", "TYPE", nameof(PaymentRow.Type), 30, minWidth: 100);
+        grid.AddText("method", "MODE", nameof(PaymentRow.Method), 30, minWidth: 110);
+        grid.AddText("reference", "RÉFÉRENCE", nameof(PaymentRow.Reference), 40, minWidth: 100);
+        grid.AddText("staff", "ENCAISSÉ PAR", nameof(PaymentRow.Staff), 30, minWidth: 110);
+        grid.AddText("amount", "MONTANT", nameof(PaymentRow.Amount), right: true, fixedWidth: 128);
+        grid.SetOptional("reference", "staff");
         grid.CellDoubleClick += (_, e) =>
         {
             if (e.RowIndex >= 0 && grid.Rows[e.RowIndex].DataBoundItem is PaymentRow row)
@@ -120,7 +77,14 @@ public sealed class CashView : BaseView
             }
         };
 
-        Controls.Add(UiKit.Rows((header, false), (filters, false), (statsWrap, false), (_methods, false), (_card, true), (_limit, false)));
+        TitledCard methods = new("Par mode de paiement", _methods, autoHeight: true);
+        TitledCard list = new("Opérations", _card, "Double-clic pour ouvrir la commande", flushContent: true) { MinimumSize = new Size(0, Theme.S(360)) };
+        VStack page = new VStack()
+            .Add(new GridRow().Add(_received, 3).Add(_refunded, 3).Add(_net, 3).Add(_count, 3))
+            .Add(methods)
+            .Add(list, StackSize.Fill)
+            .Add(_limit);
+        SetPage(header, page, scroll: true, toolbar: toolbar);
 
         _debounce.Tick += async (_, _) =>
         {
@@ -205,26 +169,47 @@ public sealed class CashView : BaseView
         }
 
         _methods.ResumeLayout(true);
+        _methods.RequestPageLayout();
         _card.Grid.SetRows(items.Select(p => new PaymentRow(p)).ToList());
         _card.UpdateEmpty();
         _limit.Visible = result.Total > MaxRows;
         _limit.Text = $"Seuls les {MaxRows} paiements les plus récents sont affichés ({result.Total} au total) : affinez la période.";
     }
 
-    private static Control MethodChip(string label, decimal amount, int count)
+    private static Control MethodChip(string label, decimal amount, int count) => new MethodTile(label, amount, count);
+
+    /// <summary>Total d'un mode de paiement (libellé, nombre d'opérations, montant).</summary>
+    private sealed class MethodTile : RoundedPanel
     {
-        RoundedPanel chip = new()
+        private readonly string _label;
+        private readonly decimal _amount;
+        private readonly int _count;
+
+        public MethodTile(string label, decimal amount, int count)
         {
-            Width = Theme.S(200),
-            Height = Theme.S(60),
-            Padding = new Padding(Theme.S(14), Theme.S(8), Theme.S(10), Theme.S(6)),
-            Margin = new Padding(0, 0, Theme.S(10), Theme.S(6)),
-            BackColor = Theme.SurfaceAlt
-        };
-        Label name = new() { Text = label.ToUpperInvariant() + (count > 0 ? $"  ·  {count}" : string.Empty), Dock = DockStyle.Top, Height = Theme.S(18), Font = Theme.F(8.5f, FontStyle.Bold), ForeColor = Theme.TextMuted };
-        Label value = new() { Text = Fmt.Money(amount), Dock = DockStyle.Fill, Font = Theme.F(12f, FontStyle.Bold), ForeColor = amount == 0 ? Theme.TextFaint : Theme.Text, AutoEllipsis = true };
-        chip.Controls.Add(value);
-        chip.Controls.Add(name);
-        return chip;
+            _label = label.ToUpperInvariant();
+            _amount = amount;
+            _count = count;
+            BackColor = Theme.SurfaceAlt;
+            DrawBorder = false;
+            Radius = 10;
+        }
+
+        public override Size GetPreferredSize(Size proposedSize) => new(proposedSize.Width, Theme.S(68));
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
+            int pad = Theme.S(16);
+            int w = Math.Max(10, Width - 2 * pad);
+            string caption = _label + (_count > 0 ? $"  ·  {_count}" : string.Empty);
+            Font value = Theme.Semi(12f);
+            int y = (Height - Theme.FieldLabel.Height - Theme.S(4) - value.Height) / 2;
+            TextRenderer.DrawText(e.Graphics, caption, Theme.FieldLabel, new Rectangle(pad, y, w, Theme.FieldLabel.Height), Theme.TextMuted, flags);
+            y += Theme.FieldLabel.Height + Theme.S(4);
+            TextRenderer.DrawText(e.Graphics, Fmt.Money(_amount), value, new Rectangle(pad, y, w, value.Height),
+                _amount == 0 ? Theme.TextFaint : Theme.Text, flags);
+        }
     }
 }

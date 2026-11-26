@@ -12,7 +12,7 @@ public sealed class ClientsView : BaseView
 {
     private const int PageSize = 25;
 
-    private readonly InputBox _search = new() { IconGlyph = Icons.Search, PlaceholderText = "Nom, téléphone ou e-mail…" };
+    private readonly InputBox _search = new() { IconGlyph = Icons.Search, PlaceholderText = "Filtrer les clients : nom, téléphone ou e-mail…" };
     private readonly ToggleBox _inactive = new() { Text = "Inclure les clients inactifs" };
     private readonly GridCard _card = new("Aucun client ne correspond à cette recherche.");
     private readonly PagerBar _pager = new();
@@ -27,30 +27,16 @@ public sealed class ClientsView : BaseView
         header.AddAction("Actualiser", ButtonKind.Secondary, Icons.Refresh, async (_, _) => await RunAsync(RefreshAsync));
         header.AddAction("Nouveau client", ButtonKind.Primary, Icons.Add, async (_, _) => await CreateAsync());
 
-        TableLayoutPanel filters = new()
-        {
-            AutoSize = true,
-            ColumnCount = 2,
-            Margin = Padding.Empty,
-            Padding = new Padding(0, 0, 0, Theme.S(14))
-        };
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        _search.Dock = DockStyle.Fill;
-        _search.Margin = new Padding(0, 0, Theme.S(20), 0);
-        _inactive.Anchor = AnchorStyles.Right;
-        filters.Controls.Add(_search, 0, 0);
-        filters.Controls.Add(_inactive, 1, 0);
+        GridRow filters = new GridRow().Add(_search, 6);
 
         ThemedGrid grid = _card.Grid;
-        grid.AddText("name", "CLIENT", nameof(ClientRow.Name), 24, minWidth: 140);
-        grid.AddText("phone", "TÉLÉPHONE", nameof(ClientRow.Phone), 16, minWidth: 120);
-        grid.AddText("email", "E-MAIL", nameof(ClientRow.Email), 24, minWidth: 140);
-        grid.AddText("orders", "COMMANDES", nameof(ClientRow.Orders), 11, true, 90);
-        grid.AddText("points", "POINTS", nameof(ClientRow.Points), 9, true, 70);
-        grid.AddText("balance", "SOLDE DÛ", nameof(ClientRow.Balance), 13, true, 100);
-        grid.AddPill("web", "WEB", 11, 100);
-        grid.AddPill("state", "", 9, 80);
+        grid.AddText("name", "CLIENT", nameof(ClientRow.Name), 45, minWidth: 150);
+        grid.AddText("phone", "TÉLÉPHONE", nameof(ClientRow.Phone), fixedWidth: 184);
+        grid.AddText("email", "E-MAIL", nameof(ClientRow.Email), 55, minWidth: 160);
+        grid.AddText("orders", "COMMANDES", nameof(ClientRow.Orders), right: true, fixedWidth: 116);
+        grid.AddText("points", "POINTS", nameof(ClientRow.Points), right: true, fixedWidth: 92);
+        grid.AddText("balance", "SOLDE DÛ", nameof(ClientRow.Balance), right: true, fixedWidth: 116);
+        grid.AddPill("status", "STATUT", fixedWidth: 128);
         grid.CellDoubleClick += (_, e) => OpenRow(e.RowIndex);
         grid.KeyDown += (_, e) =>
         {
@@ -61,7 +47,9 @@ public sealed class ClientsView : BaseView
             }
         };
 
-        Controls.Add(UiKit.Rows((header, false), (filters, false), (_card, true), (_pager, false)));
+        TitledCard list = new("Fichier client", _card, "Double-clic ou Entrée pour ouvrir la fiche", flushContent: true);
+        list.AddAction(_inactive);
+        SetPage(header, new VStack(16).Add(list, StackSize.Fill).Add(_pager), toolbar: filters);
 
         _pager.PageRequested += async (_, page) =>
         {

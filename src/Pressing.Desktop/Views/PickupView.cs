@@ -18,9 +18,9 @@ public sealed class PickupView : BaseView
         Font = Theme.F(13f)
     };
 
-    private readonly FlatButton _find = new() { Text = "Rechercher", Kind = ButtonKind.Primary, IconGlyph = Icons.Search, Height = Theme.S(56), Dock = DockStyle.Fill, Margin = new Padding(Theme.S(12), 0, 0, 0) };
-    private readonly Label _message = new() { AutoSize = true, Font = Theme.F(10f), ForeColor = Theme.Red, Margin = new Padding(0, Theme.S(10), 0, 0), Visible = false };
-    private readonly RoundedPanel _summary = new() { Dock = DockStyle.Top, Height = Theme.S(150), Visible = false, Margin = new Padding(0, 0, 0, Theme.S(16)) };
+    private readonly FlatButton _find = new() { Text = "Rechercher", Kind = ButtonKind.Primary, IconGlyph = Icons.Search, AutoSize = false, Height = Theme.S(56) };
+    private readonly TextLabel _message = new() { Font = Theme.F(10f), ForeColor = Theme.Red, Visible = false };
+    private readonly RoundedPanel _summary = new() { Visible = false };
     private readonly Label _summaryTicket = new() { AutoSize = true, Font = Theme.F(18f, FontStyle.Bold), ForeColor = Theme.Accent };
     private readonly Label _summaryClient = new() { AutoSize = true, Font = Theme.F(11f), ForeColor = Theme.Text };
     private readonly Label _summaryInfo = new() { AutoSize = true, Font = Theme.F(10f), ForeColor = Theme.TextMuted };
@@ -35,13 +35,7 @@ public sealed class PickupView : BaseView
         PageHeader header = new("Retraits", "Scannez le ticket du client pour lui remettre ses articles");
         header.AddAction("Actualiser", ButtonKind.Secondary, Icons.Refresh, async (_, _) => await RunAsync(RefreshAsync));
 
-        TableLayoutPanel entry = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, Margin = Padding.Empty, Padding = new Padding(0, 0, 0, Theme.S(4)) };
-        entry.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        entry.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(190)));
-        _ticket.Dock = DockStyle.Fill;
-        _ticket.Margin = Padding.Empty;
-        entry.Controls.Add(_ticket, 0, 0);
-        entry.Controls.Add(_find, 1, 0);
+        GridRow entry = new GridRow(56).Add(_ticket, 9).Add(_find, 3);
 
         // Résumé de la commande trouvée
         _summary.Padding = new Padding(Theme.S(24), Theme.S(18), Theme.S(24), Theme.S(18));
@@ -64,11 +58,11 @@ public sealed class PickupView : BaseView
         _summary.Controls.Add(s);
 
         ThemedGrid grid = _ready.Grid;
-        grid.AddText("ticket", "TICKET", nameof(OrderRow.Ticket), 20, minWidth: 130);
-        grid.AddText("client", "CLIENT", nameof(OrderRow.Client), 28, minWidth: 140);
-        grid.AddText("items", "ARTICLES", nameof(OrderRow.Items), 22, minWidth: 120);
-        grid.AddText("due", "PRÉVUE LE", nameof(OrderRow.Due), 14, minWidth: 100);
-        grid.AddText("balance", "RESTE", nameof(OrderRow.Balance), 14, true, 100);
+        grid.AddText("ticket", "TICKET", nameof(OrderRow.Ticket), fixedWidth: 164);
+        grid.AddText("client", "CLIENT", nameof(OrderRow.Client), 55, minWidth: 150);
+        grid.AddText("items", "ARTICLES", nameof(OrderRow.Items), 45, minWidth: 140);
+        grid.AddText("due", "PRÉVUE LE", nameof(OrderRow.Due), fixedWidth: 120);
+        grid.AddText("balance", "RESTE", nameof(OrderRow.Balance), right: true, fixedWidth: 128);
         grid.CellDoubleClick += async (_, e) =>
         {
             if (e.RowIndex >= 0 && grid.Rows[e.RowIndex].DataBoundItem is OrderRow row)
@@ -78,16 +72,12 @@ public sealed class PickupView : BaseView
         };
         TitledCard readyCard = new("Prêtes à retirer", _ready, "Double-cliquez pour lancer le retrait", flushContent: true) { Margin = new Padding(0, 0, 0, 0) };
 
-        TableLayoutPanel top = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Margin = Padding.Empty, Padding = new Padding(0, 0, 0, Theme.S(16)) };
-        top.Controls.Add(entry, 0, 0);
-        top.Controls.Add(_message, 0, 1);
-        top.Controls.Add(_summary, 0, 2);
-        top.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        top.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        top.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        _summary.Margin = new Padding(0, Theme.S(16), 0, 0);
-
-        Controls.Add(UiKit.Rows((header, false), (top, false), (readyCard, true)));
+        TitledCard scanCard = new("Scanner un ticket", new VStack(12).Add(entry).Add(_message), "Lecteur de code-barres ou saisie clavier, puis Entrée", autoHeight: true);
+        VStack page = new VStack()
+            .Add(scanCard)
+            .Add(_summary, StackSize.Fixed, 132)
+            .Add(readyCard, StackSize.Fill);
+        SetPage(header, page);
 
         _find.Click += async (_, _) => await RunAsync(() => LookupAsync(_ticket.Text));
         _ticket.KeyDown += async (_, e) =>

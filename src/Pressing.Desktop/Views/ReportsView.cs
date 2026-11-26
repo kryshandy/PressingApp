@@ -61,10 +61,10 @@ public sealed class ReportsView : BaseView
     }
 
     private readonly SelectBox _period = new();
-    private readonly DateBox _from = new() { Width = Theme.S(150) };
-    private readonly DateBox _to = new() { Width = Theme.S(150) };
-    private readonly FlowLayoutPanel _customDates = new() { AutoSize = true, WrapContents = false, Visible = false, Margin = Padding.Empty };
-    private readonly Label _range = new() { AutoSize = true, ForeColor = Theme.TextMuted, Font = Theme.F(10f), Anchor = AnchorStyles.Left };
+    private readonly DateBox _from = new();
+    private readonly DateBox _to = new();
+    private readonly GridRow _customDates = new() { Visible = false };
+    private readonly TextLabel _range = new() { ForeColor = Theme.TextMuted, Font = Theme.F(10f), TextAlign = ContentAlignment.MiddleRight };
     private readonly FlatButton _export = new() { Text = "Exporter CSV", Kind = ButtonKind.Secondary, IconGlyph = Icons.Save };
     private readonly StatCard _revenue = new("Chiffre d'affaires", "—", Theme.Accent);
     private readonly StatCard _refunds = new("Remboursements", "—", Theme.Red);
@@ -74,7 +74,7 @@ public sealed class ReportsView : BaseView
     private readonly StatCard _completed = new("Terminées", "—", Theme.Green);
     private readonly StatCard _newClients = new("Nouveaux clients", "—", Theme.Violet);
     private readonly StatCard _items = new("Articles traités", "—", Theme.Blue);
-    private readonly RevenueChart _chart = new() { Dock = DockStyle.Fill };
+    private readonly RevenueChart _chart = new();
     private readonly TitledCard _chartCard;
     private readonly GridCard _categories = new("Aucune vente sur la période.");
     private readonly GridCard _methods = new("Aucun encaissement sur la période.");
@@ -100,77 +100,31 @@ public sealed class ReportsView : BaseView
         _from.Value = DateTime.Today.AddDays(-29);
         _to.Value = DateTime.Today;
 
-        TableLayoutPanel filters = new()
-        {
-            AutoSize = true,
-            ColumnCount = 4,
-            Dock = DockStyle.Top,
-            Margin = Padding.Empty,
-            Padding = new Padding(0, 0, 0, Theme.S(8))
-        };
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(220)));
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        _period.Dock = DockStyle.Fill;
-        _period.Margin = new Padding(0, 0, Theme.S(12), 0);
-        _customDates.Controls.Add(_from);
-        _customDates.Controls.Add(UiKit.Muted("  au  "));
-        _customDates.Controls.Add(_to);
-        _customDates.Margin = new Padding(0, 0, Theme.S(16), 0);
-        foreach (Control c in _customDates.Controls)
-        {
-            c.Anchor = AnchorStyles.Left;
-        }
+        // Barre de filtres : période (3) · dates personnalisées (6) · intervalle affiché (3).
+        _customDates.Add(new InlineField("Du", _from, labelPercent: 18), 6).Add(new InlineField("au", _to, labelPercent: 18), 6);
+        GridRow filters = new GridRow(40).Add(_period, 3).Add(new Padded(_customDates, Padding.Empty), 6).Add(_range, 3);
 
-        filters.Controls.Add(_period, 0, 0);
-        filters.Controls.Add(_customDates, 1, 0);
-        filters.Controls.Add(_range, 2, 0);
-
-        TableLayoutPanel cards = new() { Dock = DockStyle.Top, Height = Theme.S(2 * 112 + 8), ColumnCount = 4, RowCount = 2, Margin = Padding.Empty };
-        for (int i = 0; i < 4; i++)
-        {
-            cards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-        }
-
-        cards.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.S(112)));
-        cards.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.S(112)));
-        StatCard[] all = { _revenue, _refunds, _net, _outstanding, _orders, _completed, _newClients, _items };
-        for (int i = 0; i < all.Length; i++)
-        {
-            cards.Controls.Add(all[i], i % 4, i / 4);
-        }
-
-        Panel chartHost = new() { Height = Theme.S(230), BackColor = Color.Transparent };
-        chartHost.Controls.Add(_chart);
-        _chartCard = new TitledCard("Recettes journalières", chartHost, "Encaissements par jour sur la période");
-        _chartCard.Dock = DockStyle.Top;
-        _chartCard.Height = Theme.S(330);
+        _chartCard = new TitledCard("Recettes journalières", _chart, "Encaissements par jour sur la période");
 
         ConfigureGrids();
-        TableLayoutPanel row1 = Columns(
-            new TitledCard("Top catégories", _categories, "Quantités vendues et chiffre d'affaires", flushContent: true),
-            new TitledCard("Modes de paiement", _methods, "Encaissements par mode", flushContent: true), 55, Theme.S(320));
-        TableLayoutPanel row2 = Columns(
-            new TitledCard("Personnel", _staff, "Commandes créées et encaissements", flushContent: true),
-            new TitledCard("Commandes récentes", _recent, "Double-clic pour ouvrir", flushContent: true), 42, Theme.S(360));
-
-        TableLayoutPanel page = new()
+        foreach (GridCard g in new[] { _categories, _methods, _staff, _recent })
         {
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 1,
-            Margin = Padding.Empty
-        };
-        page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        page.Controls.Add(cards, 0, 0);
-        page.Controls.Add(_chartCard, 0, 1);
-        page.Controls.Add(row1, 0, 2);
-        page.Controls.Add(row2, 0, 3);
+            g.AutoHeightRows = 5;
+            g.MaxRows = 8;
+        }
 
-        ScrollPanel scroll = new();
-        scroll.Controls.Add(page);
-        Controls.Add(UiKit.Rows((header, false), (filters, false), (scroll, true)));
+        // KPI 3+3+3+3 sur deux lignes, graphique pleine largeur, puis 6+6 et 6+6.
+        VStack page = new VStack()
+            .Add(new GridRow().Add(_revenue, 3).Add(_refunds, 3).Add(_net, 3).Add(_outstanding, 3))
+            .Add(new GridRow().Add(_orders, 3).Add(_completed, 3).Add(_newClients, 3).Add(_items, 3))
+            .Add(_chartCard, StackSize.Fixed, 340)
+            .Add(new GridRow()
+                .Add(new TitledCard("Top catégories", _categories, "Quantités vendues et chiffre d'affaires", flushContent: true), 6)
+                .Add(new TitledCard("Modes de paiement", _methods, "Encaissements par mode", flushContent: true), 6))
+            .Add(new GridRow()
+                .Add(new TitledCard("Personnel", _staff, "Commandes créées et encaissements", flushContent: true), 6)
+                .Add(new TitledCard("Commandes récentes", _recent, "Double-clic pour ouvrir", flushContent: true), 6));
+        SetPage(header, page, scroll: true, toolbar: filters);
 
         _period.SelectedIndexChanged += async (_, _) =>
         {
@@ -183,35 +137,26 @@ public sealed class ReportsView : BaseView
 
     public override string Title => "Rapports";
 
-    private static TableLayoutPanel Columns(Control left, Control right, int leftPercent, int height)
-    {
-        TableLayoutPanel row = new() { Dock = DockStyle.Top, Height = height, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, leftPercent));
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100 - leftPercent));
-        row.Controls.Add(left, 0, 0);
-        row.Controls.Add(right, 1, 0);
-        return row;
-    }
-
     private void ConfigureGrids()
     {
-        _categories.Grid.AddText("category", "CATÉGORIE", nameof(CategoryRow.Category), 44, minWidth: 120);
-        _categories.Grid.AddText("quantity", "QUANTITÉ", nameof(CategoryRow.Quantity), 22, true, 80);
-        _categories.Grid.AddText("revenue", "CHIFFRE D'AFFAIRES", nameof(CategoryRow.Revenue), 34, true, 140);
+        _categories.Grid.AddText("category", "CATÉGORIE", nameof(CategoryRow.Category), 100, minWidth: 110);
+        _categories.Grid.AddText("quantity", "QUANTITÉ", nameof(CategoryRow.Quantity), right: true, fixedWidth: 100);
+        _categories.Grid.AddText("revenue", "CHIFFRE D'AFFAIRES", nameof(CategoryRow.Revenue), right: true, fixedWidth: 160);
 
-        _methods.Grid.AddText("method", "MODE", nameof(MethodRow.Method), 44, minWidth: 110);
-        _methods.Grid.AddText("count", "OPÉRATIONS", nameof(MethodRow.Count), 24, true, 90);
-        _methods.Grid.AddText("amount", "MONTANT", nameof(MethodRow.Amount), 32, true, 120);
+        _methods.Grid.AddText("method", "MODE", nameof(MethodRow.Method), 100, minWidth: 110);
+        _methods.Grid.AddText("count", "OPÉRATIONS", nameof(MethodRow.Count), right: true, fixedWidth: 116);
+        _methods.Grid.AddText("amount", "MONTANT", nameof(MethodRow.Amount), right: true, fixedWidth: 132);
 
-        _staff.Grid.AddText("name", "COLLABORATEUR", nameof(StaffRow.Name), 40, minWidth: 110);
-        _staff.Grid.AddText("orders", "COMMANDES", nameof(StaffRow.Orders), 26, true, 90);
-        _staff.Grid.AddText("payments", "ENCAISSÉ", nameof(StaffRow.Payments), 34, true, 110);
+        _staff.Grid.AddText("name", "COLLABORATEUR", nameof(StaffRow.Name), 100, minWidth: 120);
+        _staff.Grid.AddText("orders", "COMMANDES", nameof(StaffRow.Orders), right: true, fixedWidth: 116);
+        _staff.Grid.AddText("payments", "ENCAISSÉ", nameof(StaffRow.Payments), right: true, fixedWidth: 132);
 
         ThemedGrid recent = _recent.Grid;
-        recent.AddText("ticket", "TICKET", nameof(OrderRow.Ticket), 24, minWidth: 120);
-        recent.AddText("client", "CLIENT", nameof(OrderRow.Client), 30, minWidth: 100);
-        recent.AddText("total", "TOTAL", nameof(OrderRow.Total), 22, true, 100);
-        recent.AddPill("status", "STATUT", 28, 130);
+        recent.AddText("ticket", "TICKET", nameof(OrderRow.Ticket), 50, minWidth: 140);
+        recent.AddText("client", "CLIENT", nameof(OrderRow.Client), 50, minWidth: 90);
+        recent.AddText("total", "TOTAL", nameof(OrderRow.Total), right: true, fixedWidth: 108);
+        recent.AddPill("status", "STATUT", fixedWidth: 132);
+        recent.SetOptional("total");
         recent.CellDoubleClick += (_, e) =>
         {
             if (e.RowIndex >= 0 && recent.Rows[e.RowIndex].DataBoundItem is OrderRow row)

@@ -16,13 +16,11 @@ public sealed class DashboardView : BaseView
     private readonly StatCard _ready;
     private readonly StatCard _overdue;
     private readonly StatCard _outstanding;
-    private readonly TableLayoutPanel _cards;
     private readonly TitledCard _chartCard;
     private readonly RevenueChart _chart = new();
     private readonly StatusBars _status = new();
     private readonly GridCard _recent = new("Aucune commande récente.");
     private readonly GridCard _readyList = new("Aucune commande prête pour le moment.");
-    private int _columns;
 
     public DashboardView(IAppHost host) : base(host)
     {
@@ -43,109 +41,45 @@ public sealed class DashboardView : BaseView
         _overdue.MakeClickable(() => Host.Navigate(NavRegistry.Orders));
         _outstanding.MakeClickable(() => Host.Navigate(NavRegistry.Unpaid));
 
-        _cards = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Margin = Padding.Empty };
-
         _chartCard = new TitledCard("Chiffre d'affaires — 7 derniers jours", _chart, "Encaissements par jour");
         TitledCard statusCard = new("Répartition par statut", _status, "Commandes en base");
-        TableLayoutPanel row2 = TwoColumns(_chartCard, statusCard, 58, Theme.S(330));
 
         ConfigureGrid(_recent.Grid, true);
         ConfigureGrid(_readyList.Grid, false);
+        _recent.AutoHeightRows = 5;
+        _recent.MaxRows = 8;
+        _readyList.AutoHeightRows = 5;
+        _readyList.MaxRows = 8;
         TitledCard recentCard = new("Commandes récentes", _recent, "Double-clic pour ouvrir", flushContent: true);
         TitledCard readyCard = new("Prêtes à retirer", _readyList, "Double-clic pour ouvrir", flushContent: true);
-        TableLayoutPanel row3 = TwoColumns(recentCard, readyCard, 50, Theme.S(360));
 
-        TableLayoutPanel page = new()
-        {
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 1,
-            Margin = Padding.Empty
-        };
-        page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        page.Controls.Add(_cards, 0, 0);
-        page.Controls.Add(row2, 0, 1);
-        page.Controls.Add(row3, 0, 2);
-
-        ScrollPanel scroll = new();
-        scroll.Controls.Add(page);
-        Controls.Add(scroll);
-        Controls.Add(_header);
-        scroll.BringToFront();
-        SizeChanged += (_, _) => ApplyCardLayout();
-        ApplyCardLayout();
+        // Grille de 12 : KPI 4+4+4 sur deux lignes de même hauteur, 8+4 (graphique + statuts), 6+6 (listes).
+        VStack page = new VStack()
+            .Add(new GridRow().Add(_revenueToday, 4).Add(_revenueMonth, 4).Add(_outstanding, 4))
+            .Add(new GridRow().Add(_active, 4).Add(_ready, 4).Add(_overdue, 4))
+            .Add(new GridRow(352).Add(_chartCard, 8).Add(statusCard, 4))
+            .Add(new GridRow().Add(recentCard, 6).Add(readyCard, 6));
+        SetPage(_header, page, scroll: true);
     }
 
     public override string Title => "Tableau de bord";
 
-    private static TableLayoutPanel TwoColumns(Control left, Control right, int leftPercent, int height)
-    {
-        TableLayoutPanel row = new()
-        {
-            Dock = DockStyle.Top,
-            Height = height,
-            ColumnCount = 2,
-            RowCount = 1,
-            Margin = Padding.Empty
-        };
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, leftPercent));
-        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100 - leftPercent));
-        row.Controls.Add(left, 0, 0);
-        row.Controls.Add(right, 1, 0);
-        return row;
-    }
-
-    private void ApplyCardLayout()
-    {
-        int columns = Width >= Theme.S(1560) ? 6 : 3;
-        if (columns == _columns)
-        {
-            return;
-        }
-
-        _columns = columns;
-        _cards.SuspendLayout();
-        _cards.Controls.Clear();
-        _cards.ColumnStyles.Clear();
-        _cards.RowStyles.Clear();
-        _cards.ColumnCount = columns;
-        for (int i = 0; i < columns; i++)
-        {
-            _cards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / columns));
-        }
-
-        StatCard[] all = { _revenueToday, _revenueMonth, _active, _ready, _overdue, _outstanding };
-        for (int i = 0; i < all.Length; i++)
-        {
-            int row = i / columns;
-            while (_cards.RowStyles.Count <= row)
-            {
-                _cards.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.S(112)));
-            }
-
-            _cards.Controls.Add(all[i], i % columns, row);
-        }
-
-        _cards.Height = Theme.S(112) * ((all.Length + columns - 1) / columns) + Theme.S(8);
-        _cards.ResumeLayout(true);
-    }
-
     private void ConfigureGrid(ThemedGrid grid, bool recent)
     {
-        grid.AddText("ticket", "TICKET", nameof(OrderRow.Ticket), 24);
-        grid.AddText("client", "CLIENT", nameof(OrderRow.Client), 32);
+        grid.AddText("ticket", "TICKET", nameof(OrderRow.Ticket), 30, minWidth: 140);
+        grid.AddText("client", "CLIENT", nameof(OrderRow.Client), 40, minWidth: 120);
         if (recent)
         {
-            grid.AddText("total", "TOTAL", nameof(OrderRow.Total), 22, true);
-            grid.AddPill("status", "STATUT", 28, 120);
+            grid.AddText("total", "TOTAL", nameof(OrderRow.Total), 22, true, fixedWidth: 112);
+            grid.AddPill("status", "STATUT", 28, fixedWidth: 132);
         }
         else
         {
-            grid.AddText("due", "PRÉVU LE", nameof(OrderRow.Due), 22);
-            grid.AddText("balance", "RESTE", nameof(OrderRow.Balance), 22, true);
+            grid.AddText("due", "PRÉVU LE", nameof(OrderRow.Due), 22, fixedWidth: 108);
+            grid.AddText("balance", "RESTE", nameof(OrderRow.Balance), 22, true, fixedWidth: 112);
         }
 
+        grid.SetOptional("total", "due");
         grid.CellDoubleClick += (_, e) =>
         {
             if (e.RowIndex >= 0 && grid.Rows[e.RowIndex].DataBoundItem is OrderRow row)

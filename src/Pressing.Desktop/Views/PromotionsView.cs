@@ -75,21 +75,20 @@ public sealed class PromotionsView : BaseView
     {
         PageHeader header = new("Promotions", "Codes promo et remises applicables lors du dépôt");
         header.AddAction("Actualiser", ButtonKind.Secondary, Icons.Refresh, async (_, _) => await RunAsync(RefreshAsync));
-        header.AddControl(_edit);
         header.AddAction("Nouvelle promotion", ButtonKind.Primary, Icons.Add, async (_, _) => await CreateAsync());
 
         _hint.Text = "Double-cliquez sur une ligne pour modifier la promotion. Une promotion inactive n'est plus acceptée à la caisse.";
-        _inactive.Margin = new Padding(0, 0, 0, Theme.S(12));
 
         ThemedGrid grid = _card.Grid;
-        grid.AddText("code", "CODE", nameof(PromoRow.Code), 14, minWidth: 110);
-        grid.AddText("description", "DESCRIPTION", nameof(PromoRow.Description), 26, minWidth: 140);
-        grid.AddText("type", "TYPE", nameof(PromoRow.Type), 11, minWidth: 100);
-        grid.AddText("value", "VALEUR", nameof(PromoRow.Value), 9, true, 80);
-        grid.AddText("minimum", "MINIMUM", nameof(PromoRow.Minimum), 11, true, 90);
-        grid.AddText("period", "PÉRIODE", nameof(PromoRow.Period), 20, minWidth: 180);
-        grid.AddText("uses", "UTILISATIONS", nameof(PromoRow.Uses), 11, true, 110);
-        grid.AddPill("state", "ÉTAT", 10, 100);
+        grid.AddText("code", "CODE", nameof(PromoRow.Code), fixedWidth: 140);
+        grid.AddText("description", "DESCRIPTION", nameof(PromoRow.Description), 100, minWidth: 160);
+        grid.AddText("type", "TYPE", nameof(PromoRow.Type), fixedWidth: 128);
+        grid.AddText("value", "VALEUR", nameof(PromoRow.Value), right: true, fixedWidth: 100);
+        grid.AddText("minimum", "MINIMUM", nameof(PromoRow.Minimum), right: true, fixedWidth: 112);
+        grid.AddText("period", "PÉRIODE", nameof(PromoRow.Period), fixedWidth: 196);
+        grid.AddText("uses", "UTILISATIONS", nameof(PromoRow.Uses), right: true, fixedWidth: 124);
+        grid.AddPill("state", "ÉTAT", fixedWidth: 112);
+        grid.SetOptional("minimum", "uses");
         grid.SelectionChanged += (_, _) => _edit.Enabled = grid.SelectedItem<PromoRow>() is not null;
         grid.CellDoubleClick += async (_, e) =>
         {
@@ -99,7 +98,10 @@ public sealed class PromotionsView : BaseView
             }
         };
 
-        Controls.Add(UiKit.Rows((header, false), (_inactive, false), (_card, true), (_hint, false)));
+        TitledCard list = new("Codes promo", _card, _hint.Text, flushContent: true);
+        list.AddAction(_inactive);
+        list.AddAction(_edit);
+        SetPage(header, list);
         _edit.Click += async (_, _) => await EditAsync();
         _inactive.CheckedChanged += (_, _) => Fill();
     }

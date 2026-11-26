@@ -50,8 +50,6 @@ public sealed class StaffView : BaseView
     {
         PageHeader header = new("Personnel", "Comptes des employés, rôles d'accès et mots de passe");
         header.AddAction("Actualiser", ButtonKind.Secondary, Icons.Refresh, async (_, _) => await RunAsync(RefreshAsync));
-        header.AddControl(_edit);
-        header.AddControl(_password);
         header.AddAction("Nouveau membre", ButtonKind.Primary, Icons.Add, async (_, _) => await CreateAsync());
 
         Label hint = new()
@@ -64,12 +62,12 @@ public sealed class StaffView : BaseView
         };
 
         ThemedGrid grid = _card.Grid;
-        grid.AddText("name", "NOM", nameof(StaffRow.Name), 24, minWidth: 150);
-        grid.AddText("username", "IDENTIFIANT", nameof(StaffRow.Username), 16, minWidth: 110);
-        grid.AddText("email", "E-MAIL", nameof(StaffRow.Email), 26, minWidth: 160);
-        grid.AddPill("role", "RÔLE", 14, 140);
-        grid.AddPill("state", "ÉTAT", 10, 100);
-        grid.AddText("last", "DERNIÈRE CONNEXION", nameof(StaffRow.LastLogin), 18, minWidth: 140);
+        grid.AddText("name", "NOM", nameof(StaffRow.Name), 40, minWidth: 160);
+        grid.AddText("username", "IDENTIFIANT", nameof(StaffRow.Username), 25, minWidth: 120);
+        grid.AddText("email", "E-MAIL", nameof(StaffRow.Email), 45, minWidth: 180);
+        grid.AddPill("role", "RÔLE", fixedWidth: 148);
+        grid.AddPill("state", "ÉTAT", fixedWidth: 112);
+        grid.AddText("last", "DERNIÈRE CONNEXION", nameof(StaffRow.LastLogin), fixedWidth: 180);
         grid.SelectionChanged += (_, _) =>
         {
             bool has = grid.SelectedItem<StaffRow>() is not null;
@@ -84,7 +82,10 @@ public sealed class StaffView : BaseView
             }
         };
 
-        Controls.Add(UiKit.Rows((header, false), (_card, true), (hint, false)));
+        TitledCard list = new("Comptes", _card, hint.Text, flushContent: true);
+        list.AddAction(_edit);
+        list.AddAction(_password);
+        SetPage(header, list);
         _edit.Click += async (_, _) => await EditAsync();
         _password.Click += async (_, _) => await ResetPasswordAsync();
     }

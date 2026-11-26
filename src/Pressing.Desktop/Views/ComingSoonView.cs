@@ -15,9 +15,8 @@ public sealed class ComingSoonView : BaseView
     {
         _title = title;
         PageHeader header = new(title, "Module en cours de développement");
-        Controls.Add(header);
 
-        RoundedPanel card = new() { Dock = DockStyle.Fill, Padding = Theme.Pad(40) };
+        RoundedPanel card = new() { Padding = Theme.Pad(40) };
         TableLayoutPanel center = new()
         {
             Dock = DockStyle.Fill,
@@ -49,8 +48,7 @@ public sealed class ComingSoonView : BaseView
         content.Controls.Add(soon, 0, 3);
         center.Controls.Add(content, 0, 1);
         card.Controls.Add(center);
-        Controls.Add(card);
-        card.BringToFront();
+        SetPage(header, card);
     }
 
     public override string Title => _title;

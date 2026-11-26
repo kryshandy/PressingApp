@@ -28,16 +28,13 @@ public sealed class OrderDetailView : BaseView
 
     private readonly int _orderId;
     private OrderDto? _order;
-    private readonly TwoColumnPanel _body;
-    private FlowLayoutPanel _itemTools = null!;
-
-    private readonly Label _ticket = new() { AutoSize = true, Font = Theme.F(22f, FontStyle.Bold), ForeColor = Theme.Accent, Margin = Padding.Empty };
-    private readonly Label _subtitle = new() { AutoSize = true, Font = Theme.F(10f), ForeColor = Theme.TextMuted, Margin = new Padding(0, Theme.S(2), 0, 0) };
-    private readonly PillLabel _statusPill = new() { Anchor = AnchorStyles.Left };
-    private readonly PillLabel _expressPill = new() { Anchor = AnchorStyles.Left, Text = "EXPRESS", PillColor = Theme.Amber, Visible = false };
+    private readonly PageHeader _header = new("Commande", "Chargement…");
+    private readonly PillLabel _statusPill = new();
+    private readonly PillLabel _expressPill = new() { Text = "EXPRESS", PillColor = Theme.Amber, Visible = false };
+    private readonly FigureBlock _balance = new("Reste à payer", 24f);
 
     private readonly FlatButton _pay = new() { Text = "Encaisser", Kind = ButtonKind.Primary, IconGlyph = Icons.Money };
-    private readonly FlatButton _pickup = new() { Text = "Retrait", Kind = ButtonKind.Info, IconGlyph = Icons.Pickup };
+    private readonly FlatButton _pickup = new() { Text = "Retrait", Kind = ButtonKind.Secondary, IconGlyph = Icons.Pickup };
     private readonly FlatButton _receipt = new() { Text = "Reçu PDF", Kind = ButtonKind.Secondary, IconGlyph = Icons.Pdf };
     private readonly FlatButton _email = new() { Text = "Envoyer par e-mail", Kind = ButtonKind.Secondary, IconGlyph = Icons.Mail };
     private readonly FlatButton _refund = new() { Text = "Rembourser", Kind = ButtonKind.Secondary, IconGlyph = Icons.Refund };
@@ -45,10 +42,10 @@ public sealed class OrderDetailView : BaseView
 
     private readonly GridCard _itemsGrid = new("Aucun article.");
     private readonly TitledCard _itemsCard;
-    private readonly FlatButton _setProcessing = new() { Text = "En traitement", Kind = ButtonKind.Secondary, Height = Theme.S(36) };
-    private readonly FlatButton _setReady = new() { Text = "Prêt", Kind = ButtonKind.Secondary, IconGlyph = Icons.Check, Height = Theme.S(36) };
-    private readonly SelectBox _bulkStatus = new() { Width = Theme.S(170), Height = Theme.S(36) };
-    private readonly FlatButton _bulkApply = new() { Text = "Tout passer à", Kind = ButtonKind.Secondary, Height = Theme.S(36) };
+    private readonly FlatButton _setProcessing = new() { Text = "En traitement", Kind = ButtonKind.Secondary };
+    private readonly FlatButton _setReady = new() { Text = "Prêt", Kind = ButtonKind.Secondary, IconGlyph = Icons.Check };
+    private readonly SelectBox _bulkStatus = new() { Width = Theme.S(160), Height = Theme.S(32) };
+    private readonly FlatButton _bulkApply = new() { Text = "Appliquer", Kind = ButtonKind.Secondary };
     private readonly GridCard _paymentsGrid = new("Aucun paiement enregistré.");
     private readonly TitledCard _paymentsCard;
     private readonly GridCard _pickupsGrid = new("Aucun retrait pour le moment.");
@@ -56,68 +53,44 @@ public sealed class OrderDetailView : BaseView
     private readonly InfoList _clientInfo = new();
     private readonly InfoList _dates = new();
     private readonly InfoList _amounts = new();
-    private readonly LinkLabel _clientLink = new();
+    private readonly TextLabel _clientLink = new();
     private readonly TitledCard _notesCard;
-    private readonly Label _notes = new() { AutoSize = true, MaximumSize = new Size(Theme.S(300), 0), ForeColor = Theme.Text, Font = Theme.F(10f) };
+    private readonly TextLabel _notes = new() { Wrap = true, ForeColor = Theme.Text, Font = Theme.F(10f) };
 
     public OrderDetailView(IAppHost host, int orderId) : base(host)
     {
         _orderId = orderId;
 
-        // ----- En-tête -----
-        FlatButton back = new() { Text = "Retour", Kind = ButtonKind.Ghost, IconGlyph = Icons.Back, Anchor = AnchorStyles.Left, Margin = new Padding(0, 0, Theme.S(16), 0) };
+        // ----- En-tête : Retour sur la gouttière, ticket + pastilles, client et dates, actions sur une ligne -----
+        FlatButton back = new() { Text = "Retour", Kind = ButtonKind.Secondary, IconGlyph = Icons.Back };
         back.Click += (_, _) => Host.GoBack();
-        TableLayoutPanel titleBox = new() { AutoSize = true, ColumnCount = 1, Anchor = AnchorStyles.Left, Margin = Padding.Empty };
-        titleBox.Controls.Add(_ticket, 0, 0);
-        titleBox.Controls.Add(_subtitle, 0, 1);
-        FlowLayoutPanel pills = new() { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.Left, Margin = new Padding(Theme.S(18), 0, 0, 0) };
-        pills.Controls.Add(_statusPill);
-        pills.Controls.Add(_expressPill);
-
-        TableLayoutPanel top = new()
+        _header.SetLeading(back);
+        _header.AddTitleAdornment(_statusPill);
+        _header.AddTitleAdornment(_expressPill);
+        List<FlatButton> actions = new() { _email, _receipt };
+        if (Session.IsManagerOrAdmin)
         {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 4,
-            RowCount = 1,
-            Margin = Padding.Empty,
-            Padding = new Padding(0, 0, 0, Theme.S(14))
-        };
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        top.Controls.Add(back, 0, 0);
-        top.Controls.Add(titleBox, 1, 0);
-        top.Controls.Add(pills, 2, 0);
-
-        FlowLayoutPanel actions = new()
-        {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            WrapContents = true,
-            Margin = Padding.Empty,
-            Padding = new Padding(0, 0, 0, Theme.S(14)),
-            Dock = DockStyle.Fill
-        };
-        foreach (FlatButton b in new[] { _pay, _pickup, _receipt, _email, _refund, _cancel })
-        {
-            b.Margin = new Padding(0, 0, Theme.S(10), Theme.S(8));
-            actions.Controls.Add(b);
+            actions.Insert(0, _cancel);
+            actions.Insert(1, _refund);
         }
 
-        _refund.Visible = Session.IsManagerOrAdmin;
-        _cancel.Visible = Session.IsManagerOrAdmin;
+        actions.Add(_pickup);
+        actions.Add(_pay);
+        foreach (FlatButton b in actions)
+        {
+            _header.Actions.Add(b);
+        }
 
         // ----- Articles -----
         ThemedGrid items = _itemsGrid.Grid;
-        items.AddText("article", "ARTICLE", nameof(ItemRow.Article), 28, minWidth: 140);
-        items.AddText("service", "SERVICE", nameof(ItemRow.Service), 20, minWidth: 130);
-        items.AddText("qty", "QTÉ", nameof(ItemRow.Quantity), 7, true, 56);
-        items.AddText("unit", "PRIX UNIT.", nameof(ItemRow.UnitPrice), 13, true, 96);
-        items.AddText("total", "TOTAL", nameof(ItemRow.Total), 13, true, 96);
-        items.AddPill("status", "STATUT", 16, 130);
-        items.AddText("picked", "RETIRÉ", nameof(ItemRow.PickedUp), 9, true, 72);
+        items.AddText("article", "ARTICLE", nameof(ItemRow.Article), 55, minWidth: 150);
+        items.AddText("service", "SERVICE", nameof(ItemRow.Service), 45, minWidth: 120);
+        items.AddText("qty", "QTÉ", nameof(ItemRow.Quantity), right: true, fixedWidth: 64);
+        items.AddText("unit", "PRIX UNIT.", nameof(ItemRow.UnitPrice), right: true, fixedWidth: 108);
+        items.AddText("total", "TOTAL", nameof(ItemRow.Total), right: true, fixedWidth: 108);
+        items.AddPill("status", "STATUT", fixedWidth: 136);
+        items.AddText("picked", "RETIRÉ", nameof(ItemRow.PickedUp), right: true, fixedWidth: 84);
+        items.SetOptional("picked", "unit", "service");
         items.SelectionChanged += (_, _) => UpdateItemButtons();
 
         _bulkStatus.SetChoices(new[]
@@ -126,93 +99,74 @@ public sealed class OrderDetailView : BaseView
             new Choice<ItemStatus>(ItemStatus.InProgress, "En traitement"),
             new Choice<ItemStatus>(ItemStatus.Ready, "Prêt")
         }, ItemStatus.Ready);
-        FlowLayoutPanel itemTools = new()
+        ActionBar itemTools = new(alignRight: false) { ButtonHeight = Theme.S(32), MaxVisible = 10 };
+        TextLabel allLabel = new() { Text = "Passer tous les articles à :", Font = Theme.F(9.5f), ForeColor = Theme.TextMuted, AutoSize = true, Height = Theme.S(20) };
+        foreach (Control c in new Control[] { allLabel, _bulkStatus, _bulkApply })
         {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            WrapContents = true,
-            Dock = DockStyle.Fill,
-            Margin = Padding.Empty,
-            Padding = new Padding(Theme.S(19), 0, Theme.S(19), Theme.S(10))
-        };
-        Label selectedLabel = UiKit.Label("Sélection :", Theme.F(9.5f), Theme.TextMuted);
-        Label allLabel = UiKit.Label("Tous :", Theme.F(9.5f), Theme.TextMuted);
-        selectedLabel.Margin = new Padding(0, Theme.S(8), Theme.S(10), 0);
-        allLabel.Margin = new Padding(Theme.S(16), Theme.S(8), Theme.S(10), 0);
-        _bulkApply.Text = "Appliquer";
-        foreach (Control c in new Control[] { selectedLabel, _setProcessing, _setReady, allLabel, _bulkStatus, _bulkApply })
-        {
-            if (c is not Label)
-            {
-                c.Margin = new Padding(0, 0, Theme.S(8), 0);
-            }
-
-            itemTools.Controls.Add(c);
+            itemTools.Add(c);
         }
 
-        _itemTools = itemTools;
-        TableLayoutPanel itemsContent = (TableLayoutPanel)UiKit.Rows((itemTools, false), (_itemsGrid, true));
-        _itemsCard = new TitledCard("Articles", itemsContent, null, flushContent: true) { Dock = DockStyle.Top, Margin = new Padding(0, 0, 0, Theme.S(12)) };
+        _itemsGrid.AutoHeightRows = 2;
+        _itemsGrid.MaxRows = 10;
+        VStack itemsContent = new VStack(16)
+            .Add(new Padded(itemTools, new Padding(Theme.CardPadding - 1, 0, Theme.CardPadding - 1, 0)))
+            .Add(_itemsGrid);
+        _itemsCard = new TitledCard("Articles", itemsContent, "Sélectionnez un article pour changer son statut", flushContent: true);
+        _itemsCard.AddAction(_setProcessing);
+        _itemsCard.AddAction(_setReady);
 
         // ----- Paiements / retraits -----
         ThemedGrid pay = _paymentsGrid.Grid;
-        pay.AddText("date", "DATE", nameof(PaymentRow.Date), 20, minWidth: 130);
-        pay.AddText("type", "TYPE", nameof(PaymentRow.Type), 16, minWidth: 110);
-        pay.AddText("method", "MODE", nameof(PaymentRow.Method), 16, minWidth: 100);
-        pay.AddText("reference", "RÉFÉRENCE", nameof(PaymentRow.Reference), 18, minWidth: 100);
-        pay.AddText("staff", "PAR", nameof(PaymentRow.Staff), 14, minWidth: 90);
-        pay.AddText("amount", "MONTANT", nameof(PaymentRow.Amount), 16, true, 110);
-        _paymentsCard = new TitledCard("Paiements", _paymentsGrid, null, flushContent: true) { Dock = DockStyle.Top, Margin = new Padding(0, 0, 0, Theme.S(12)) };
+        pay.AddText("date", "DATE", nameof(PaymentRow.Date), fixedWidth: 148);
+        pay.AddText("type", "TYPE", nameof(PaymentRow.Type), 25, minWidth: 100);
+        pay.AddText("method", "MODE", nameof(PaymentRow.Method), 25, minWidth: 110);
+        pay.AddText("reference", "RÉFÉRENCE", nameof(PaymentRow.Reference), 30, minWidth: 90);
+        pay.AddText("staff", "PAR", nameof(PaymentRow.Staff), 20, minWidth: 90);
+        pay.AddText("amount", "MONTANT", nameof(PaymentRow.Amount), right: true, fixedWidth: 120);
+        pay.SetOptional("reference", "staff");
+        _paymentsGrid.AutoHeightRows = 1;
+        _paymentsGrid.MaxRows = 8;
+        _paymentsCard = new TitledCard("Paiements", _paymentsGrid, null, flushContent: true);
 
         ThemedGrid pick = _pickupsGrid.Grid;
-        pick.AddText("when", "DATE", nameof(PickupRow.When), 22, minWidth: 130);
-        pick.AddText("items", "ARTICLES REMIS", nameof(PickupRow.Items), 44, minWidth: 160);
-        pick.AddText("staff", "PAR", nameof(PickupRow.Staff), 16, minWidth: 90);
-        pick.AddText("note", "NOTE", nameof(PickupRow.Note), 18, minWidth: 80);
-        _pickupsCard = new TitledCard("Retraits", _pickupsGrid, null, flushContent: true) { Dock = DockStyle.Top, Margin = new Padding(0, 0, 0, Theme.S(12)) };
+        pick.AddText("when", "DATE", nameof(PickupRow.When), fixedWidth: 148);
+        pick.AddText("items", "ARTICLES REMIS", nameof(PickupRow.Items), 50, minWidth: 160);
+        pick.AddText("staff", "PAR", nameof(PickupRow.Staff), 20, minWidth: 90);
+        pick.AddText("note", "NOTE", nameof(PickupRow.Note), 30, minWidth: 90);
+        pick.SetOptional("note", "staff");
+        _pickupsGrid.AutoHeightRows = 1;
+        _pickupsGrid.MaxRows = 8;
+        _pickupsCard = new TitledCard("Retraits", _pickupsGrid, null, flushContent: true);
 
-        TableLayoutPanel left = new() { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, Margin = Padding.Empty };
-        left.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        left.Controls.Add(_itemsCard, 0, 0);
-        left.Controls.Add(_paymentsCard, 0, 1);
-        left.Controls.Add(_pickupsCard, 0, 2);
+        VStack left = new VStack().Add(_itemsCard).Add(_paymentsCard).Add(_pickupsCard);
 
-        // ----- Colonne de droite -----
-        _clientLink.AutoSize = true;
-        _clientLink.Font = Theme.F(12f, FontStyle.Bold);
-        _clientLink.LinkColor = Theme.Text;
-        _clientLink.ActiveLinkColor = Theme.Accent;
-        _clientLink.VisitedLinkColor = Theme.Text;
-        _clientLink.LinkBehavior = LinkBehavior.HoverUnderline;
-        _clientLink.BackColor = Color.Transparent;
-        _clientLink.Margin = new Padding(0, 0, 0, Theme.S(8));
-        _clientLink.LinkClicked += (_, _) =>
+        // ----- Colonne de droite : carte Résumé -----
+        _clientLink.Font = Theme.Semi(12f);
+        _clientLink.ForeColor = Theme.Text;
+        _clientLink.Cursor = Cursors.Hand;
+        _clientLink.MouseEnter += (_, _) => _clientLink.ForeColor = Theme.Accent;
+        _clientLink.MouseLeave += (_, _) => _clientLink.ForeColor = Theme.Text;
+        _clientLink.Click += (_, _) =>
         {
             if (_order is not null)
             {
                 Host.OpenClient(_order.ClientId);
             }
         };
-        TableLayoutPanel clientBody = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, BackColor = Color.Transparent };
-        clientBody.Controls.Add(_clientLink, 0, 0);
-        clientBody.Controls.Add(_clientInfo, 0, 1);
-        TitledCard clientCard = new("Client et livraison", clientBody, null, false, true) { Margin = new Padding(0, 0, 0, Theme.S(12)) };
-        TitledCard datesCard = new("Chronologie", _dates, null, false, true) { Margin = new Padding(0, 0, 0, Theme.S(12)) };
-        TitledCard amountsCard = new("Montants", _amounts, null, false, true) { Margin = new Padding(0, 0, 0, Theme.S(12)) };
-        _notesCard = new TitledCard("Notes", _notes, null, false, true) { Margin = new Padding(0, 0, 0, Theme.S(12)), Visible = false };
+        VStack summary = new VStack(16)
+            .Add(_clientLink)
+            .Add(_clientInfo)
+            .Add(new SectionRule())
+            .Add(_amounts)
+            .Add(_balance);
+        TitledCard summaryCard = new("Résumé", summary, null, false, true);
+        TitledCard datesCard = new("Chronologie", _dates, null, false, true);
+        _notesCard = new TitledCard("Notes", _notes, null, false, true) { Visible = false };
+        VStack right = new VStack().Add(summaryCard).Add(datesCard).Add(_notesCard);
 
-        TableLayoutPanel right = new() { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, Margin = Padding.Empty };
-        right.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        right.Controls.Add(amountsCard, 0, 0);
-        right.Controls.Add(clientCard, 0, 1);
-        right.Controls.Add(datesCard, 0, 2);
-        right.Controls.Add(_notesCard, 0, 3);
-
-        _body = new TwoColumnPanel(left, right, 372);
-        ScrollPanel scroll = new();
-        scroll.Controls.Add(_body);
-
-        Controls.Add(UiKit.Rows((top, false), (actions, false), (scroll, true)));
+        // 8 + 4 ; la colonne Résumé reste visible pendant le défilement.
+        GridRow body = new GridRow { StackBelow = 900 }.Add(left, 8).Add(right, 4).Sticky(right);
+        SetPage(_header, body, scroll: true);
 
         _pay.Click += async (_, _) => await PayAsync();
         _pickup.Click += async (_, _) => await PickupAsync();
@@ -224,14 +178,6 @@ public sealed class OrderDetailView : BaseView
         _setReady.Click += async (_, _) => await SetSelectedStatusAsync(ItemStatus.Ready);
         _bulkApply.Click += async (_, _) => await BulkStatusAsync();
         UpdateButtons();
-        SizeChanged += (_, _) =>
-        {
-            if (_order is not null)
-            {
-                FitHeights(_order);
-                _body.PerformLayout();
-            }
-        };
     }
 
     public override string Title => _order is null ? "Commande" : "Commande " + _order.TicketNumber;
@@ -263,11 +209,12 @@ public sealed class OrderDetailView : BaseView
             form.Text = Title + " — Pressing Éclat";
         }
 
-        _ticket.Text = order.TicketNumber;
-        _subtitle.Text = $"{order.ClientName} · déposée {Fmt.Relative(order.CreatedAt)}";
+        _header.TitleText = order.TicketNumber;
+        _header.Subtitle = $"{order.ClientName} · déposée le {Fmt.Date(order.CreatedAt)} · retrait le {Fmt.Date(order.DueDate)}";
         _statusPill.Text = order.StatusLabel;
         _statusPill.PillColor = Theme.StatusColor(order.Status);
         _expressPill.Visible = order.IsExpress;
+        _header.PerformLayout();
 
         _itemsGrid.Grid.SetRows(order.Items.Select(i => new ItemRow(i)).ToList());
         _itemsGrid.UpdateEmpty();
@@ -275,17 +222,16 @@ public sealed class OrderDetailView : BaseView
         _paymentsGrid.UpdateEmpty();
         _pickupsGrid.Grid.SetRows(order.Pickups.OrderByDescending(p => p.PickedUpAt).Select(p => new PickupRow(p)).ToList());
         _pickupsGrid.UpdateEmpty();
-        FitHeights(order);
         _pickupsCard.Visible = order.Pickups.Count > 0 || order.Status is OrderStatus.Ready or OrderStatus.PartiallyPickedUp or OrderStatus.Completed;
 
         _clientLink.Text = order.ClientName;
-        _clientLink.Links.Clear();
-        _clientLink.Links.Add(0, order.ClientName.Length);
         _clientInfo.Clear();
         _clientInfo.Add("Téléphone", order.ClientPhone);
         _clientInfo.Add("E-mail", string.IsNullOrWhiteSpace(order.ClientEmail) ? "—" : order.ClientEmail);
         _clientInfo.AddSeparator();
-        _clientInfo.Add("Remise", order.DeliveryTypeLabel);
+        _clientInfo.Add("Échéance", Fmt.Date(order.DueDate) + (order.DueDate.Date < DateTime.Today && order.Status is not (OrderStatus.Completed or OrderStatus.Cancelled) ? " (en retard)" : string.Empty));
+        _clientInfo.Add("Express", order.IsExpress ? "Oui" : "Non", order.IsExpress ? Theme.Amber : null);
+        _clientInfo.Add("Livraison", order.DeliveryTypeLabel);
         if (order.DeliveryType == DeliveryType.HomeDelivery)
         {
             _clientInfo.Add("Adresse", string.IsNullOrWhiteSpace(order.DeliveryAddress) ? "—" : order.DeliveryAddress);
@@ -346,27 +292,13 @@ public sealed class OrderDetailView : BaseView
         _amounts.AddSeparator();
         _amounts.Add("Total", Fmt.Money(order.Total), null, true, 11f);
         _amounts.Add("Déjà payé", Fmt.Money(order.PaidAmount), Theme.Green);
-        _amounts.Add("Reste à payer", order.Balance > 0 ? Fmt.Money(order.Balance) : "Soldé",
-            order.Balance > 0 ? Theme.Amber : Theme.Green, true, 13f);
+        _balance.Value.Text = order.Balance > 0 ? Fmt.Money(order.Balance) : "Soldé";
+        _balance.Value.ForeColor = order.Balance > 0 ? Theme.Accent : Theme.Green;
 
         _notes.Text = order.Notes ?? string.Empty;
         _notesCard.Visible = !string.IsNullOrWhiteSpace(order.Notes);
         UpdateButtons();
-        _body.PerformLayout();
-    }
-
-    private void FitHeights(OrderDto order)
-    {
-        int toolbar = _itemTools.GetPreferredSize(new Size(Math.Max(Theme.S(300), _itemsCard.Width - Theme.S(40)), 0)).Height;
-        FitHeight(_itemsCard, _itemsGrid, order.Items.Count, toolbar + Theme.S(4));
-        FitHeight(_paymentsCard, _paymentsGrid, order.Payments.Count);
-        FitHeight(_pickupsCard, _pickupsGrid, order.Pickups.Count);
-    }
-
-    private static void FitHeight(TitledCard card, GridCard grid, int rows, int extra = 0)
-    {
-        int shown = Math.Max(rows, 1);
-        card.Height = Theme.S(18) + Theme.S(34) + Theme.S(12) + grid.Grid.ColumnHeadersHeight + shown * grid.Grid.RowTemplate.Height + Theme.S(20) + extra;
+        _notes.RequestPageLayout();
     }
 
     private void UpdateButtons()

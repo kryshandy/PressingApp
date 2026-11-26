@@ -49,22 +49,20 @@ public sealed class TariffsView : BaseView
         header.AddAction("Actualiser", ButtonKind.Secondary, Icons.Refresh, async (_, _) => await RunAsync(RefreshAsync));
         if (Session.IsManagerOrAdmin)
         {
-            header.AddControl(_edit);
             header.AddAction("Nouvelle catégorie", ButtonKind.Primary, Icons.Add, async (_, _) => await CreateAsync());
         }
 
         _hint.Text = Session.IsManagerOrAdmin
             ? "Double-cliquez sur une ligne pour modifier la catégorie et ses tarifs."
             : "Consultation seule : la modification des tarifs est réservée aux managers.";
-        _inactive.Margin = new Padding(0, 0, 0, Theme.S(12));
 
         ThemedGrid grid = _card.Grid;
-        grid.AddText("category", "CATÉGORIE", nameof(PriceRow.CategoryName), 24, minWidth: 140);
-        grid.AddText("service", "SERVICE", nameof(PriceRow.Service), 24, minWidth: 140);
-        grid.AddText("amount", "PRIX", nameof(PriceRow.Amount), 15, true, 100);
-        grid.AddText("express", "SUPPL. EXPRESS", nameof(PriceRow.Express), 16, true, 120);
-        grid.AddText("days", "DÉLAI", nameof(PriceRow.Days), 12, true, 90);
-        grid.AddPill("state", "", 10, 90);
+        grid.AddText("category", "CATÉGORIE", nameof(PriceRow.CategoryName), 50, minWidth: 160);
+        grid.AddText("service", "SERVICE", nameof(PriceRow.Service), 50, minWidth: 160);
+        grid.AddText("amount", "PRIX", nameof(PriceRow.Amount), right: true, fixedWidth: 132);
+        grid.AddText("express", "SUPPL. EXPRESS", nameof(PriceRow.Express), right: true, fixedWidth: 152);
+        grid.AddText("days", "DÉLAI", nameof(PriceRow.Days), right: true, fixedWidth: 104);
+        grid.AddPill("state", "", fixedWidth: 120);
         grid.SelectionChanged += (_, _) => _edit.Enabled = Session.IsManagerOrAdmin && grid.SelectedItem<PriceRow>() is not null;
         grid.CellDoubleClick += async (_, e) =>
         {
@@ -74,7 +72,14 @@ public sealed class TariffsView : BaseView
             }
         };
 
-        Controls.Add(UiKit.Rows((header, false), (_inactive, false), (_card, true), (_hint, false)));
+        TitledCard list = new("Grille tarifaire", _card, _hint.Text, flushContent: true);
+        list.AddAction(_inactive);
+        if (Session.IsManagerOrAdmin)
+        {
+            list.AddAction(_edit);
+        }
+
+        SetPage(header, list);
         _edit.Click += async (_, _) => await EditAsync();
         _inactive.CheckedChanged += async (_, _) => await RunAsync(LoadAsync);
     }

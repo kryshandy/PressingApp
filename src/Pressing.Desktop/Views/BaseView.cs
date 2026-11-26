@@ -19,7 +19,7 @@ public abstract class BaseView : UserControl
         BackColor = Theme.Background;
         ForeColor = Theme.Text;
         Font = Theme.Body;
-        Padding = new Padding(Theme.S(28), Theme.S(24), Theme.S(28), Theme.S(20));
+        Padding = Padding.Empty;
         DoubleBuffered = true;
     }
 
@@ -51,6 +51,17 @@ public abstract class BaseView : UserControl
 
     /// <summary>Raccourci F-clavier propre à la vue ; retourne vrai si traité.</summary>
     public virtual bool HandleShortcut(Keys keyData) => false;
+
+    /// <summary>
+    /// Installe le gabarit de page standard (DESIGN.md) : en-tête, barre de filtres facultative et corps
+    /// (rempli ou défilant). Retourne le <see cref="PageLayout"/> créé.
+    /// </summary>
+    protected PageLayout SetPage(PageHeader? header, Control body, bool scroll = false, Control? toolbar = null)
+    {
+        PageLayout page = new(header, body, scroll, toolbar);
+        Controls.Add(page);
+        return page;
+    }
 
     /// <summary>Exécute une opération réseau avec état occupé et gestion d'erreurs.</summary>
     protected Task<bool> RunAsync(Func<Task> action, string? context = null) => UiRun.RunAsync(this, action, context);

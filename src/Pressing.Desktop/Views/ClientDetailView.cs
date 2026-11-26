@@ -32,18 +32,17 @@ public sealed class ClientDetailView : BaseView
 
     private readonly int _clientId;
     private ClientDetailDto? _detail;
-    private readonly TwoColumnPanel _body;
-
-    private readonly Label _name = new() { AutoSize = true, Font = Theme.F(22f, FontStyle.Bold), ForeColor = Theme.Text, Margin = Padding.Empty };
-    private readonly Label _subtitle = new() { AutoSize = true, Font = Theme.F(10f), ForeColor = Theme.TextMuted, Margin = new Padding(0, Theme.S(2), 0, 0) };
-    private readonly PillLabel _webPill = new() { Text = "Accès web actif", PillColor = Theme.Blue, Visible = false, Anchor = AnchorStyles.Left };
-    private readonly PillLabel _inactivePill = new() { Text = "Inactif", PillColor = Theme.Slate, Visible = false, Anchor = AnchorStyles.Left };
+    private readonly PageHeader _header = new("Client", "Chargement…");
+    private readonly InitialsAvatar _avatar = new();
+    private readonly TextLabel _name = new() { Font = Theme.Semi(14f), ForeColor = Theme.TitleText };
+    private readonly TextLabel _subtitle = new() { Font = Theme.F(9.5f), ForeColor = Theme.TextMuted, Wrap = true };
+    private readonly PillLabel _webPill = new() { Text = "Accès web actif", PillColor = Theme.Blue, Visible = false };
+    private readonly PillLabel _inactivePill = new() { Text = "Inactif", PillColor = Theme.Slate, Visible = false };
     private readonly FlatButton _newOrder = new() { Text = "Nouveau dépôt", Kind = ButtonKind.Primary, IconGlyph = Icons.Add };
     private readonly FlatButton _edit = new() { Text = "Modifier", Kind = ButtonKind.Secondary, IconGlyph = Icons.Edit };
     private readonly FlatButton _access = new() { Text = "Accès web", Kind = ButtonKind.Secondary, IconGlyph = Icons.Key };
     private readonly FlatButton _revoke = new() { Text = "Désactiver l'accès web", Kind = ButtonKind.Secondary, IconGlyph = Icons.Cancel };
     private readonly FlatButton _loyalty = new() { Text = "Ajuster les points", Kind = ButtonKind.Secondary, IconGlyph = Icons.Gift };
-    private readonly Panel _statsHost = new() { Dock = DockStyle.Top, Height = Theme.S(108), Margin = new Padding(0, 0, 0, Theme.S(6)) };
     private readonly StatCard _statOrders = new("Commandes", "—", Theme.Blue);
     private readonly StatCard _statSpent = new("Total dépensé", "—", Theme.Accent);
     private readonly StatCard _statBalance = new("Solde dû", "—", Theme.Amber);
@@ -60,58 +59,32 @@ public sealed class ClientDetailView : BaseView
     {
         _clientId = clientId;
 
-        FlatButton back = new() { Text = "Retour", Kind = ButtonKind.Ghost, IconGlyph = Icons.Back, Anchor = AnchorStyles.Left, Margin = new Padding(0, 0, Theme.S(16), 0) };
+        FlatButton back = new() { Text = "Retour", Kind = ButtonKind.Secondary, IconGlyph = Icons.Back };
         back.Click += (_, _) => Host.GoBack();
-        TableLayoutPanel titleBox = new() { AutoSize = true, ColumnCount = 1, Anchor = AnchorStyles.Left, Margin = Padding.Empty };
-        titleBox.Controls.Add(_name, 0, 0);
-        titleBox.Controls.Add(_subtitle, 0, 1);
-        FlowLayoutPanel pills = new() { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.Left, Margin = new Padding(Theme.S(18), 0, 0, 0) };
-        pills.Controls.Add(_webPill);
-        pills.Controls.Add(_inactivePill);
-        TableLayoutPanel top = new()
+        _header.SetLeading(back);
+        _header.AddTitleAdornment(_webPill);
+        _header.AddTitleAdornment(_inactivePill);
+        if (Session.IsManagerOrAdmin)
         {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 4,
-            Margin = Padding.Empty,
-            Padding = new Padding(0, 0, 0, Theme.S(14))
-        };
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        top.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        top.Controls.Add(back, 0, 0);
-        top.Controls.Add(titleBox, 1, 0);
-        top.Controls.Add(pills, 2, 0);
-
-        FlowLayoutPanel actions = new() { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true, Margin = Padding.Empty, Padding = new Padding(0, 0, 0, Theme.S(14)) };
-        foreach (FlatButton b in new[] { _newOrder, _edit, _access, _revoke, _loyalty })
-        {
-            b.Margin = new Padding(0, 0, Theme.S(10), Theme.S(8));
-            actions.Controls.Add(b);
+            _header.Actions.Add(_loyalty);
         }
 
-        _loyalty.Visible = Session.IsManagerOrAdmin;
-
-        TableLayoutPanel stats = new() { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1 };
-        for (int i = 0; i < 4; i++)
+        foreach (FlatButton b in new[] { _revoke, _access, _edit, _newOrder })
         {
-            stats.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+            _header.Actions.Add(b);
         }
 
-        stats.Controls.Add(_statOrders, 0, 0);
-        stats.Controls.Add(_statSpent, 1, 0);
-        stats.Controls.Add(_statBalance, 2, 0);
-        stats.Controls.Add(_statPoints, 3, 0);
-        _statsHost.Controls.Add(stats);
+        _statPoints.BackColor = Theme.SurfaceAlt;
+        _statPoints.DrawBorder = false;
 
         ThemedGrid orders = _orders.Grid;
-        orders.AddText("ticket", "TICKET", nameof(OrderRow.Ticket), 20, minWidth: 130);
-        orders.AddText("created", "DÉPOSÉE LE", nameof(OrderRow.Created), 16, minWidth: 100);
-        orders.AddText("due", "PRÉVUE LE", nameof(OrderRow.Due), 16, minWidth: 100);
-        orders.AddText("total", "TOTAL", nameof(OrderRow.Total), 16, true, 100);
-        orders.AddText("balance", "RESTE", nameof(OrderRow.Balance), 14, true, 90);
-        orders.AddPill("status", "STATUT", 18, 130);
+        orders.AddText("ticket", "TICKET", nameof(OrderRow.Ticket), 100, minWidth: 150);
+        orders.AddText("created", "DÉPOSÉE LE", nameof(OrderRow.Created), fixedWidth: 112);
+        orders.AddText("due", "PRÉVUE LE", nameof(OrderRow.Due), fixedWidth: 112);
+        orders.AddText("total", "TOTAL", nameof(OrderRow.Total), right: true, fixedWidth: 112);
+        orders.AddText("balance", "RESTE", nameof(OrderRow.Balance), right: true, fixedWidth: 104);
+        orders.AddPill("status", "STATUT", fixedWidth: 140);
+        orders.SetOptional("created", "due");
         orders.CellDoubleClick += (_, e) =>
         {
             if (e.RowIndex >= 0 && orders.Rows[e.RowIndex].DataBoundItem is OrderRow row)
@@ -119,43 +92,44 @@ public sealed class ClientDetailView : BaseView
                 Host.OpenOrder(row.Id);
             }
         };
-        _ordersCard = new TitledCard("Commandes", _orders, "Double-clic pour ouvrir", flushContent: true) { Dock = DockStyle.Top, Margin = new Padding(6, 6, 6, 6) };
+        _ordersCard = new TitledCard("Commandes", _orders, "Double-clic pour ouvrir", flushContent: true) ;
 
         ThemedGrid pay = _payments.Grid;
-        pay.AddText("date", "DATE", nameof(PaymentRow.Date), 24, minWidth: 130);
-        pay.AddText("ticket", "TICKET", nameof(PaymentRow.Ticket), 22, minWidth: 120);
-        pay.AddText("type", "TYPE", nameof(PaymentRow.Type), 18, minWidth: 100);
-        pay.AddText("method", "MODE", nameof(PaymentRow.Method), 16, minWidth: 90);
-        pay.AddText("amount", "MONTANT", nameof(PaymentRow.Amount), 20, true, 110);
-        _paymentsCard = new TitledCard("Paiements", _payments, null, flushContent: true) { Dock = DockStyle.Top, Margin = new Padding(6, 6, 6, 6) };
+        pay.AddText("date", "DATE", nameof(PaymentRow.Date), fixedWidth: 148);
+        pay.AddText("ticket", "TICKET", nameof(PaymentRow.Ticket), 50, minWidth: 140);
+        pay.AddText("type", "TYPE", nameof(PaymentRow.Type), 25, minWidth: 100);
+        pay.AddText("method", "MODE", nameof(PaymentRow.Method), 25, minWidth: 110);
+        pay.AddText("amount", "MONTANT", nameof(PaymentRow.Amount), right: true, fixedWidth: 120);
+        pay.SetOptional("method", "type");
+        _paymentsCard = new TitledCard("Paiements", _payments, null, flushContent: true) ;
 
         ThemedGrid loy = _loyaltyGrid.Grid;
-        loy.AddText("date", "DATE", nameof(LoyaltyRow.Date), 28, minWidth: 130);
-        loy.AddText("type", "TYPE", nameof(LoyaltyRow.Type), 22, minWidth: 110);
-        loy.AddText("points", "POINTS", nameof(LoyaltyRow.Points), 14, true, 80);
-        loy.AddText("note", "NOTE", nameof(LoyaltyRow.Note), 36, minWidth: 120);
-        _loyaltyCard = new TitledCard("Fidélité", _loyaltyGrid, null, flushContent: true) { Dock = DockStyle.Top, Margin = new Padding(6, 6, 6, 6) };
+        loy.AddText("date", "DATE", nameof(LoyaltyRow.Date), fixedWidth: 148);
+        loy.AddText("type", "TYPE", nameof(LoyaltyRow.Type), 30, minWidth: 110);
+        loy.AddText("points", "POINTS", nameof(LoyaltyRow.Points), right: true, fixedWidth: 92);
+        loy.AddText("note", "NOTE", nameof(LoyaltyRow.Note), 70, minWidth: 140);
+        loy.SetOptional("type");
+        _loyaltyCard = new TitledCard("Fidélité", _loyaltyGrid, null, flushContent: true) ;
 
-        TableLayoutPanel left = new() { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, Margin = Padding.Empty };
-        left.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        left.Controls.Add(_ordersCard, 0, 0);
-        left.Controls.Add(_paymentsCard, 0, 1);
-        left.Controls.Add(_loyaltyCard, 0, 2);
+        foreach (GridCard g in new[] { _orders, _payments, _loyaltyGrid })
+        {
+            g.AutoHeightRows = 3;
+            g.MaxRows = 10;
+        }
 
-        TitledCard contactCard = new("Coordonnées", _contact, null, false, true) { Margin = new Padding(6, 6, 6, 6) };
-        TableLayoutPanel right = new() { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, Margin = Padding.Empty };
-        right.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        right.Controls.Add(contactCard, 0, 0);
-
-        _body = new TwoColumnPanel(left, right, 372);
-
-        ScrollPanel scroll = new();
-        scroll.Controls.Add(_body);
-        scroll.Controls.Add(_statsHost);
-        _statsHost.SendToBack();
-        _body.BringToFront();
-
-        Controls.Add(UiKit.Rows((top, false), (actions, false), (scroll, true)));
+        // 4 + 8 : identité à gauche ; indicateurs puis historique à droite.
+        VStack identity = new VStack(16)
+            .Add(new AvatarRow(_avatar, _name, _subtitle))
+            .Add(_contact)
+            .Add(_statPoints);
+        TitledCard identityCard = new("Identité", identity, null, false, true);
+        VStack right = new VStack()
+            .Add(new GridRow().Add(_statOrders, 4).Add(_statSpent, 4).Add(_statBalance, 4))
+            .Add(_ordersCard)
+            .Add(_paymentsCard)
+            .Add(_loyaltyCard);
+        GridRow body = new GridRow { StackBelow = 900 }.Add(identityCard, 4).Add(right, 8).Sticky(identityCard);
+        SetPage(_header, body, scroll: true);
 
         _newOrder.Click += (_, _) => { if (_detail is not null) Host.StartNewOrder(_detail.Client); };
         _edit.Click += async (_, _) => await EditAsync();
@@ -194,6 +168,9 @@ public sealed class ClientDetailView : BaseView
         }
 
         _name.Text = c.FullName;
+        _avatar.Initials = string.Concat(c.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => char.ToUpperInvariant(p[0])));
+        _header.TitleText = c.FullName;
+        _header.Subtitle = "Fiche client · " + c.Phone;
         _subtitle.Text = $"Cliente depuis le {Fmt.Date(c.CreatedAt)}" + (c.LastOrderAt.HasValue ? $" · dernière commande {Fmt.Relative(c.LastOrderAt.Value)}" : string.Empty);
         _webPill.Visible = c.WebAccessEnabled;
         _inactivePill.Visible = !c.IsActive;
@@ -221,20 +198,48 @@ public sealed class ClientDetailView : BaseView
         _payments.UpdateEmpty();
         _loyaltyGrid.Grid.SetRows(detail.LoyaltyTransactions.Select(t => new LoyaltyRow(t)).ToList());
         _loyaltyGrid.UpdateEmpty();
-        Fit(_ordersCard, _orders, detail.Orders.Count);
-        Fit(_paymentsCard, _payments, detail.Payments.Count);
-        Fit(_loyaltyCard, _loyaltyGrid, detail.LoyaltyTransactions.Count);
 
         _access.Text = c.WebAccessEnabled ? "Réinitialiser l'accès web" : "Activer l'accès web";
         _revoke.Visible = c.WebAccessEnabled;
         _newOrder.Enabled = c.IsActive;
-        _body.PerformLayout();
+        _header.PerformLayout();
     }
 
-    private static void Fit(TitledCard card, GridCard grid, int rows)
+    /// <summary>Avatar + nom + ancienneté (haut de la carte Identité).</summary>
+    private sealed class AvatarRow : LayoutControl
     {
-        int shown = Math.Min(Math.Max(rows, 1), 10);
-        card.Height = Theme.S(18) + Theme.S(34) + Theme.S(12) + grid.Grid.ColumnHeadersHeight + shown * grid.Grid.RowTemplate.Height + Theme.S(24);
+        private readonly Control _avatar;
+        private readonly TextLabel _name;
+        private readonly TextLabel _since;
+
+        public AvatarRow(Control avatar, TextLabel name, TextLabel since)
+        {
+            _avatar = avatar;
+            _name = name;
+            _since = since;
+            Controls.Add(avatar);
+            Controls.Add(name);
+            Controls.Add(since);
+        }
+
+        private int TextLeft => _avatar.Width + Theme.S(16);
+
+        public override Size GetPreferredSize(Size proposedSize)
+        {
+            int width = proposedSize.Width > 0 ? proposedSize.Width : Width;
+            int text = _name.Font.Height + Theme.S(4) + _since.GetPreferredSize(new Size(Math.Max(10, width - TextLeft), 0)).Height;
+            return new Size(width, Math.Max(_avatar.Height, text));
+        }
+
+        protected override void Arrange()
+        {
+            _avatar.Location = new Point(0, (Height - _avatar.Height) / 2);
+            int w = Math.Max(10, Width - TextLeft);
+            int since = _since.GetPreferredSize(new Size(w, 0)).Height;
+            int top = (Height - _name.Font.Height - Theme.S(4) - since) / 2;
+            _name.SetBounds(TextLeft, top, w, _name.Font.Height);
+            _since.SetBounds(TextLeft, top + _name.Font.Height + Theme.S(4), w, since);
+        }
     }
 
     private async Task EditAsync()

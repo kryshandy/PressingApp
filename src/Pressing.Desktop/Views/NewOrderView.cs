@@ -72,11 +72,12 @@ public sealed class NewOrderView : BaseView
     // ---- Client --------------------------------------------------------------------------
     private readonly InputBox _clientSearch = new() { IconGlyph = Icons.Search, PlaceholderText = "Rechercher un client : nom, prénom ou téléphone…" };
     private readonly GridCard _clientResults = new("Aucun client trouvé.") { Visible = false };
-    private readonly RoundedPanel _clientChip = new() { Visible = false, BackColor = Theme.SurfaceAlt };
-    private readonly Label _clientName = new() { AutoSize = true, Font = Theme.F(12f, FontStyle.Bold), ForeColor = Theme.Text };
+    private readonly RoundedPanel _clientChip = new() { Visible = false, BackColor = Theme.SurfaceAlt, DrawBorder = false };
+    private readonly FlatButton _newClient = new() { Text = "Nouveau client", Kind = ButtonKind.Secondary, IconGlyph = Icons.Add, AutoSize = false };
+    private readonly Label _clientName = new() { AutoSize = true, Font = Theme.Semi(11f), ForeColor = Theme.Text };
     private readonly Label _clientMeta = new() { AutoSize = true, Font = Theme.F(9.5f), ForeColor = Theme.TextMuted };
     private readonly System.Windows.Forms.Timer _clientDebounce = new() { Interval = 300 };
-    private TableLayoutPanel _clientSearchRow = null!;
+    private GridRow _clientSearchRow = null!;
     private int _clientSearchVersion;
 
     // ---- Ajout de ligne ------------------------------------------------------------------
@@ -86,8 +87,8 @@ public sealed class NewOrderView : BaseView
     private readonly InputBox _price = new() { Suffix = "FCFA", TextAlign = HorizontalAlignment.Right, SelectAllOnFocus = true };
     private readonly ToggleBox _lineExpress = new() { Text = "Express" };
     private readonly InputBox _description = new() { PlaceholderText = "Description / remarque (taches, couleur…)" };
-    private readonly FlatButton _addLine = new() { Text = "Ajouter", Kind = ButtonKind.Primary, IconGlyph = Icons.Add };
-    private readonly Label _priceHint = new() { AutoSize = true, ForeColor = Theme.TextFaint, Font = Theme.F(8.5f), Margin = new Padding(0, Theme.S(4), 0, 0) };
+    private readonly FlatButton _addLine = new() { Text = "Ajouter", Kind = ButtonKind.Secondary, IconGlyph = Icons.Add, AutoSize = false };
+    private readonly TextLabel _priceHint = new() { ForeColor = Theme.TextFaint, Font = Theme.F(8.5f) };
     private readonly GridCard _linesGrid = new("Aucun article : choisissez une catégorie puis cliquez sur « Ajouter ».");
 
     // ---- Options -------------------------------------------------------------------------
@@ -97,18 +98,18 @@ public sealed class NewOrderView : BaseView
     private readonly InputBox _address = new() { PlaceholderText = "Adresse de livraison" };
     private readonly InputBox _fee = new() { Suffix = "FCFA", TextAlign = HorizontalAlignment.Right, SelectAllOnFocus = true, Text = "0" };
     private readonly InputBox _discount = new() { Suffix = "FCFA", TextAlign = HorizontalAlignment.Right, SelectAllOnFocus = true, Text = "0" };
-    private readonly InputBox _promo = new() { PlaceholderText = "Ex. BIENVENUE10", CharacterCasingUpper = true };
-    private readonly FlatButton _promoCheck = new() { Text = "Vérifier", Kind = ButtonKind.Secondary, Height = Theme.S(40) };
-    private readonly Label _promoMessage = new() { AutoSize = true, Font = Theme.F(9f), Margin = new Padding(0, Theme.S(4), 0, 0) };
+    private readonly InputBox _promo = new() { PlaceholderText = "BIENVENUE10", CharacterCasingUpper = true };
+    private readonly FlatButton _promoCheck = new() { Text = string.Empty, IconGlyph = Icons.Check, Kind = ButtonKind.Secondary };
+    private readonly TextLabel _promoMessage = new() { Font = Theme.F(9f), Wrap = true };
     private readonly InputBox _points = new() { TextAlign = HorizontalAlignment.Right, SelectAllOnFocus = true, Text = "0", Suffix = "pts" };
-    private readonly InputBox _notes = new() { Multiline = true, PlaceholderText = "Notes internes sur le dépôt" };
+    private readonly InputBox _notes = new() { PlaceholderText = "Remarques sur le dépôt (visibles par le personnel uniquement)" };
     private readonly InputBox _deposit = new() { Suffix = "FCFA", TextAlign = HorizontalAlignment.Right, SelectAllOnFocus = true, Text = "0" };
     private readonly SelectBox _depositMethod = new();
     private readonly InputBox _depositRef = new() { PlaceholderText = "Réf. transaction (facultatif)" };
     private readonly ToggleBox _payAll = new() { Text = "Payer la totalité maintenant" };
-    private FieldBox _addressField = null!;
-    private FieldBox _feeField = null!;
-    private FieldBox _pointsField = null!;
+    private InlineField _addressField = null!;
+    private InlineField _feeField = null!;
+    private InlineField _pointsField = null!;
     private readonly System.Windows.Forms.Timer _quoteTimer = new() { Interval = 300 };
 
     // ---- Récapitulatif -------------------------------------------------------------------
@@ -119,7 +120,7 @@ public sealed class NewOrderView : BaseView
     private Label _sumTotal = null!;
     private Label _sumDeposit = null!;
     private Label _sumBalance = null!;
-    private readonly Label _sumError = new() { AutoSize = true, MaximumSize = new Size(Theme.S(340), 0), ForeColor = Theme.Red, Font = Theme.F(9f), Margin = new Padding(0, Theme.S(4), 0, Theme.S(6)) };
+    private readonly TextLabel _sumError = new() { ForeColor = Theme.Red, Font = Theme.F(9f) };
     private readonly FlatButton _submit = new()
     {
         Text = "Valider le dépôt",
@@ -127,7 +128,6 @@ public sealed class NewOrderView : BaseView
         IconGlyph = Icons.Check,
         AutoSize = false,
         Height = Theme.S(48),
-        Dock = DockStyle.Fill,
         Font = Theme.F(11.5f, FontStyle.Bold),
         Margin = Padding.Empty,
         Enabled = false
@@ -153,13 +153,9 @@ public sealed class NewOrderView : BaseView
         Control left = BuildLeft();
         Control right = BuildRight();
 
-        TableLayoutPanel body = new() { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
-        body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(372)));
-        body.Controls.Add(left, 0, 0);
-        body.Controls.Add(right, 1, 0);
-
-        _formRoot = UiKit.Rows((header, false), (body, true));
+        // 8 + 4 : saisie à gauche, carte « Récapitulatif » collante à droite ; un seul défilement (la page).
+        GridRow body = new GridRow { StackBelow = 860 }.Add(left, 8).Add(right, 4).Sticky(right);
+        _formRoot = new PageLayout(header, body, scroll: true);
         BuildConfirmation();
         Controls.Add(_formRoot);
         Controls.Add(_confirmPanel);
@@ -190,211 +186,159 @@ public sealed class NewOrderView : BaseView
     // ==== Construction =====================================================================
     private Control BuildLeft()
     {
-        // -- Client --
-        _clientSearchRow = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, Margin = Padding.Empty };
-        _clientSearchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        _clientSearchRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        _clientSearch.Dock = DockStyle.Fill;
-        _clientSearch.Margin = new Padding(0, 0, Theme.S(10), 0);
-        FlatButton newClient = new() { Text = "Nouveau client", Kind = ButtonKind.Secondary, IconGlyph = Icons.Add, Margin = Padding.Empty };
-        newClient.Click += (_, _) => CreateClient();
-        _clientSearchRow.Controls.Add(_clientSearch, 0, 0);
-        _clientSearchRow.Controls.Add(newClient, 1, 0);
+        // -- Client : une seule rangée (recherche + nouveau client), résultats dessous si besoin --
+        _clientSearchRow = new GridRow().Add(_clientSearch, 8).Add(_newClient, 4);
+        _newClient.Click += (_, _) => CreateClient();
 
         ThemedGrid results = _clientResults.Grid;
-        results.AddText("name", "CLIENT", nameof(ClientRow.Name), 40, minWidth: 140);
-        results.AddText("phone", "TÉLÉPHONE", nameof(ClientRow.Phone), 30, minWidth: 120);
-        results.AddText("balance", "SOLDE DÛ", nameof(ClientRow.Balance), 30, true, 100);
-        _clientResults.Height = Theme.S(38 + 36 * 4 + 4);
-        _clientResults.Dock = DockStyle.Top;
-        _clientResults.Margin = new Padding(0, Theme.S(10), 0, 0);
+        results.AddText("name", "CLIENT", nameof(ClientRow.Name), 55, minWidth: 140);
+        results.AddText("phone", "TÉLÉPHONE", nameof(ClientRow.Phone), 45, minWidth: 130);
+        results.AddText("balance", "SOLDE DÛ", nameof(ClientRow.Balance), right: true, fixedWidth: 112);
+        _clientResults.AutoHeightRows = 1;
+        _clientResults.MaxRows = 4;
         _clientResults.BackColor = Theme.SurfaceAlt;
 
-        _clientChip.Dock = DockStyle.Top;
-        _clientChip.Height = Theme.S(72);
-        _clientChip.Padding = new Padding(Theme.S(18), Theme.S(10), Theme.S(12), Theme.S(10));
-        TableLayoutPanel chip = new() { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
+        _clientChip.Padding = new Padding(Theme.S(16), 0, Theme.S(12), 0);
+        TableLayoutPanel chip = new() { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
         chip.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         chip.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        TableLayoutPanel chipText = new() { AutoSize = true, ColumnCount = 1, Anchor = AnchorStyles.Left };
+        TableLayoutPanel chipText = new() { AutoSize = true, ColumnCount = 1, Anchor = AnchorStyles.Left, Margin = Padding.Empty };
+        _clientName.Margin = Padding.Empty;
+        _clientMeta.Margin = new Padding(0, Theme.S(2), 0, 0);
         chipText.Controls.Add(_clientName, 0, 0);
         chipText.Controls.Add(_clientMeta, 0, 1);
-        FlatButton change = new() { Text = "Changer", Kind = ButtonKind.Secondary, Anchor = AnchorStyles.Right, Margin = Padding.Empty };
+        FlatButton change = new() { Text = "Changer", Kind = ButtonKind.Secondary, Anchor = AnchorStyles.Right, Margin = Padding.Empty, Height = Theme.S(32) };
         change.Click += (_, _) => ClearClient();
         chip.Controls.Add(chipText, 0, 0);
         chip.Controls.Add(change, 1, 0);
         _clientChip.Controls.Add(chip);
 
-        TableLayoutPanel clientBody = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
-        clientBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        clientBody.Controls.Add(_clientSearchRow, 0, 0);
-        clientBody.Controls.Add(_clientResults, 0, 1);
-        clientBody.Controls.Add(_clientChip, 0, 2);
-        TitledCard clientCard = new("1 · Client", clientBody, null, false, true) { Margin = new Padding(0, 0, Theme.S(12), Theme.S(12)) };
+        VStack clientBody = new VStack(12)
+            .Add(_clientSearchRow)
+            .Add(_clientResults)
+            .Add(_clientChip, StackSize.Fixed, 68);
+        TitledCard clientCard = new("Client", clientBody, null, false, true);
 
-        // -- Lignes --
+        // -- Articles : saisie alignée sur une grille de 4 colonnes, puis la grille des lignes --
         _category.Format = o => ((CategoryDto)o).Name;
         _category.Placeholder = "Catégorie…";
         _service.Format = o => ((CategoryPriceDto)o).ServiceLabel;
         _service.Placeholder = "Service…";
-        _addLine.AutoSize = false;
-        _addLine.Height = Theme.S(36);
-        _addLine.Width = Theme.S(124);
-        _addLine.Margin = Padding.Empty;
 
-        TableLayoutPanel add = new() { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 3, RowCount = 2, Margin = Padding.Empty };
-        add.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
-        add.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
-        add.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(150)));
-        add.Controls.Add(new FieldBox("Catégorie", _category), 0, 0);
-        add.Controls.Add(new FieldBox("Service", _service), 1, 0);
-        add.Controls.Add(new FieldBox("Quantité", _quantity), 2, 0);
-
-        TableLayoutPanel add2 = new() { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 3, Margin = Padding.Empty };
-        add2.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, Theme.S(160)));
-        add2.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        add2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        FieldBox priceField = new("Prix unitaire", _price);
-        _lineExpress.Anchor = AnchorStyles.Left;
-        _lineExpress.Margin = new Padding(0, Theme.S(8), Theme.S(18), 0);
-        FieldBox descField = new("Description", _description);
-        add2.Controls.Add(priceField, 0, 0);
-        add2.Controls.Add(_lineExpress, 1, 0);
-        add2.Controls.Add(descField, 2, 0);
-        _lineExpress.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
-        _lineExpress.Margin = new Padding(Theme.S(4), 0, Theme.S(18), Theme.S(18));
-
-        TableLayoutPanel addBlock = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
-        addBlock.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        addBlock.Controls.Add(add, 0, 0);
-        addBlock.Controls.Add(add2, 0, 1);
-        addBlock.Controls.Add(_priceHint, 0, 2);
+        FormGrid entry = new(4) { ColumnGap = Theme.S(16) };
+        entry.AddField("Catégorie", _category);
+        entry.AddField("Service", _service);
+        entry.AddField("Quantité", _quantity);
+        entry.AddField("Prix unitaire", _price);
+        entry.AddField("Description", _description, 2);
+        entry.Add(_lineExpress);
+        entry.Add(_addLine);
 
         ThemedGrid grid = _linesGrid.Grid;
-        grid.AddText("article", "ARTICLE", nameof(LineRow.Article), 44, minWidth: 160);
-        grid.AddText("qty", "QTÉ", nameof(LineRow.Quantity), 9, true, 56);
-        grid.AddText("unit", "PRIX UNIT.", nameof(LineRow.Unit), 18, true, 96);
-        grid.AddText("total", "TOTAL", nameof(LineRow.Total), 18, true, 96);
-        grid.AddPill("express", "", 14, 96);
-        DataGridViewTextBoxColumn remove = grid.AddText("remove", "", nameof(LineRow.Remove), 6, true, 44);
+        grid.AddText("article", "ARTICLE", nameof(LineRow.Article), 100, minWidth: 160);
+        grid.AddText("qty", "QTÉ", nameof(LineRow.Quantity), right: true, fixedWidth: 64);
+        grid.AddText("unit", "PRIX UNIT.", nameof(LineRow.Unit), right: true, fixedWidth: 108);
+        grid.AddText("total", "TOTAL", nameof(LineRow.Total), right: true, fixedWidth: 112);
+        grid.AddPill("express", "", fixedWidth: 108);
+        DataGridViewTextBoxColumn remove = grid.AddText("remove", "", nameof(LineRow.Remove), fixedWidth: 48);
         remove.DefaultCellStyle.Font = Theme.Icon(10f);
         remove.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
         remove.ToolTipText = "Retirer la ligne";
-        _linesGrid.Dock = DockStyle.Fill;
-        _linesGrid.Margin = new Padding(0, Theme.S(8), 0, 0);
-        Label hint = new()
-        {
-            Text = "Double-clic : modifier · Suppr : retirer · + / − : quantité",
-            AutoSize = true,
-            Font = Theme.F(8.5f),
-            ForeColor = Theme.TextFaint,
-            Margin = new Padding(0, Theme.S(8), 0, 0)
-        };
-        TableLayoutPanel linesBody = (TableLayoutPanel)UiKit.Rows((addBlock, false), (_linesGrid, true), (hint, false));
-        TitledCard linesCard = new("2 · Articles", linesBody) { Margin = new Padding(0, 0, Theme.S(12), 0) };
-        linesCard.AddAction(_addLine);
+        _linesGrid.MinimumSize = new Size(0, Theme.S(40 + 44 * 3 + 2));
 
-        return UiKit.Rows((clientCard, false), (linesCard, true));
+        VStack linesBody = new VStack(16)
+            .Add(entry)
+            .Add(_priceHint)
+            .Add(_linesGrid, StackSize.Fill)
+            .Add(new FieldBox("Notes internes", _notes));
+        linesBody.Gap = Theme.S(16);
+        TitledCard linesCard = new("Articles", linesBody, "Double-clic : modifier · Suppr : retirer · + / − : quantité");
+
+        return new VStack().Add(clientCard).Add(linesCard, StackSize.Fill);
     }
 
     private Control BuildRight()
     {
-        _delivery.SetChoices(Enum.GetValues<DeliveryType>().Select(d => new Choice<DeliveryType>(d, d.Label())), DeliveryType.StorePickup);
+        _delivery.SetChoices(new[]
+        {
+            new Choice<DeliveryType>(DeliveryType.StorePickup, "Retrait en boutique"),
+            new Choice<DeliveryType>(DeliveryType.HomeDelivery, "Livraison à domicile")
+        }, DeliveryType.StorePickup);
         _depositMethod.SetChoices(Choices.PaymentMethods(), PaymentMethod.Cash);
         _due.Value = DateTime.Today.AddDays(2);
-
         _promoMessage.Text = string.Empty;
-        TableLayoutPanel promoRow = new() { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, Margin = Padding.Empty };
-        promoRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        promoRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        _promo.Dock = DockStyle.Fill;
-        _promo.Margin = new Padding(0, 0, Theme.S(8), 0);
-        _promoCheck.Margin = Padding.Empty;
-        promoRow.Controls.Add(_promo, 0, 0);
-        promoRow.Controls.Add(_promoCheck, 1, 0);
-        TableLayoutPanel promoBlock = new() { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
-        promoBlock.Controls.Add(promoRow, 0, 0);
-        promoBlock.Controls.Add(_promoMessage, 0, 1);
+        new ToolTip().SetToolTip(_promoCheck, "Vérifier le code promo");
 
-        _notes.Height = Theme.S(76);
-        FormGrid form = new();
-        form.Add(_globalExpress, 2);
-        _globalExpress.Margin = new Padding(0, 0, 0, Theme.S(12));
-        form.AddField("Retrait prévu le", _due);
-        form.AddField("Remise manuelle", _discount);
-        form.AddField("Mode de remise", _delivery, 2);
-        _addressField = form.AddField("Adresse de livraison", _address, 2);
-        _feeField = form.AddField("Frais de livraison", _fee, 2);
-        form.Add(new FieldBox("Code promo", promoBlock), 2);
-        _pointsField = form.AddField("Points fidélité à utiliser", _points, 1, "Disponibles : —");
-        form.AddField("Notes", _notes, 2);
-        Label depositTitle = UiKit.Label("ACOMPTE", Theme.F(8.5f, FontStyle.Bold), Theme.Accent);
-        depositTitle.Margin = new Padding(0, Theme.S(6), 0, Theme.S(8));
-        form.Add(depositTitle, 2);
-        form.AddField("Montant versé", _deposit);
-        form.AddField("Mode de paiement", _depositMethod);
-        form.AddField("Référence", _depositRef, 2);
-        form.Add(_payAll, 2);
+        _addressField = new InlineField("Adresse", _address);
+        _feeField = new InlineField("Frais de livraison", _fee);
+        _pointsField = new InlineField("Points fidélité", _points, "Disponibles : —");
 
-        TitledCard options = new("3 · Options et acompte", form, null, false, true) { Margin = new Padding(0, 0, 0, Theme.S(12)) };
-
-        // Détail du montant (dans la zone défilante)
-        InfoList details = new();
+        // Détail du montant puis totaux
+        InfoList details = new(false);
         _sumSubtotal = details.Add("Sous-total", "0 FCFA");
         _sumExpress = details.Add("Supplément express", "0 FCFA");
         _sumDelivery = details.Add("Livraison", "0 FCFA");
         _sumDiscounts = details.Add("Remises", "0 FCFA", Theme.Green);
-        TitledCard detailsCard = new("Détail du montant", details, null, false, true) { Margin = new Padding(0, 0, 0, Theme.S(12)) };
-
-        TableLayoutPanel stack = new() { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, Margin = Padding.Empty };
-        stack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        stack.Controls.Add(options, 0, 0);
-        stack.Controls.Add(detailsCard, 0, 1);
-        ScrollPanel scroll = new();
-        scroll.Controls.Add(stack);
-
-        // Total, acompte et validation : toujours visibles en bas
-        TableLayoutPanel totals = new() { ColumnCount = 2, RowCount = 2, Dock = DockStyle.Fill, Margin = Padding.Empty };
-        totals.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
-        totals.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
-        totals.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
-        totals.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
-        Label MakeKey(string t, float size) => new() { Text = t, Dock = DockStyle.Fill, Font = Theme.F(size), ForeColor = Theme.TextMuted, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
-        Label MakeValue(Color c, float size) => new() { Dock = DockStyle.Fill, Font = Theme.F(size, FontStyle.Bold), ForeColor = c, TextAlign = ContentAlignment.MiddleRight, Text = "0 FCFA" };
-        _sumTotal = MakeValue(Theme.Accent, 15f);
-        _sumBalance = MakeValue(Theme.Amber, 11f);
+        InfoList totals = new(false);
+        _sumTotal = totals.Add("Total", "0 FCFA", Theme.Accent, true, 16f);
+        _sumBalance = totals.Add("Reste à payer", "0 FCFA", Theme.Amber, true, 11f);
         _sumDeposit = new Label();
-        totals.Controls.Add(MakeKey("TOTAL", 12f), 0, 0);
-        totals.Controls.Add(_sumTotal, 1, 0);
-        totals.Controls.Add(MakeKey("Reste à payer", 10f), 0, 1);
-        totals.Controls.Add(_sumBalance, 1, 1);
-        TableLayoutPanel stickyBody = new() { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty };
-        stickyBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        stickyBody.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.S(76)));
-        stickyBody.RowStyles.Add(new RowStyle(SizeType.Absolute, Theme.S(22)));
-        stickyBody.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        totals.Dock = DockStyle.Fill;
-        stickyBody.Controls.Add(totals, 0, 0);
-        _sumError.AutoSize = false;
-        _sumError.MaximumSize = Size.Empty;
-        _sumError.Dock = DockStyle.Fill;
-        _sumError.AutoEllipsis = true;
-        _sumError.Margin = Padding.Empty;
-        _sumError.TextAlign = ContentAlignment.MiddleLeft;
-        stickyBody.Controls.Add(_sumError, 0, 1);
-        _submit.Dock = DockStyle.Fill;
-        stickyBody.Controls.Add(_submit, 0, 2);
-        RoundedPanel sticky = new()
-        {
-            Dock = DockStyle.Fill,
-            Height = Theme.S(190),
-            Padding = new Padding(Theme.S(20), Theme.S(12), Theme.S(20), Theme.S(14)),
-            Margin = Padding.Empty,
-            BorderColor = Theme.Mix(Theme.Border, Theme.Accent, 0.5f)
-        };
-        sticky.Controls.Add(stickyBody);
+        _sumError.Wrap = true;
 
-        return UiKit.Rows((scroll, true), (sticky, false));
+        _globalExpress.Text = "Dépôt express (tous les articles)";
+        VStack recap = new VStack(12)
+            .Add(_globalExpress)
+            .Add(new InlineField("Retrait prévu le", _due))
+            .Add(new InlineField("Livraison", _delivery))
+            .Add(_addressField)
+            .Add(_feeField)
+            .Add(new InlineField("Remise", _discount))
+            .Add(new InlineField("Code promo", new PromoBox(_promo, _promoCheck)))
+            .Add(_promoMessage)
+            .Add(_pointsField)
+            .Add(new SectionRule("Acompte"))
+            .Add(new InlineField("Montant versé", _deposit))
+            .Add(new InlineField("Mode de paiement", _depositMethod))
+            .Add(new InlineField("Référence", _depositRef))
+            .Add(_payAll)
+            .Add(new SectionRule())
+            .Add(details)
+            .Add(new SectionRule())
+            .Add(totals)
+            .Add(_sumError)
+            .Add(_submit, StackSize.Fixed, 48);
+        RecapCard = new TitledCard("Récapitulatif", recap, null, false, true)
+        {
+            BorderColor = Theme.Mix(Theme.Border, Theme.Accent, 0.45f)
+        };
+        return RecapCard;
+    }
+
+    private TitledCard RecapCard { get; set; } = null!;
+
+    /// <summary>Champ code promo + bouton « Vérifier » sur une seule rangée.</summary>
+    private sealed class PromoBox : LayoutControl
+    {
+        private readonly Control _input;
+        private readonly Control _button;
+
+        public PromoBox(Control input, Control button)
+        {
+            _input = input;
+            _button = button;
+            LayoutUtil.Prepare(input);
+            LayoutUtil.Prepare(button);
+            Controls.Add(input);
+            Controls.Add(button);
+            Height = Theme.ControlHeight;
+        }
+
+        protected override void Arrange()
+        {
+            int bw = _button.GetPreferredSize(Size.Empty).Width;
+            _button.SetBounds(Width - bw, 0, bw, Height);
+            _input.SetBounds(0, 0, Math.Max(10, Width - bw - Theme.S(8)), Height);
+        }
     }
 
     private void BuildConfirmation()
