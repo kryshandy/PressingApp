@@ -63,7 +63,7 @@ public sealed class CashView : BaseView
         ThemedGrid grid = _card.Grid;
         grid.AddText("date", "DATE", nameof(PaymentRow.Date), fixedWidth: 152);
         grid.AddText("ticket", "TICKET", nameof(PaymentRow.Ticket), fixedWidth: 164);
-        grid.AddText("type", "TYPE", nameof(PaymentRow.Type), 30, minWidth: 100);
+        grid.AddText("type", "TYPE", nameof(PaymentRow.Type), 30, minWidth: 138);
         grid.AddText("method", "MODE", nameof(PaymentRow.Method), 30, minWidth: 110);
         grid.AddText("reference", "RÉFÉRENCE", nameof(PaymentRow.Reference), 40, minWidth: 100);
         grid.AddText("staff", "ENCAISSÉ PAR", nameof(PaymentRow.Staff), 30, minWidth: 110);
