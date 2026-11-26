@@ -181,7 +181,13 @@ public sealed class NotificationsDialog : DialogForm
         public string When { get; }
 
         public (string Text, Color Color)? GetPill(string columnName) => columnName == "kind"
-            ? (Source.KindLabel, Source.Kind switch
+            ? (Source.Kind switch
+            {
+                NotificationKind.Success => "Succès",
+                NotificationKind.Warning => "Attention",
+                NotificationKind.Danger => "Alerte",
+                _ => "Info"
+            }, Source.Kind switch
             {
                 NotificationKind.Success => Theme.Green,
                 NotificationKind.Warning => Theme.Amber,
@@ -200,16 +206,17 @@ public sealed class NotificationsDialog : DialogForm
         : base("Notifications", "Double-cliquez sur une notification pour ouvrir la commande concernée.", 820, 560)
     {
         _api = api;
-        Primary.Text = "Tout marquer comme lu";
-        Primary.Kind = ButtonKind.Secondary;
-        Secondary.Text = "Fermer";
-        Secondary.Kind = ButtonKind.Primary;
+        // Secondary (à gauche) : action ; Primary (à droite) : fermer.
+        Secondary.Text = "Tout marquer comme lu";
+        Secondary.DialogResult = DialogResult.None;
+        Primary.Text = "Fermer";
+        Primary.DialogResult = DialogResult.Cancel;
 
         ThemedGrid grid = _card.Grid;
-        grid.AddPill("kind", "Type", 14, 110);
-        grid.AddText("title", "Titre", nameof(NotifRow.Title), 26);
-        grid.AddText("message", "Message", nameof(NotifRow.Message), 40);
-        grid.AddText("when", "Quand", nameof(NotifRow.When), 18);
+        grid.AddPill("kind", "TYPE", fixedWidth: 124);
+        grid.AddText("title", "TITRE", nameof(NotifRow.Title), 40, minWidth: 140);
+        grid.AddText("message", "MESSAGE", nameof(NotifRow.Message), 60, minWidth: 160);
+        grid.AddText("when", "QUAND", nameof(NotifRow.When), fixedWidth: 120);
         grid.SetRows(items.Select(n => new NotifRow(n)).ToList());
         grid.CellDoubleClick += (_, e) =>
         {
@@ -225,7 +232,7 @@ public sealed class NotificationsDialog : DialogForm
             }
         };
         Body.Controls.Add(_card);
-        Primary.Click += async (_, _) =>
+        Secondary.Click += async (_, _) =>
         {
             bool ok = await UiRun.RunAsync(this, () => _api.MarkAllNotificationsReadAsync(), "Notifications");
             if (ok)
@@ -233,7 +240,8 @@ public sealed class NotificationsDialog : DialogForm
                 grid.SetRows(items.Select(n => new NotifRow(n with { IsRead = true })).ToList());
             }
         };
-        AcceptButton = Secondary;
+        AcceptButton = Primary;
+        CancelButton = Primary;
     }
 
     public int? OpenOrderId { get; private set; }

@@ -55,7 +55,15 @@ Un écran a **un seul** élément en laiton dominant (l'action principale ou le 
 - Barre de titre Windows **en mode sombre** (`DwmSetWindowAttribute`, `DWMWA_USE_IMMERSIVE_DARK_MODE`).
 - Taille minimale 1280×760 ; rendu vérifié à 1280×760, 1600×900 et 1920×1080, à 100 % et 150 %.
 
+## 6 bis. Implémentation
+
+Les règles ci-dessus sont appliquées par les primitives de `Ui/Layout.cs` (`PageLayout`, `ScrollViewport`, `VStack`, `GridRow`, `ActionBar`, `TextLabel`…) — voir `README-DESKTOP.md`. Règles complémentaires :
+- Les libellés de texte d'une page utilisent `TextLabel` (pas de marge GDI) pour que titre, champs et cartes partagent exactement le même bord gauche.
+- Une seule action laiton par écran : les actions secondaires de ligne (Modifier, Mot de passe…) vont dans l'en-tête de la carte grille, en 32 px.
+- Dans une barre d'actions alignée à droite, l'ordre va du moins important (à gauche) au plus important (Primary, à droite) : ce sont les actions de gauche qui débordent dans « Plus d'actions ».
+- Dialogues : largeur 480 (message), 560 (formulaire) ou 760 (tableau) ; la hauteur suit le contenu.
+
 ## 7. Contrôle qualité visuel (avant chaque PR)
 
-`Pressing.Desktop.exe --selftest --screens <dossier>` génère une capture de chaque écran. Relire chaque capture avec cette liste :
+`PRESSING_DPI_UNAWARE=1 Pressing.Desktop.exe --selftest --screens <dossier>` génère une capture de chaque écran, de chaque dialogue et de la coque à 1280×760 et 1600×900 (ajouter `PRESSING_UI_SCALE=1.5` pour 150 %). Relire chaque capture avec cette liste :
 bords alignés · cartes d'une ligne de même hauteur · aucune barre native · aucune troncature de texte clé · une seule action laiton · états vides soignés · aucun contrôle gris Windows.

@@ -67,6 +67,75 @@ internal static class SelfTest
             : new Size(1440, 900);
     }
 
+    private static IEnumerable<Size> ShellSizes()
+    {
+        string value = Environment.GetEnvironmentVariable("PRESSING_TEST_SIZES") ?? "1280x760,1600x900";
+        foreach (string part in value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] wh = part.Split('x');
+            if (wh.Length == 2 && int.TryParse(wh[0], out int w) && int.TryParse(wh[1], out int h))
+            {
+                yield return new Size(w, h);
+            }
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool PrintWindow(IntPtr hWnd, IntPtr hdc, uint flags);
+
+    /// <summary>Redimensionne sans le plafond « taille de l'écran » de Windows Forms (captures 1600×900 sur un écran plus petit).</summary>
+    private static void ResizeWindow(Form form, Size size)
+    {
+        SetWindowPos(form.Handle, IntPtr.Zero, form.Left, form.Top, size.Width, size.Height, 0x0004 | 0x0010);
+        form.PerformLayout();
+    }
+
+    /// <summary>Capture réelle d'une fenêtre (barre de titre DWM sombre, textes d'aide) ; repli sur DrawToBitmap.</summary>
+    private static Bitmap? PrintForm(Form form)
+    {
+        try
+        {
+            Bitmap bitmap = new(form.Width, form.Height);
+            using (Graphics g = Graphics.FromImage(bitmap))
+            {
+                IntPtr hdc = g.GetHdc();
+                bool ok;
+                try
+                {
+                    ok = PrintWindow(form.Handle, hdc, 2);
+                }
+                finally
+                {
+                    g.ReleaseHdc(hdc);
+                }
+
+                if (!ok)
+                {
+                    bitmap.Dispose();
+                    return null;
+                }
+            }
+
+            // Une capture DWM d'une fenêtre hors écran peut être noire : on vérifie quelques pixels.
+            Color probe = bitmap.GetPixel(bitmap.Width / 2, bitmap.Height / 2);
+            Color corner = bitmap.GetPixel(Math.Min(bitmap.Width - 1, 40), Math.Min(bitmap.Height - 1, 120));
+            if (probe.ToArgb() == Color.Black.ToArgb() && corner.ToArgb() == Color.Black.ToArgb())
+            {
+                bitmap.Dispose();
+                return null;
+            }
+
+            return bitmap;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static void Write(string line)
     {
         Log.AppendLine(line);
@@ -467,35 +536,41 @@ internal static class SelfTest
             }
         });
 
-        await Step("Coque principale FrmMain : navigation dans tous les écrans", async () =>
+        // Coque complète à plusieurs tailles de fenêtre (px logiques, DESIGN.md §6) : PRESSING_TEST_SIZES="1280x760,1600x900".
+        foreach (Size logical in ShellSizes())
         {
-            using FrmMain main = new(session)
+            string suffix = "-" + logical.Width;
+            await Step($"Coque principale FrmMain {logical.Width}×{logical.Height} : navigation dans tous les écrans", async () =>
             {
-                StartPosition = FormStartPosition.Manual,
-                Location = new Point(-5000, -5000),
-                ShowInTaskbar = false
-            };
-            main.WindowState = FormWindowState.Normal;
-            main.Size = TestSize();
-            main.Show();
-            await Task.Delay(1500);
-            foreach (NavItem item in NavRegistry.Items.Where(i => i.IsAllowed(session.Role)))
-            {
-                main.Navigate(item.Key);
-                await Task.Delay(1100);
-                await Capture(main, screensDir, "shell-" + item.Key);
-            }
+                FrmMain.AllowOversize = true;
+                using FrmMain main = new(session)
+                {
+                    StartPosition = FormStartPosition.Manual,
+                    Location = new Point(-5000, -5000),
+                    ShowInTaskbar = false
+                };
+                main.WindowState = FormWindowState.Normal;
+                main.Show();
+                ResizeWindow(main, new Size(Theme.S(logical.Width), Theme.S(logical.Height)));
+                await Task.Delay(1500);
+                foreach (NavItem item in NavRegistry.Items.Where(i => i.IsAllowed(session.Role)))
+                {
+                    main.Navigate(item.Key);
+                    await Task.Delay(1100);
+                    await Capture(main, screensDir, "shell-" + item.Key + suffix);
+                }
 
-            main.OpenOrder(order.Id);
-            await Task.Delay(1200);
-            await Capture(main, screensDir, "shell-order-detail");
-            main.OpenClient(client.Id);
-            await Task.Delay(1200);
-            await Capture(main, screensDir, "shell-client-detail");
-            main.GoBack();
-            await Task.Delay(800);
-            main.Close();
-        });
+                main.OpenOrder(order.Id);
+                await Task.Delay(1200);
+                await Capture(main, screensDir, "shell-order-detail" + suffix);
+                main.OpenClient(client.Id);
+                await Task.Delay(1200);
+                await Capture(main, screensDir, "shell-client-detail" + suffix);
+                main.GoBack();
+                await Task.Delay(800);
+                main.Close();
+            });
+        }
 
         await Step("Session expirée : événement Unauthorized", async () =>
         {
@@ -554,8 +629,12 @@ internal static class SelfTest
             return;
         }
 
-        using Bitmap bitmap = new(size.Width, size.Height);
-        control.DrawToBitmap(bitmap, new Rectangle(Point.Empty, size));
+        using Bitmap bitmap = (control is Form shown ? PrintForm(shown) : null) ?? new Bitmap(size.Width, size.Height);
+        if (control is not Form || bitmap.Width != size.Width || bitmap.GetPixel(bitmap.Width / 2, bitmap.Height / 2).A == 0)
+        {
+            control.DrawToBitmap(bitmap, new Rectangle(Point.Empty, size));
+        }
+
         bitmap.Save(Path.Combine(dir, name + ".png"), System.Drawing.Imaging.ImageFormat.Png);
         if (temporary && control is Form f)
         {

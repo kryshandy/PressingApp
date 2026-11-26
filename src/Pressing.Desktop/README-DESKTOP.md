@@ -15,6 +15,24 @@ Tableau de bord, Nouveau dépôt, Commandes (+ détail), Clients (+ fiche), Retr
 - **Paramètres** (`SettingsView`) : boutique, commandes, fidélité, e-mails (journal, test), reçus ; sauvegardes et journal d'audit (Admin). Lecture seule pour un Manager.
 `ComingSoonView` reste disponible pour un futur module.
 
+## Mise en page (charte `DESIGN.md`)
+Les primitives de `Ui/Layout.cs` rendent la charte automatique ; **ne plus utiliser** `TableLayoutPanel`, `ScrollPanel` ou `TwoColumnPanel` pour une page.
+- `SetPage(header, body, scroll, toolbar)` (dans `BaseView`) installe un `PageLayout` : gouttière 32 px (mêmes bords que l'en-tête global), en-tête, barre de filtres (16 px dessous), corps rempli (`scroll: false`, listes) ou défilant (`scroll: true`).
+- `ScrollViewport` : l'unique défilement d'une page, sans barre native (fine barre thémée dans la gouttière de droite), molette, focus clavier rendu visible. `ThemedGrid` défile aussi sans barre native (molette + barre fine dessinée).
+- `VStack(gap = 24)` : pile verticale ; `Add(c, StackSize.Auto | Fixed | Fill, hauteur)`.
+- `GridRow` : ligne de 12 colonnes, gouttière 24 px, cellules de même hauteur : `new GridRow().Add(a, 8).Add(b, 4)` ; `.Sticky(b)` garde une colonne visible pendant le défilement ; `StackBelow = 900` empile sous 900 px.
+- `UniformRow` (N éléments égaux), `FormGrid(n)` (champs 6+6, 24 px / 16 px), `FieldBox` (libellé MAJUSCULES + champ), `InlineField` (libellé à gauche), `SectionRule("Acompte")`, `FigureBlock` (chiffre clé), `Padded`.
+- `TitledCard(titre, contenu, sous-titre, flush, autoHeight)` : padding 24, titre 12 pt, 16 px avant le contenu, actions 32 px à droite (`AddAction`).
+- `ActionBar` : boutons sur UNE ligne ; au-delà de 4 (ou faute de place) les actions secondaires les plus à gauche passent dans « Plus d'actions ». `PageHeader.AddAction`/`Actions`, `SetLeading(bouton Retour)`, `AddTitleAdornment(pastille)`.
+- `TextLabel` : libellé sans la marge GDI (alignement exact au pixel) ; `Wrap = true` pour le retour à la ligne.
+- Grilles : `AddText(..., fixedWidth: 112)` pour les montants/dates/quantités, `weight` + `minWidth` pour les colonnes texte ; `GridCard.AutoHeightRows`/`MaxRows` pour une grille dans une page défilante.
+- Après un changement de contenu (lignes chargées, bloc affiché/masqué), appeler `control.RequestPageLayout()` (déjà fait par `GridCard`, `InfoList` et les conteneurs).
+- Champs : `InputBox.PlaceholderText` est dessiné au thème (aussi dans les captures). Cases : `ToggleBox` (interrupteur par défaut, `Style = ToggleStyle.Check` pour une case).
+- Dialogues : hériter de `DialogForm` (largeurs 480 / 560 / 760, hauteur ajustée au contenu, blocs ajoutés à `Body` en `Dock = Top`).
+
+## Contrôle visuel
+`PRESSING_DPI_UNAWARE=1 Pressing.Desktop.exe --selftest --screens <dossier>` : captures de chaque vue, dialogue et de la coque à 1280×760 et 1600×900 (`PRESSING_TEST_SIZES`), barre de titre DWM comprise. `PRESSING_UI_SCALE=1.5` (avec `PRESSING_DPI_UNAWARE=1`) simule un affichage à 150 %.
+
 ## Conventions
 - Couleurs/polices/espacements : uniquement `Ui/Theme.cs` (`Theme.S(px)` pour toute taille en pixels : DPI).
 - Réseau : toujours `await RunAsync(...)` (curseur d'attente, boutons `FlatButton.Busy`, erreurs `ApiException` en boîte de dialogue). Dialogues : hériter de `DialogForm`, appeler l'API via `UiRun.RunAsync(this, ...)`.

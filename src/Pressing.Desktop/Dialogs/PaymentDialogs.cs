@@ -253,14 +253,11 @@ public sealed class PickupDialog : DialogForm
         Body.Controls.Add(grid);
         Body.Controls.Add(_remaining);
         Body.Controls.Add(itemsWrap);
-        Body.Controls.Add(new Label
+        Body.Controls.Add(new TextLabel
         {
             Text = "ARTICLES À REMETTRE AU CLIENT",
-            Dock = DockStyle.Top,
-            Height = Theme.S(30),
-            Font = Theme.F(8.5f, FontStyle.Bold),
-            ForeColor = Theme.TextMuted,
-            TextAlign = ContentAlignment.BottomLeft
+            Font = Theme.FieldLabel,
+            ForeColor = Theme.TextMuted
         });
         Body.Controls.Add(Summary.Strip(
             ("Total", Fmt.Money(order.Total), null),

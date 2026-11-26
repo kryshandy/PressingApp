@@ -19,6 +19,13 @@ static class Program
         EnvFile.Load(AppContext.BaseDirectory);
         EnvFile.Load();
 
+        // Contrôle visuel (auto-test) : rendu à 96 dpi pour vérifier la mise en page à 100 % (ou à 150 % avec
+        // PRESSING_UI_SCALE=1.5) quel que soit le réglage d'affichage de Windows.
+        if (Environment.GetEnvironmentVariable("PRESSING_DPI_UNAWARE") == "1")
+        {
+            Application.SetHighDpiMode(HighDpiMode.DpiUnaware);
+        }
+
         ApplicationConfiguration.Initialize();
         Application.SetColorMode(SystemColorMode.Dark);
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
