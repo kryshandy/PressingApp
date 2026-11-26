@@ -53,6 +53,7 @@ public sealed class TestDb : IDisposable
         services.AddScoped<EmailTemplateService>();
         services.AddScoped<EmailService>();
         services.AddScoped<OrderService>();
+        services.AddScoped<DashboardService>();
 
         _provider = services.BuildServiceProvider();
         _scope = _provider.CreateScope();
@@ -66,6 +67,9 @@ public sealed class TestDb : IDisposable
     public OrderService Orders => _scope.ServiceProvider.GetRequiredService<OrderService>();
     public PaymentService Payments => _scope.ServiceProvider.GetRequiredService<PaymentService>();
     public SettingsService Settings => _scope.ServiceProvider.GetRequiredService<SettingsService>();
+    public DashboardService Dashboard => _scope.ServiceProvider.GetRequiredService<DashboardService>();
+    public ReceiptService Receipts => _scope.ServiceProvider.GetRequiredService<ReceiptService>();
+    public PressingDatabaseOptions DbOptions => _scope.ServiceProvider.GetRequiredService<PressingDatabaseOptions>();
     public ClientService Clients => _scope.ServiceProvider.GetRequiredService<ClientService>();
 
     public CurrentUser Cashier { get; } = new() { StaffId = 1, Name = "Test", Role = "Cashier" };

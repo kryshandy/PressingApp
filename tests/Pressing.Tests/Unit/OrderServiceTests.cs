@@ -123,7 +123,7 @@ public class OrderServiceTests : IDisposable
         await Assert.ThrowsAsync<InvalidOperationException>(() => CreateAsync(c, chemises: 0, pantalons: 0));
 
         Category chemise = await _t.CategoryAsync("Chemise");
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _t.Orders.CreateAsync(new CreateOrderRequest(
+        await Assert.ThrowsAsync<ArgumentException>(() => _t.Orders.CreateAsync(new CreateOrderRequest(
             c.Id,
             [new CreateOrderItemRequest(chemise.Id, ServiceType.WashAndIron, 0, null, false, null, null, null)],
             false, null, DeliveryType.StorePickup, null, 0, 0, null, 0, null, 0, PaymentMethod.Cash, null), _t.Cashier));
@@ -224,7 +224,7 @@ public class OrderServiceTests : IDisposable
     {
         ClientEntity c = await _t.AddClientAsync();
         OrderDto order = await CreateAsync(c);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _t.Payments.AddPaymentAsync(order.Id,
+        await Assert.ThrowsAsync<ArgumentException>(() => _t.Payments.AddPaymentAsync(order.Id,
             new AddPaymentRequest(amount, PaymentMethod.Cash, null, null, null), _t.Cashier));
     }
 
