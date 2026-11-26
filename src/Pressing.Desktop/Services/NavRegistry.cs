@@ -40,8 +40,7 @@ public static class NavRegistry
     public static readonly Func<UserRole, bool> AdminOnly = r => r == UserRole.Admin;
 
     /// <summary>
-    /// Toutes les entrées, dans l'ordre d'affichage. Les 4 écrans d'administration pointent vers
-    /// <see cref="ComingSoonView"/> : remplacez la fabrique par la vue réelle (ex. <c>h =&gt; new PromotionsView(h)</c>).
+    /// Toutes les entrées, dans l'ordre d'affichage. 
     /// </summary>
     public static readonly IReadOnlyList<NavItem> Items = new List<NavItem>
     {
@@ -54,13 +53,13 @@ public static class NavRegistry
         new(Unpaid, "Impayés", Icons.Unpaid, "Finances", h => new OutstandingView(h), Everyone),
         new(Tariffs, "Tarifs", Icons.Tariffs, "Finances", h => new TariffsView(h), Everyone),
         new(Promotions, "Promotions", Icons.Promotions, "Administration",
-            h => new ComingSoonView(h, "Promotions", "Codes promo et remises : gestion des campagnes.", Icons.Promotions), ManagerOrAdmin),
+            h => new PromotionsView(h), ManagerOrAdmin),
         new(Reports, "Rapports", Icons.Reports, "Administration",
-            h => new ComingSoonView(h, "Rapports", "Chiffre d'affaires, exports et statistiques détaillées.", Icons.Reports), ManagerOrAdmin),
+            h => new ReportsView(h), ManagerOrAdmin),
         new(Staff, "Personnel", Icons.Staff, "Administration",
-            h => new ComingSoonView(h, "Personnel", "Comptes des employés, rôles et mots de passe.", Icons.Staff), AdminOnly),
+            h => new StaffView(h), AdminOnly),
         new(Settings, "Paramètres", Icons.Settings, "Administration",
-            h => new ComingSoonView(h, "Paramètres", "Informations de la boutique, e-mails, fidélité et sauvegardes.", Icons.Settings), ManagerOrAdmin),
+            h => new SettingsView(h), ManagerOrAdmin),
         new(Account, "Mon compte", Icons.Account, "Compte", h => new AccountView(h), Everyone)
     };
 

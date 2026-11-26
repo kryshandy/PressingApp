@@ -398,6 +398,61 @@ internal static class SelfTest
             session.InvalidateCatalog();
         });
 
+        await Step("Administration : promotions, rapport, personnel, paramètres, sauvegarde", async () =>
+        {
+            string tag = DateTime.Now.ToString("HHmmss");
+            PromotionDto? promo = await api.CreatePromotionAsync(new CreatePromotionRequest("AUTO" + tag, "Auto-test", PromotionType.Percentage, 10, 0,
+                DateTime.Today, DateTime.Today.AddDays(30).AddDays(1).AddSeconds(-1), 0, true));
+            Check(promo is { Code: not null } && promo.Code == "AUTO" + tag, "promotion créée");
+            PromotionDto? promoUpdated = await api.UpdatePromotionAsync(promo!.Id, new UpdatePromotionRequest(promo.Code!, "Modifiée", PromotionType.FixedAmount, 500, 1000,
+                promo.ValidFrom, promo.ValidTo, 5, false));
+            Check(promoUpdated is { Description: "Modifiée", IsActive: false, MaxUses: 5 }, "promotion modifiée");
+
+            ReportDto? report = await api.GetReportAsync(DateTime.Today.AddDays(-29), DateTime.Today);
+            Check(report is { Daily.Count: > 0 }, "rapport");
+            byte[] csv = await api.ExportReportCsvAsync(DateTime.Today.AddDays(-29), DateTime.Today);
+            Check(csv.Length > 50, "CSV vide");
+
+            StaffUserDto? member = await api.CreateStaffAsync(new CreateStaffRequest("Auto Test " + tag, "auto" + tag, null, UserRole.Cashier, "MotDePasse@2026"));
+            Check(member is not null && member.Id > 0, "membre créé");
+            StaffUserDto? memberUpdated = await api.UpdateStaffAsync(member!.Id, new UpdateStaffRequest(member.FullName, member.Username, "auto@example.com", UserRole.Manager, false));
+            Check(memberUpdated is { Role: UserRole.Manager, IsActive: false }, "membre modifié");
+            Check((await api.SetStaffPasswordAsync(member.Id, "AutreMdp@2026")) is not null, "mot de passe");
+
+            SettingsView settings = new(fake);
+            hostForm.Controls.Add(settings);
+            settings.Dock = DockStyle.Fill;
+            await settings.LoadAsync();
+            foreach (string section in new[] { "emails", "receipts", "backups", "audit", "loyalty", "orders", "shop" })
+            {
+                await settings.ShowSectionAsync(section);
+                await Capture(settings, screensDir, "settings-" + section);
+            }
+
+            string? original = settings.GetFieldValue(SettingsKeys.ShopSlogan);
+            settings.SetFieldValue(SettingsKeys.ShopSlogan, "Slogan auto-test " + tag);
+            Check(await settings.SaveChangesAsync() == 1, "un seul paramètre modifié");
+            Check((await api.GetSettingsAsync())!.Values[SettingsKeys.ShopSlogan] == "Slogan auto-test " + tag, "paramètre enregistré");
+            settings.SetFieldValue(SettingsKeys.ShopSlogan, original ?? string.Empty);
+            Check(await settings.SaveChangesAsync() == 1, "paramètre remis");
+            hostForm.Controls.Remove(settings);
+            settings.Dispose();
+
+            BackupResultDto? backup = await api.CreateBackupAsync();
+            Check(backup is { IntegrityOk: true, Size: > 0 }, "sauvegarde");
+            Check((await api.GetBackupsAsync())!.Any(b => b.FileName == backup!.FileName), "liste des sauvegardes");
+            EmailMessageDto? test = await api.SendTestEmailAsync("auto@example.com");
+            Check(test is not null, "e-mail de test");
+            Check((await api.GetAuditAsync(1, 10, null)) is { Total: > 0 }, "audit");
+
+            using PromotionDialog promoDialog = new(api, promoUpdated);
+            await Capture(promoDialog, screensDir, "dialog-promotion");
+            using StaffDialog staffDialog = new(api, memberUpdated, session.Staff.Id);
+            await Capture(staffDialog, screensDir, "dialog-staff");
+            using StaffPasswordDialog pwdDialog = new(api, memberUpdated!);
+            await Capture(pwdDialog, screensDir, "dialog-staff-password");
+        });
+
         await Step("Changement de mot de passe : refus d'un mauvais mot de passe actuel", async () =>
         {
             try
