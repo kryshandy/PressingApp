@@ -54,13 +54,18 @@ public sealed class CategoryDialog : DialogForm
         string[] headers = { "SERVICE", "PRIX", "SUPPL. EXPRESS", "DÉLAI (J)", "ACTIF" };
         for (int c = 0; c < headers.Length; c++)
         {
-            prices.Controls.Add(new Label
+            // TextLabel : aucune marge interne GDI, donc bord gauche exact ; les colonnes numériques sont
+            // alignées à droite comme les valeurs saisies en dessous.
+            bool numeric = c is 1 or 2 or 3;
+            prices.Controls.Add(new TextLabel
             {
                 Text = headers[c],
-                AutoSize = true,
-                Font = Theme.F(8.5f, FontStyle.Bold),
+                Font = Theme.FieldLabel,
                 ForeColor = Theme.TextMuted,
-                Margin = new Padding(0, 0, Theme.S(8), Theme.S(6))
+                TextAlign = numeric ? ContentAlignment.BottomRight : ContentAlignment.BottomLeft,
+                Dock = DockStyle.Fill,
+                Height = Theme.S(20),
+                Margin = new Padding(c == 4 ? Theme.S(8) : 0, 0, c == 4 ? 0 : Theme.S(8 + (numeric ? 12 : 0)), Theme.S(6))
             }, c, 0);
         }
 
