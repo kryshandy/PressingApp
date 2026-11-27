@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 
 namespace Pressing.Core.Data;
@@ -6,9 +6,9 @@ namespace Pressing.Core.Data;
 public partial class DatabaseInitializer
 {
     /// <summary>
-    /// Applique les migrations. Une base ancienne (créée par EnsureCreated, sans historique)
-    /// est sauvegardée puis « adoptée » : Baseline est marquée comme déjà appliquée.
-    /// Toute migration en attente est précédée d'une sauvegarde.
+    /// Applique les migrations. Une base ancienne (crÃ©Ã©e par EnsureCreated, sans historique)
+    /// est sauvegardÃ©e puis Â« adoptÃ©e Â» : Baseline est marquÃ©e comme dÃ©jÃ  appliquÃ©e.
+    /// Toute migration en attente est prÃ©cÃ©dÃ©e d'une sauvegarde.
     /// </summary>
     private async Task MigrateOrAdoptAsync(CancellationToken ct)
     {
@@ -50,6 +50,6 @@ public partial class DatabaseInitializer
         Directory.CreateDirectory(backups);
         string target = System.IO.Path.Combine(backups, $"pressing-{motif}-{DateTime.Now:yyyyMMdd-HHmmss}.db");
 
-        await _db.Database.ExecuteSqlRawAsync($"VACUUM INTO '{target.Replace("'", "''")}';", ct);
+        await _db.Database.ExecuteSqlRawAsync("VACUUM INTO {0};", new object[] { target }, ct);
     }
 }
