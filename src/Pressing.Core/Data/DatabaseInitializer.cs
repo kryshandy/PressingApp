@@ -1,10 +1,11 @@
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Pressing.Core.Options;
 using Pressing.Core.Security;
 
 namespace Pressing.Core.Data;
 
-public class DatabaseInitializer
+public partial class DatabaseInitializer
 {
     private readonly PressingDbContext _db;
     private readonly PressingDatabaseOptions _options;
@@ -18,8 +19,8 @@ public class DatabaseInitializer
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         PressingDatabase.EnsureDirectory(_options.Path);
-        await _db.Database.EnsureCreatedAsync(ct);
-        await _db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", ct);
+    await MigrateOrAdoptAsync(ct);
+       await _db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", ct);
         await _db.Database.ExecuteSqlRawAsync("PRAGMA synchronous=NORMAL;", ct);
         await _db.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout=10000;", ct);
 
