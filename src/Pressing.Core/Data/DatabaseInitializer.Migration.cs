@@ -31,7 +31,7 @@ public partial class DatabaseInitializer
             await _db.Database.ExecuteSqlRawAsync(
                 "CREATE TABLE \"__EFMigrationsHistory\" (\"MigrationId\" TEXT NOT NULL CONSTRAINT \"PK___EFMigrationsHistory\" PRIMARY KEY, \"ProductVersion\" TEXT NOT NULL);", ct);
             await _db.Database.ExecuteSqlRawAsync(
-                $"INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ('{baseline}', '{version}');", ct);
+                "INSERT INTO \"__EFMigrationsHistory\" (\"MigrationId\", \"ProductVersion\") VALUES ({0}, {1});", new object[] { baseline, version }, ct);
         }
         else if (tables > 0 && (await _db.Database.GetPendingMigrationsAsync(ct)).Any())
         {
