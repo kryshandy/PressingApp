@@ -12,6 +12,7 @@ using Pressing.Api.Infrastructure;
 using Pressing.Core;
 using Pressing.Core.Data;
 using Pressing.Core.Email;
+using Pressing.Core.Messaging;
 using Pressing.Core.Options;
 using Pressing.Core.Reports;
 using Pressing.Core.Security;
@@ -56,6 +57,12 @@ TokenOptions tokenOptions = new()
 
 builder.Services.AddSingleton(databaseOptions);
 builder.Services.AddSingleton(emailOptions);
+
+WhatsAppOptions whatsAppOptions =
+    builder.Configuration.GetSection("WhatsApp").Get<WhatsAppOptions>()
+    ?? new WhatsAppOptions();
+
+builder.Services.AddSingleton(whatsAppOptions);
 builder.Services.AddSingleton(tokenOptions);
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddHttpContextAccessor();
@@ -99,6 +106,14 @@ else
     builder.Services.AddSingleton<IEmailTransport, SimulatedEmailTransport>();
 }
 
+if (whatsAppOptions.Provider.Equals("meta", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddHttpClient<IWhatsAppTransport, MetaWhatsAppTransport>();
+}
+else
+{
+    builder.Services.AddSingleton<IWhatsAppTransport, SimulatedWhatsAppTransport>();
+}
 if (emailOptions.BackgroundEnabled)
 {
     builder.Services.AddHostedService<EmailBackgroundService>();

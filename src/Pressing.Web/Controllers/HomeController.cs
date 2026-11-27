@@ -91,6 +91,10 @@ public sealed class HomeController : Controller
                     : message;
                 return RedirectToAction(nameof(Contact));
             }
+            catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.ServiceUnavailable)
+            {
+                ModelState.AddModelError("", "Le service est temporairement indisponible. Votre message est conservé dans le formulaire ; vous pouvez réessayer.");
+            }
             catch (ApiException ex) when (ex.StatusCode != HttpStatusCode.ServiceUnavailable && !ex.IsUnauthorized)
             {
                 ModelState.AddModelError("", ex.Message);

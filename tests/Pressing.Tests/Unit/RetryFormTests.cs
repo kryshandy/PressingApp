@@ -1,4 +1,4 @@
-extern alias web;
+﻿extern alias WebApp;
 
 using System.Net;
 using Microsoft.AspNetCore.Http;
@@ -12,8 +12,8 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Primitives;
 using Pressing.Client;
-using ApiExceptionFilter = web::Pressing.Web.Infrastructure.ApiExceptionFilter;
-using RetryForm = web::Pressing.Web.Infrastructure.RetryForm;
+using ApiExceptionFilter = WebApp::Pressing.Web.Infrastructure.ApiExceptionFilter;
+using RetryForm = WebApp::Pressing.Web.Infrastructure.RetryForm;
 
 namespace Pressing.Tests.Unit;
 
@@ -158,7 +158,7 @@ public class RetryFormTests
         http.Request.Method = "POST";
         http.Request.Path = path;
         http.Request.ContentType = "application/x-www-form-urlencoded";
-        http.Features.Set<IFormFeature>(new FormFeature(new FormCollection(form)));
+        http.Request.Form = new FormCollection(form);
         return http;
     }
 
@@ -176,3 +176,6 @@ public class RetryFormTests
         public ITempDataDictionary GetTempData(HttpContext context) => tempData;
     }
 }
+
+
+
