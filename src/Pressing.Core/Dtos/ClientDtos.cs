@@ -1,3 +1,5 @@
+using Pressing.Core.Entities;
+
 namespace Pressing.Core.Dtos;
 
 public record ClientDto(
@@ -18,7 +20,10 @@ public record ClientDto(
     int OrderCount,
     decimal Balance,
     decimal TotalSpent,
-    DateTime? LastOrderAt);
+    DateTime? LastOrderAt,
+    ClientNotificationPreference NotificationPreference,
+    DateTime? ConsentGivenAt,
+    DateTime? ConsentRevokedAt);
 
 public record CreateClientRequest(
     string FirstName,
@@ -29,7 +34,8 @@ public record CreateClientRequest(
     string? Address,
     string? Notes,
     string? Password,
-    bool SendWelcomeEmail);
+    bool SendWelcomeEmail,
+    ClientNotificationPreference NotificationPreference = ClientNotificationPreference.None);
 
 public record UpdateClientRequest(
     string FirstName,
@@ -39,7 +45,8 @@ public record UpdateClientRequest(
     string? Email,
     string? Address,
     string? Notes,
-    bool IsActive);
+    bool IsActive,
+    ClientNotificationPreference? NotificationPreference = null);
 
 public record SetClientPasswordRequest(
     string? Password,
@@ -52,7 +59,8 @@ public record UpdateProfileRequest(
     string Phone,
     string WhatsApp,
     string? Email,
-    string? Address);
+    string? Address,
+    ClientNotificationPreference? NotificationPreference = null);
 
 public record PortalDashboardDto(
     ClientDto Client,

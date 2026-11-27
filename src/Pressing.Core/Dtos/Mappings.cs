@@ -27,7 +27,10 @@ public static class Mappings
         orderCount,
         balance,
         totalSpent,
-        lastOrderAt);
+        lastOrderAt,
+        client.NotificationPreference,
+        client.ConsentGivenAt,
+        client.ConsentRevokedAt);
 
     public static OrderSummaryDto ToSummary(this Order order)
     {

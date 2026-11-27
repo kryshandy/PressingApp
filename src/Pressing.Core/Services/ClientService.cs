@@ -133,6 +133,7 @@ public class ClientService
         CancellationToken ct = default)
     {
         ValidateClient(request.FirstName, request.LastName, request.Phone, request.WhatsApp, request.Email);
+        ValidateNotificationPreference(request.NotificationPreference, request.Email, request.WhatsApp);
 
         string phoneNormalized = PhoneNormalizer.Normalize(request.Phone);
         if (await _db.Clients.AnyAsync(c => c.PhoneNormalized == phoneNormalized, ct))
@@ -182,6 +183,7 @@ public class ClientService
             UpdatedAt = DateTime.Now
         };
 
+        ApplyNotificationPreference(client, request.NotificationPreference);
         _db.Clients.Add(client);
         await _db.SaveChangesAsync(ct);
         await _audit.LogAsync(user, "create", nameof(Client), client.Id.ToString(), $"Client {client.FullName}", ct: ct);
@@ -201,6 +203,10 @@ public class ClientService
         CancellationToken ct = default)
     {
         ValidateClient(request.FirstName, request.LastName, request.Phone, request.WhatsApp, request.Email);
+        if (request.NotificationPreference.HasValue)
+        {
+            ValidateNotificationPreference(request.NotificationPreference.Value, request.Email, request.WhatsApp);
+        }
 
         Client client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == id, ct)
             ?? throw new KeyNotFoundException("Client introuvable.");
@@ -223,6 +229,10 @@ public class ClientService
         client.PhoneNormalized = normalized;
         client.WhatsApp = request.WhatsApp.Trim();
         client.Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
+        if (request.NotificationPreference.HasValue)
+        {
+            ApplyNotificationPreference(client, request.NotificationPreference.Value);
+        }
         client.Address = request.Address?.Trim();
         client.Notes = request.Notes?.Trim();
         client.IsActive = request.IsActive;
@@ -240,6 +250,10 @@ public class ClientService
         CancellationToken ct = default)
     {
         ValidateClient(request.FirstName, request.LastName, request.Phone, request.WhatsApp, request.Email);
+        if (request.NotificationPreference.HasValue)
+        {
+            ValidateNotificationPreference(request.NotificationPreference.Value, request.Email, request.WhatsApp);
+        }
         Client client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == id, ct)
             ?? throw new KeyNotFoundException("Client introuvable.");
 
@@ -261,6 +275,10 @@ public class ClientService
         client.PhoneNormalized = normalized;
         client.WhatsApp = request.WhatsApp.Trim();
         client.Email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
+        if (request.NotificationPreference.HasValue)
+        {
+            ApplyNotificationPreference(client, request.NotificationPreference.Value);
+        }
         client.Address = request.Address?.Trim();
         client.UpdatedAt = DateTime.Now;
 
@@ -381,6 +399,43 @@ public class ClientService
             });
     }
 
+    private static void ValidateNotificationPreference(
+        ClientNotificationPreference preference,
+        string? email,
+        string? whatsApp)
+    {
+        if (!Enum.IsDefined(preference))
+            throw new InvalidOperationException("Le canal de notification choisi est invalide.");
+
+        if (preference == ClientNotificationPreference.Email && string.IsNullOrWhiteSpace(email))
+            throw new InvalidOperationException("Une adresse e-mail est obligatoire pour choisir ce canal.");
+
+        if (preference == ClientNotificationPreference.WhatsApp && string.IsNullOrWhiteSpace(whatsApp))
+            throw new InvalidOperationException("Un numéro WhatsApp est obligatoire pour choisir ce canal.");
+    }
+
+    private static void ApplyNotificationPreference(
+        Client client,
+        ClientNotificationPreference preference)
+    {
+        if (client.NotificationPreference == preference)
+            return;
+
+        DateTime now = DateTime.Now;
+
+        if (preference == ClientNotificationPreference.None)
+        {
+            if (client.NotificationPreference != ClientNotificationPreference.None)
+                client.ConsentRevokedAt = now;
+        }
+        else
+        {
+            client.ConsentGivenAt = now;
+            client.ConsentRevokedAt = null;
+        }
+
+        client.NotificationPreference = preference;
+    }
     private static void ValidateClient(string firstName, string lastName, string phone, string whatsApp, string? email)
     {
         if (string.IsNullOrWhiteSpace(firstName)) throw new InvalidOperationException("Le prénom est obligatoire.");

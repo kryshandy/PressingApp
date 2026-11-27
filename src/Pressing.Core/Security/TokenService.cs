@@ -79,6 +79,17 @@ public class TokenService
         }
     }
 
+    public string CreateUnsubscribeToken(int clientId)
+    {
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, clientId.ToString()),
+            new("client_id", clientId.ToString()),
+            new("token_type", "unsubscribe")
+        };
+
+        return Write(claims, DateTime.UtcNow.AddDays(180));
+    }
     private string Write(IEnumerable<Claim> claims, DateTime expires)
     {
         var credentials = new SigningCredentials(
