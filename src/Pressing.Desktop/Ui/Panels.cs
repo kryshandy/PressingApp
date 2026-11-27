@@ -192,6 +192,10 @@ public sealed class FieldBox : LayoutControl
             ForeColor = Theme.TextMuted
         };
         Control = control;
+        // Le libellé visible est aussi le nom accessible du champ (relation libellé/contrôle).
+        if (string.IsNullOrWhiteSpace(control.AccessibleName)) control.AccessibleName = label;
+        if (hint is not null && string.IsNullOrWhiteSpace(control.AccessibleDescription))
+            control.AccessibleDescription = hint;
         LayoutUtil.Prepare(control);
         Controls.Add(Caption);
         Controls.Add(control);
@@ -241,8 +245,16 @@ public sealed class PagerBar : LayoutControl
     public PagerBar()
     {
         Height = Theme.S(40);
-        _prev = new FlatButton { Kind = ButtonKind.Secondary, IconGlyph = Icons.ChevronLeft, AutoSize = false, Height = Theme.S(36) };
-        _next = new FlatButton { Kind = ButtonKind.Secondary, IconGlyph = Icons.ChevronRight, AutoSize = false, Height = Theme.S(36) };
+        _prev = new FlatButton
+        {
+            Kind = ButtonKind.Secondary, IconGlyph = Icons.ChevronLeft, AutoSize = false, Height = Theme.S(36),
+            AccessibleName = "Page précédente", AccessibleDescription = "Afficher la page précédente"
+        };
+        _next = new FlatButton
+        {
+            Kind = ButtonKind.Secondary, IconGlyph = Icons.ChevronRight, AutoSize = false, Height = Theme.S(36),
+            AccessibleName = "Page suivante", AccessibleDescription = "Afficher la page suivante"
+        };
         _info = new TextLabel { Font = Theme.F(9.5f), ForeColor = Theme.TextMuted, TextAlign = ContentAlignment.MiddleCenter };
         _total = new TextLabel { Font = Theme.F(9.5f), ForeColor = Theme.TextMuted, TextAlign = ContentAlignment.MiddleRight };
         _prev.Click += (_, _) => PageRequested?.Invoke(this, Page - 1);

@@ -33,7 +33,7 @@ public sealed class AccountController : Controller
     {
         if (User.Identity?.IsAuthenticated == true) return LocalRedirect(SafeReturn(returnUrl));
         if (expiree == "1") ViewData["Info"] = "Votre session a expiré. Reconnectez-vous pour continuer.";
-        return View(new LoginForm { ReturnUrl = returnUrl });
+        return View(RetryForm.Restore(TempData, new LoginForm { ReturnUrl = returnUrl }));
     }
 
     [AllowAnonymous]
@@ -69,7 +69,7 @@ public sealed class AccountController : Controller
 
     [AllowAnonymous]
     [HttpGet("mot-de-passe-oublie")]
-    public IActionResult Forgot() => View(new ForgotForm());
+    public IActionResult Forgot() => View(RetryForm.Restore(TempData, new ForgotForm()));
 
     [AllowAnonymous]
     [HttpPost("mot-de-passe-oublie")]
@@ -93,7 +93,7 @@ public sealed class AccountController : Controller
     }
     [AllowAnonymous]
     [HttpGet("reinitialiser")]
-    public IActionResult Reset(string? token) => View(new ResetForm { Token = token ?? "" });
+    public IActionResult Reset(string? token) => View(RetryForm.Restore(TempData, new ResetForm { Token = token ?? "" }));
 
     [AllowAnonymous]
     [HttpPost("reinitialiser")]
@@ -172,11 +172,11 @@ public sealed class AccountController : Controller
     public async Task<IActionResult> Profile(CancellationToken ct)
     {
         var c = await Api.GetProfileAsync(ct) ?? throw EmptyResponse();
-        return View(new ProfileForm
+        return View(RetryForm.Restore(TempData, new ProfileForm
         {
             FirstName = c.FirstName, LastName = c.LastName, Phone = c.Phone,
             WhatsApp = c.WhatsApp, Email = c.Email, Address = c.Address
-        });
+        }));
     }
 
     [HttpPost("profil")]
@@ -210,7 +210,7 @@ public sealed class AccountController : Controller
     }
 
     [HttpGet("mot-de-passe")]
-    public IActionResult Password() => View(new ChangePasswordForm());
+    public IActionResult Password() => View(RetryForm.Restore(TempData, new ChangePasswordForm()));
 
     [HttpPost("mot-de-passe")]
     public async Task<IActionResult> Password(ChangePasswordForm form, CancellationToken ct)

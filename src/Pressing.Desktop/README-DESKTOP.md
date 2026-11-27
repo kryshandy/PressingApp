@@ -13,7 +13,6 @@ Tableau de bord, Nouveau dépôt, Commandes (+ détail), Clients (+ fiche), Retr
 - **Rapports** (`ReportsView`) : période, chiffres clés, graphique, tableaux, export CSV, Manager/Admin.
 - **Personnel** (`StaffView`, `StaffDialogs`) : comptes, rôles, mots de passe, Admin.
 - **Paramètres** (`SettingsView`) : boutique, commandes, fidélité, e-mails (journal, test), reçus ; sauvegardes et journal d'audit (Admin). Lecture seule pour un Manager.
-`ComingSoonView` reste disponible pour un futur module.
 
 ## Mise en page (charte `DESIGN.md`)
 Les primitives de `Ui/Layout.cs` rendent la charte automatique ; **ne plus utiliser** `TableLayoutPanel`, `ScrollPanel` ou `TwoColumnPanel` pour une page.

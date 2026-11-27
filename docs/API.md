@@ -1,4 +1,4 @@
-# Contrat de l'API — Pressing Éclat v1
+# Contrat de l'API — Pressing Éclat version 2.0.0
 
 Ce document est **la référence** entre l'API (`src/Pressing.Api`), la bibliothèque cliente
 (`src/Pressing.Client`), le site web (`src/Pressing.Web`) et l'application Desktop
@@ -6,13 +6,17 @@ Ce document est **la référence** entre l'API (`src/Pressing.Api`), la biblioth
 
 ## Conventions
 
-- Base : `http://localhost:5180` (variable `PRESSING_PUBLIC_API_URL`).
+- Base publique : `http://localhost:5180` par défaut (variable `PRESSING_PUBLIC_API_URL`, utilisée par le Desktop et le site).
+  L'adresse d'écoute du serveur est `PRESSING_API_URL` (`http://0.0.0.0:5180` par défaut) : derrière un reverse proxy,
+  l'API peut écouter en HTTP interne alors que les clients appellent une URL HTTPS publique. Les deux variables ne sont
+  pas interchangeables.
 - JSON en camelCase, **énumérations sérialisées en texte** (`"WashAndIron"`, `"Ready"`…) via `JsonStringEnumConverter`.
 - Dates : `DateTime` en heure locale du serveur, format ISO 8601. Elles peuvent comporter un décalage (`+01:00`) :
   les clients doivent les traiter comme de l'heure locale (ne pas convertir en UTC).
-- IP des clients : derrière le site web ou un reverse proxy, l'en-tête `X-Forwarded-For` n'est pris en compte que
-  si l'appelant est de confiance (boucle locale, ou adresses listées dans `PRESSING_TRUSTED_PROXIES`) ; la limitation
-  de débit (`429`) porte sur cette adresse.
+- IP des clients : derrière le site web ou un reverse proxy, `X-Forwarded-For` et `X-Forwarded-Proto` ne sont pris en
+  compte que si l'appelant est de confiance (boucle locale, ou adresses listées dans `PRESSING_TRUSTED_PROXIES`).
+  Un seul hop est accepté (`ForwardLimit = 1`) et `X-Real-IP` n'est pas lu. La limitation de débit (`429`) porte sur
+  l'adresse corrigée ; `X-Forwarded-Proto` permet aussi de marquer le cookie `Secure` quand le public est en HTTPS.
 - Authentification : `Authorization: Bearer <jwt>`. Le jeton contient la revendication `token_type` = `staff` ou `client`.
 - Erreurs : `application/problem+json` (`ProblemDetails`) — le message lisible est dans `detail`
   (ou `message` pour les routes d'authentification / publiques).
@@ -20,6 +24,27 @@ Ce document est **la référence** entre l'API (`src/Pressing.Api`), la biblioth
   - `401` non connecté · `403` rôle insuffisant · `404` introuvable · `409` conflit · `429` trop de requêtes.
 - Politiques : `StaffOnly` (tout le personnel), `ManagerOrAdmin`, `AdminOnly`, `ClientOnly`.
 - Tous les DTO sont dans `src/Pressing.Core/Dtos`.
+
+## Découverte de l'API (anonyme)
+
+| Méthode | Route | Paramètres / corps | Réponse | Statut | Authentification |
+| --- | --- | --- | --- | --- | --- |
+| GET | `/` | aucun / aucun | `{ name, version, documentation, health }` (voir ci-dessous) | `200 OK` | anonyme |
+| GET | `/openapi/v1.json` | aucun / aucun | document OpenAPI au format JSON (`application/json`) | `200 OK` | anonyme |
+
+`GET /` renvoie notamment :
+
+```json
+{
+  "name": "Pressing Éclat API",
+  "version": "2.0.0",
+  "documentation": "/openapi/v1.json",
+  "health": "/api/health"
+}
+```
+
+Le chemin `/openapi/v1.json` est un chemin de contrat versionné : il ne doit pas être renommé lors d'un changement
+de version du logiciel.
 
 ## Santé et public (anonyme)
 

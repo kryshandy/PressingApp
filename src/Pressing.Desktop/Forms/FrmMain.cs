@@ -251,7 +251,12 @@ public sealed class FrmMain : Form, IAppHost
 
         UserChip chip = new(_session.Staff);
         chip.Click += (_, _) => Navigate(NavRegistry.Account);
-        FlatButton logout = new() { Kind = ButtonKind.Secondary, IconGlyph = Icons.Logout, Text = string.Empty, AutoSize = false, Size = new Size(Theme.S(40), Theme.S(40)) };
+        FlatButton logout = new()
+        {
+            Kind = ButtonKind.Secondary, IconGlyph = Icons.Logout, Text = string.Empty,
+            AutoSize = false, Size = new Size(Theme.S(40), Theme.S(40)),
+            AccessibleName = "Se déconnecter", AccessibleDescription = "Fermer la session du personnel"
+        };
         logout.Click += (_, _) => Logout();
         new ToolTip().SetToolTip(logout, "Se déconnecter");
         new ToolTip().SetToolTip(_bell, "Notifications");
@@ -602,12 +607,22 @@ internal sealed class BellButton : Control
         TabStop = true;
         Size = new Size(Theme.S(40), Theme.S(40));
         Cursor = Cursors.Hand;
+        AccessibleRole = AccessibleRole.PushButton;
+        AccessibleName = "Notifications";
+        AccessibleDescription = "Afficher les notifications";
     }
 
     public int Count
     {
         get => _count;
-        set { _count = value; Invalidate(); }
+        set
+        {
+            _count = value;
+            AccessibleDescription = _count > 0
+                ? $"{_count} notification(s) en attente"
+                : "Aucune notification en attente";
+            Invalidate();
+        }
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -657,6 +672,9 @@ internal sealed class UserChip : Control
         _staff = staff;
         Cursor = Cursors.Hand;
         Size = new Size(Theme.S(210), Theme.S(44));
+        AccessibleRole = AccessibleRole.PushButton;
+        AccessibleName = $"Mon compte : {_staff.FullName} ({_staff.Role.Label()})";
+        AccessibleDescription = "Ouvrir mon compte";
     }
 
     protected override void OnPaint(PaintEventArgs e)

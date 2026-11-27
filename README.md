@@ -1,4 +1,4 @@
-# Pressing Éclat — logiciel de gestion de pressing (v1)
+# Pressing Éclat — logiciel de gestion de pressing (version 2.0.0)
 
 Solution complète pour un pressing : **une application Desktop pour le personnel**, **un site web pour les clients**
 et **une API** qui centralise les données. Tout fonctionne en local sur un poste Windows, sans serveur de base de données à installer.
@@ -13,7 +13,7 @@ Les trois partagent **la même base SQLite** à travers l'API : un dépôt enreg
 
 ---
 
-## 1. Fonctionnalités de la v1
+## 1. Fonctionnalités de la version 2.0.0
 
 ### Au comptoir (Desktop)
 - **Connexion du personnel** avec 3 rôles : *Administrateur*, *Manager*, *Caissier* — le menu s'adapte au rôle.
@@ -39,55 +39,89 @@ Les trois partagent **la même base SQLite** à travers l'API : un dépôt enreg
 - Un client ne voit **que ses propres** commandes et reçus.
 - Limitation des tentatives de connexion par adresse IP.
 - Journal d'audit de toutes les opérations sensibles.
-- **133 tests automatisés** (calculs, paiements, retraits, droits, portail, suivi).
+- **157 tests automatisés** (calculs, paiements, retraits, droits, portail, suivi, reprise après panne de l'API).
 
 ---
 
 ## 2. Prérequis
 
-- Windows 10 ou 11
-- [.NET SDK 10](https://dotnet.microsoft.com/download) ou plus récent (le runtime *Windows Desktop* est inclus dans le SDK)
-- PowerShell (fourni avec Windows)
+| Outil | Version | Vérifier |
+| --- | --- | --- |
+| Windows | 10 ou 11 (le Desktop est une application Windows Forms) | — |
+| [.NET SDK](https://dotnet.microsoft.com/download) | **10 ou plus récent** (le runtime *Windows Desktop* est inclus) | `dotnet --list-sdks` |
+| PowerShell | celui de Windows suffit | — |
+| Git | pour cloner et contribuer | `git --version` |
 
-Aucun serveur de base de données : SQLite est embarqué.
+Aucun serveur de base de données à installer : SQLite est embarqué.
 
-## 3. Installation et lancement
+Si PowerShell refuse de lancer les scripts (« l'exécution de scripts est désactivée »), autorisez-les pour votre
+seul compte, une fois pour toutes :
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+## 3. Lancer les applications
+
+### 3.1 Premier lancement (poste de développement ou de démonstration)
 
 ```powershell
 git clone https://github.com/kryshandy/PressingApp.git
 cd PressingApp
-copy .env.example .env          # configuration locale (facultatif : les valeurs par défaut fonctionnent)
-.\scripts\build.ps1 -Tests      # restaure, compile et lance les tests
-.\scripts\start.ps1             # démarre l'API, le site et le Desktop
+copy .env.example .env          # facultatif : start.ps1 le crée s'il manque
+.\scripts\build.ps1 -Tests      # restaure, compile et lance les tests (doit finir par « Compilation terminée »)
+.\scripts\start.ps1             # démarre l'API, puis le site, puis le Desktop
 ```
 
-- Sans le Desktop : `.\scripts\start.ps1 -SansDesktop`
-- Arrêt : `.\scripts\stop.ps1`
-- Journaux : dossier `logs\`
+`start.ps1` attend que l'API réponde sur `http://localhost:5180/api/health` avant de lancer le site et le Desktop.
+Les trois applications partagent la même base, créée automatiquement au premier démarrage de l'API
+(catalogue, tarifs, comptes et, par défaut, données de démonstration).
 
-Lancement manuel, projet par projet :
+| Application | Adresse | Comment l'ouvrir |
+| --- | --- | --- |
+| API | http://localhost:5180 | utilisée par les deux autres ; santé : `/api/health`, contrat : `/openapi/v1.json` |
+| Site client | http://localhost:5181 | dans un navigateur |
+| Desktop | — | s'ouvre tout seul sur l'écran de connexion |
+
+### 3.2 Au quotidien
+
+| Besoin | Commande |
+| --- | --- |
+| Tout démarrer (recompile d'abord) | `.\scripts\start.ps1` |
+| Démarrer sans recompiler (plus rapide) | `.\scripts\start.ps1 -SansBuild` |
+| API et site seulement (serveur, ou Desktop lancé ailleurs) | `.\scripts\start.ps1 -SansDesktop` |
+| Tout arrêter | `.\scripts\stop.ps1` |
+| Voir les journaux | dossier `logs\` (`api.log`, `api.err.log`, `web.log`, `web.err.log`) |
+
+**Toujours lancer `stop.ps1` avant de recompiler** : une API ou un Desktop encore ouvert verrouille les fichiers
+de `bin\` et la compilation échoue avec « le fichier est verrouillé par Pressing.Api ».
+
+### 3.3 Lancement manuel, projet par projet (débogage)
+
+Dans trois terminaux, **dans cet ordre** (l'API d'abord) :
 
 ```powershell
-dotnet run --project src/Pressing.Api        # http://localhost:5180
-dotnet run --project src/Pressing.Web        # http://localhost:5181
+dotnet run --project src/Pressing.Api      # http://localhost:5180
+dotnet run --project src/Pressing.Web      # http://localhost:5181
 dotnet run --project src/Pressing.Desktop
 ```
 
-> Si Windows affiche une alerte du pare-feu au premier lancement de l'API, autorisez l'accès au réseau privé
-> uniquement si d'autres postes du pressing doivent s'y connecter.
+Chaque application lit le fichier `.env` en remontant depuis son dossier : lancées depuis le dépôt, elles trouvent
+toutes le même `.env` à la racine.
 
 ## 4. Comptes de démonstration
 
-Créés automatiquement au premier démarrage (à changer en production) :
+Créés automatiquement **au premier démarrage** de l'API (une base déjà créée garde ses comptes) :
 
 | Rôle | Identifiant | Mot de passe |
 | --- | --- | --- |
-| Administrateur | `admin` | `Admin@2026!` (variable `PRESSING_ADMIN_PASSWORD`) |
+| Administrateur | `admin` | `Admin@2026!` (variables `PRESSING_ADMIN_USERNAME` / `PRESSING_ADMIN_PASSWORD`) |
 | Manager | `manager` | `Manager@2026!` |
 | Caissier | `caisse` | `Caisse@2026!` |
 | Clients démo (site web) | leur téléphone ou e-mail (voir l'écran Clients) | `Client@2026!` |
 
-Les données de démonstration (clients, commandes, paiements) se désactivent avec `PRESSING_SEED_DEMO=false`.
+Les données de démonstration (clients, commandes, paiements, comptes manager et caissier) se désactivent avec
+`PRESSING_SEED_DEMO=false`, **avant** le premier démarrage. En production, voir la section 6.
 
 ## 5. Parcours type au comptoir
 
@@ -99,34 +133,127 @@ Les données de démonstration (clients, commandes, paiements) se désactivent a
 5. Au retour du client : **Retraits** → saisir/scanner le ticket → cocher les articles → encaisser le reste → valider.
 6. En fin de journée : **Caisse** pour le total par mode de paiement, **Impayés** pour les relances.
 
-## 6. Configuration (`.env`)
+## 6. Configuration pour un lancement complet
 
-Toutes les variables sont documentées dans [`.env.example`](.env.example). Les principales :
+Tout fonctionne **sans rien configurer** sur un seul poste : e-mails simulés (visibles dans Paramètres → E-mails),
+données de démonstration, adresses `localhost`. Pour un vrai pressing, faites la liste ci-dessous **dans l'ordre**.
+
+### 6.1 Liste de mise en service
+
+| # | Quoi | Où | Pourquoi |
+| --- | --- | --- | --- |
+| 1 | Choisir l'emplacement de la base et des sauvegardes | `.env` : `PRESSING_DB_PATH`, `PRESSING_BACKUP_PATH` (sauvegardes sur un autre disque ou une clé) | une panne de disque ne doit pas emporter les deux |
+| 2 | Désactiver la démonstration | `.env` : `PRESSING_SEED_DEMO=false` | pas de faux clients ni de comptes `manager` / `caisse` connus de tous |
+| 3 | Mot de passe administrateur | `.env` : `PRESSING_ADMIN_PASSWORD` (long et unique) | lu **une seule fois**, à la création de la base |
+| 4 | Mode production | `.env` : `ASPNETCORE_ENVIRONMENT=Production` | page d'erreur publique et HSTS sur le site |
+| 5 | Premier démarrage | `.\scripts\start.ps1` puis connexion `admin` | la base, la clé `jwt.key` et le compte admin sont créés |
+| 6 | Infos de la boutique | Desktop → **Paramètres → Boutique** (nom, adresse, téléphone, WhatsApp, e-mail, horaires) | elles apparaissent sur les reçus, les e-mails et le site |
+| 7 | Tarifs et catégories | Desktop → **Tarifs** | le catalogue de départ est un exemple : ajustez prix, express et délais |
+| 8 | Comptes du personnel | Desktop → **Personnel** (un compte par personne, rôle Caissier par défaut) | chaque action est tracée au nom de son auteur dans l'audit |
+| 9 | E-mails réels | `.env` (voir 6.3), puis Desktop → **Paramètres → E-mails → e-mail de test** | confirmation de dépôt, « commande prête », reçus, mot de passe oublié |
+| 10 | Adresse publique du site | `.env` : `PRESSING_WEB_URL` | les liens des e-mails (suivi, réinitialisation) doivent ouvrir le vrai site |
+| 11 | Autres postes du comptoir | voir 6.4 | plusieurs caisses sur la même base |
+| 12 | Première sauvegarde | Desktop → **Paramètres → Sauvegardes → Sauvegarder maintenant** | vérifier que le dossier de sauvegarde fonctionne |
+
+Après toute modification du `.env` : `.\scripts\stop.ps1` puis `.\scripts\start.ps1 -SansBuild`.
+
+### 6.2 Variables du `.env`
+
+Toutes les variables sont documentées dans [`.env.example`](.env.example). Le fichier `.env` n'est **jamais** versionné.
 
 | Variable | Rôle | Défaut |
 | --- | --- | --- |
 | `PRESSING_DB_PATH` | fichier de la base SQLite | `%LOCALAPPDATA%\Pressing\pressing.db` |
 | `PRESSING_BACKUP_PATH` | dossier des sauvegardes | `Backups` à côté de la base |
-| `PRESSING_PUBLIC_API_URL` | adresse de l'API utilisée par le Desktop et le site | `http://localhost:5180` |
-| `PRESSING_WEB_URL` | adresse du site (liens dans les e-mails) | `http://localhost:5181` |
+| `PRESSING_API_URL` | **adresse d'écoute** de l'API (serveur uniquement) | `http://0.0.0.0:5180` |
+| `PRESSING_PUBLIC_API_URL` | **adresse publique** de l'API utilisée par le Desktop et le site | `http://localhost:5180` |
+| `PRESSING_WEB_URL` | adresse publique du site (liens dans les e-mails) | `http://localhost:5181` |
 | `PRESSING_ADMIN_USERNAME` / `PRESSING_ADMIN_PASSWORD` | compte administrateur initial | `admin` / `Admin@2026!` |
 | `PRESSING_SEED_DEMO` | données de démonstration | `true` |
-| `EMAIL_PROVIDER` | `auto`, `resend`, `smtp` ou `simulated` | `auto` (simulé si rien n'est configuré) |
-| `RESEND_API_KEY` ou `SMTP_*` | envoi réel des e-mails | vide |
+| `PRESSING_JWT_KEY` | clé de signature des jetons | vide : générée dans `jwt.key` à côté de la base |
+| `EMAIL_PROVIDER` | `auto`, `resend`, `smtp` ou `simulated` | `auto` |
+| `RESEND_*` ou `SMTP_*` | envoi réel des e-mails | vide |
+| `EMAIL_BACKGROUND_ENABLED` | traitement automatique de la file d'e-mails | `true` |
 | `PRESSING_TRUSTED_PROXIES` | IP des proxys de confiance (reverse proxy) | vide |
 
-Le fichier `.env` n'est **jamais** versionné.
+`PRESSING_API_URL` et `PRESSING_PUBLIC_API_URL` sont **différents** : le premier dit à l'API sur quelle adresse
+elle écoute (`0.0.0.0:5180` derrière un proxy) ; le second dit aux clients quelle adresse appeler
+(`https://api.exemple.local` si un reverse proxy termine TLS). En local, les deux valeurs par défaut pointent vers
+`localhost:5180`. Les en-têtes `X-Forwarded-For` / `X-Forwarded-Proto` ne sont acceptés que depuis la boucle locale
+ou les IP listées dans `PRESSING_TRUSTED_PROXIES` ; `X-Real-IP` n'est pas utilisé.
 
-**Installation sur plusieurs postes** : l'API tourne sur un poste « serveur » du pressing ; sur les autres postes,
-réglez `PRESSING_PUBLIC_API_URL=http://<ip-du-serveur>:5180` dans le `.env` du Desktop. Ne partagez jamais le fichier
-`.db` par le réseau : tous les postes passent par l'API.
+La clé JWT générée (`jwt.key`, à côté de la base) est ignorée par Git ; ne la copiez pas sur un autre poste
+(chaque serveur doit avoir la sienne).
+
+### 6.3 Activer les vrais e-mails
+
+Avec `EMAIL_PROVIDER=auto`, l'API choisit Resend si `RESEND_API_KEY` est rempli, sinon SMTP si `SMTP_HOST` est rempli,
+sinon le mode simulé (rien ne part, tout est journalisé).
+
+**Option A — Resend** (le plus simple) : créez une clé sur resend.com, puis :
+
+```
+RESEND_API_KEY=re_xxxxxxxx
+RESEND_FROM_EMAIL=contact@votre-domaine.com
+RESEND_FROM_NAME=Pressing Éclat
+```
+
+L'expéditeur de test `onboarding@resend.dev` n'envoie qu'à l'adresse du compte Resend : pour écrire aux clients,
+vérifiez votre domaine dans Resend et utilisez une adresse de ce domaine.
+
+**Option B — SMTP avec un mot de passe d'application** (Gmail, Outlook, OVH…). Exemple Gmail (la validation en
+deux étapes doit être active sur le compte pour créer un mot de passe d'application) :
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USE_SSL=true
+SMTP_USER=votre.adresse@gmail.com
+SMTP_APP_PASSWORD=xxxx xxxx xxxx xxxx
+```
+
+Vérifiez ensuite dans Desktop → **Paramètres → E-mails** : envoyez un e-mail de test et cochez les envois
+automatiques voulus (confirmation, commande prête, reçu).
+
+### 6.4 Plusieurs postes au comptoir
+
+1. Choisissez un poste « serveur » toujours allumé : il lance l'API et le site (`.\scripts\start.ps1 -SansDesktop`)
+   et garde la base sur **son disque local**.
+2. Sur ce serveur, ouvrez le port de l'API au réseau privé (PowerShell **administrateur**) ; ajoutez 5181 si des
+   clients consultent le site depuis le Wi-Fi de la boutique :
+
+   ```powershell
+   New-NetFirewallRule -DisplayName "Pressing API" -Direction Inbound -Protocol TCP -LocalPort 5180 -Action Allow -Profile Private
+   ```
+
+3. Sur chaque autre poste : installez le .NET SDK (ou le runtime Windows Desktop 10), récupérez le Desktop et placez
+   à côté un `.env` contenant `PRESSING_PUBLIC_API_URL=http://<ip-du-serveur>:5180`.
+4. Ne partagez **jamais** le fichier `.db` par le réseau : tous les postes passent par l'API.
+
+### 6.5 Ce qui n'est pas encore configurable
+
+Les rappels WhatsApp, l'assistant vocal IA, le paiement en ligne et les étiquettes QR font partie de la v3 en cours
+(voir [CONTRIBUTING.md](CONTRIBUTING.md) et `docs/Brief-etat-et-feuille-de-route-v3.pdf`) : aucune variable n'est à
+renseigner pour eux aujourd'hui. Le numéro WhatsApp saisi dans Paramètres → Boutique est seulement affiché.
+
+### 6.6 Dépannage
+
+| Symptôme | Cause probable et solution |
+| --- | --- |
+| « L'API ne répond pas encore » au démarrage | lire `logs\api.err.log` ; port 5180 déjà pris (`.\scripts\stop.ps1`, ou `Get-NetTCPConnection -LocalPort 5180`) |
+| Compilation : fichier verrouillé par `Pressing.Api` ou `Pressing.Desktop` | une instance tourne encore : `.\scripts\stop.ps1` puis recompiler |
+| Voyant rouge sous « Vérification du serveur » sur l'écran de connexion du Desktop | l'API est arrêtée, ou `PRESSING_PUBLIC_API_URL` pointe ailleurs (poste distant : pare-feu du serveur, 6.4) |
+| Le site affiche « service momentanément indisponible » | l'API est arrêtée : relancer `start.ps1` ; les formulaires saisis sont conservés |
+| Les e-mails restent « simulés » | aucune clé Resend ni hôte SMTP dans `.env`, ou API non redémarrée après la modification |
+| Le mot de passe admin du `.env` ne marche pas | la base existait déjà : le mot de passe n'est lu qu'à sa création ; changez-le dans Desktop → **Mon compte** |
+| `dotnet` introuvable ou « SDK not found » | installer le .NET SDK 10+ puis rouvrir le terminal |
 
 ## 7. Données et sauvegardes
 
 - Base : `%LOCALAPPDATA%\Pressing\pressing.db` (créée automatiquement, mode WAL, catalogue de 20 catégories et tarifs de départ).
 - **Paramètres → Sauvegardes → Sauvegarder maintenant** crée une copie vérifiée dans `Backups`.
 - Ne supprimez jamais `pressing.db`, `pressing.db-wal` ou `pressing.db-shm` : faites d'abord une sauvegarde.
-- Le schéma est créé avec `EnsureCreated` ; le passage aux migrations EF Core est le premier chantier de la v2 (voir CONTRIBUTING).
+- Le schéma est créé avec `EnsureCreated` ; le passage aux migrations EF Core est prévu dans les évolutions futures (voir CONTRIBUTING).
 
 ## 8. Architecture
 
@@ -147,7 +274,7 @@ Guides internes :
 - [docs/API.md](docs/API.md) — contrat de l'API et règles métier
 - [src/Pressing.Desktop/DESIGN.md](src/Pressing.Desktop/DESIGN.md) — charte de mise en page du Desktop
 - [src/Pressing.Desktop/README-DESKTOP.md](src/Pressing.Desktop/README-DESKTOP.md) — ajouter un écran au Desktop
-- [CONTRIBUTING.md](CONTRIBUTING.md) — **organisation de l'équipe et fonctionnalités avancées de la v2**
+- [CONTRIBUTING.md](CONTRIBUTING.md) — **organisation de l'équipe et fonctionnalités avancées à venir**
 
 ## 9. Tests et vérifications
 
@@ -162,8 +289,8 @@ Guides internes :
 
 ## 10. Suite du projet
 
-La v2 (notifications WhatsApp/SMS, paiement Mobile Money en ligne, collecte et livraison, étiquettes code-barres,
-clôture de caisse, migrations, CI, déploiement…) est répartie entre les 5 membres de l'équipe dans
+Les évolutions à venir (notifications WhatsApp/SMS, paiement Mobile Money en ligne, collecte et livraison,
+étiquettes code-barres, clôture de caisse, migrations, CI, déploiement…) sont réparties entre les 5 membres dans
 **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ## Équipe

@@ -10,11 +10,13 @@ public sealed class HomeController : Controller
 {
     private readonly PortalApi _portal;
     private readonly ShopDirectory _shop;
+    private readonly ILogger<HomeController> _logger;
 
-    public HomeController(PortalApi portal, ShopDirectory shop)
+    public HomeController(PortalApi portal, ShopDirectory shop, ILogger<HomeController> logger)
     {
         _portal = portal;
         _shop = shop;
+        _logger = logger;
     }
 
     [HttpGet("")]
@@ -29,12 +31,21 @@ public sealed class HomeController : Controller
     public async Task<IActionResult> Suivi(string? ticket, string? phone, CancellationToken ct)
     {
         var vm = new SuiviViewModel { Ticket = (ticket ?? "").Trim(), Phone = (phone ?? "").Trim() };
-        if (string.IsNullOrEmpty(vm.Ticket) && string.IsNullOrEmpty(vm.Phone)) return View(vm);
+        // Première ouverture : aucun paramètre dans l'URL. Une recherche avec des champs vides
+        // envoie bien ?ticket=&phone= : ASP.NET lie alors ces valeurs vides à null, mais les clés existent.
+        if (!Request.Query.ContainsKey("ticket") && !Request.Query.ContainsKey("phone")) return View(vm);
+
+        if (string.IsNullOrEmpty(vm.Ticket) && string.IsNullOrEmpty(vm.Phone))
+        {
+            vm.Searched = true;
+            vm.Error = SuiviViewModel.RequiredMessage;
+            return View(vm);
+        }
 
         vm.Searched = true;
         if (string.IsNullOrEmpty(vm.Ticket) || string.IsNullOrEmpty(vm.Phone))
         {
-            vm.Error = "Renseignez à la fois le numéro de ticket et le téléphone utilisé lors du dépôt.";
+            vm.Error = SuiviViewModel.PartialMessage;
             return View(vm);
         }
 
@@ -44,14 +55,19 @@ public sealed class HomeController : Controller
         }
         catch (ApiException ex) when (ex.StatusCode != HttpStatusCode.ServiceUnavailable && !ex.IsUnauthorized)
         {
-            vm.Error = ex.Message;
+            // Un 500 peut contenir un détail technique : on ne l'affiche pas, on le journalise seulement.
+            vm.Error = (int)ex.StatusCode >= 500
+                ? "Un incident imprévu s'est produit de notre côté. Réessayez dans un instant."
+                : ex.Message;
+            if ((int)ex.StatusCode >= 500)
+                _logger.LogError(ex, "Erreur API sur le suivi {Ticket} : {Detail}", vm.Ticket, ex.Detail ?? ex.Message);
         }
         return View(vm);
     }
 
     [HttpGet("contact")]
     public async Task<IActionResult> Contact(CancellationToken ct) =>
-        View(new ContactViewModel { Shop = await _shop.GetShopAsync(ct) });
+        View(RetryForm.Restore(TempData, new ContactViewModel { Shop = await _shop.GetShopAsync(ct) }));
 
     [HttpPost("contact")]
     public async Task<IActionResult> Contact(ContactForm form, CancellationToken ct)

@@ -7,7 +7,8 @@
         <h1 class="display-1">Service momentanément indisponible</h1>
         <p class="page-lede">Nous ne parvenons pas à joindre nos serveurs pour le moment. Vos commandes et vos données sont en sécurité : réessayez dans quelques instants.</p>
         <div class="status-actions">
-            <button class="btn btn-ink" type="button" data-reload>Réessayer</button>
+            @{ var retryUrl = ViewData["RetryUrl"] as string ?? "/"; }
+            <button class="btn btn-ink" type="button" data-reload data-retry-url="@retryUrl">Réessayer</button>
             <a class="btn btn-ghost-ink" href="/contact">Nous contacter</a>
         </div>
     </div>

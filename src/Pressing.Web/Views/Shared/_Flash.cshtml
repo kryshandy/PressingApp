@@ -13,6 +13,12 @@
             <div class="flash flash-@kind" role="@(kind == "error" ? "alert" : "status")">
                 @Icons.Svg(kind == "success" ? "check" : kind == "error" ? "alert" : "info", size: 20)
                 <p>@text</p>
+                @if (kind == "success")
+                {
+                    <button type="button" class="flash-close" data-close-flash aria-label="Fermer ce message" title="Fermer">
+                        @Icons.Svg("close", size: 16)
+                    </button>
+                }
             </div>
         }
     </div>

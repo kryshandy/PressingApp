@@ -193,6 +193,11 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Un seul hop accepté : un client ne peut pas fabriquer une chaîne de proxys pour changer son IP aux yeux
+    // de la limitation de débit. X-Real-IP n'est pas lu par l'application.
+    options.ForwardLimit = 1;
+    // Le site web n'envoie que X-Forwarded-For ; ne pas imposer autant d'entrées X-Forwarded-Proto.
+    options.RequireHeaderSymmetry = false;
     foreach (string raw in (Environment.GetEnvironmentVariable("PRESSING_TRUSTED_PROXIES") ?? string.Empty)
                  .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
     {
