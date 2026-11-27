@@ -26,6 +26,7 @@ public class PressingDbContext : DbContext
     public DbSet<StaffNotification> StaffNotifications => Set<StaffNotification>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+    public DbSet<ReminderLog> ReminderLogs => Set<ReminderLog>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -205,6 +206,12 @@ public class PressingDbContext : DbContext
         {
             entity.Property(n => n.Kind).HasConversion<string>();
             entity.HasIndex(n => new { n.IsRead, n.CreatedAt });
+        });
+
+        modelBuilder.Entity<ReminderLog>(entity =>
+        {
+            entity.HasIndex(r => new { r.OrderId, r.ReminderType }).IsUnique();
+            entity.HasIndex(r => r.SentAt);
         });
 
         modelBuilder.Entity<AppSetting>(entity =>

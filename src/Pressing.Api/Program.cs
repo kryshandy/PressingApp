@@ -92,6 +92,8 @@ builder.Services.AddScoped<CustomerAuthService>();
 builder.Services.AddScoped<StaffService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<ReportService>();
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+builder.Services.AddScoped<ReminderService>();
 
 if (emailOptions.EffectiveProvider == "resend")
 {
@@ -118,6 +120,8 @@ if (emailOptions.BackgroundEnabled)
 {
     builder.Services.AddHostedService<EmailBackgroundService>();
 }
+builder.Services.AddHostedService<ReminderBackgroundService>();
+
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -188,15 +192,15 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
-// IP réelle derrière le site web / un reverse proxy : boucle locale (par défaut) + PRESSING_TRUSTED_PROXIES
-// (adresses IP séparées par des virgules). Les autres sources ne peuvent pas imposer leur X-Forwarded-For.
+// IP rÃ©elle derriÃ¨re le site web / un reverse proxy : boucle locale (par dÃ©faut) + PRESSING_TRUSTED_PROXIES
+// (adresses IP sÃ©parÃ©es par des virgules). Les autres sources ne peuvent pas imposer leur X-Forwarded-For.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    // Un seul hop accepté : un client ne peut pas fabriquer une chaîne de proxys pour changer son IP aux yeux
-    // de la limitation de débit. X-Real-IP n'est pas lu par l'application.
+    // Un seul hop acceptÃ© : un client ne peut pas fabriquer une chaÃ®ne de proxys pour changer son IP aux yeux
+    // de la limitation de dÃ©bit. X-Real-IP n'est pas lu par l'application.
     options.ForwardLimit = 1;
-    // Le site web n'envoie que X-Forwarded-For ; ne pas imposer autant d'entrées X-Forwarded-Proto.
+    // Le site web n'envoie que X-Forwarded-For ; ne pas imposer autant d'entrÃ©es X-Forwarded-Proto.
     options.RequireHeaderSymmetry = false;
     foreach (string raw in (Environment.GetEnvironmentVariable("PRESSING_TRUSTED_PROXIES") ?? string.Empty)
                  .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -213,7 +217,7 @@ builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
-// Doit rester avant UseRateLimiter : la limitation de débit est partitionnée par l'IP déjà corrigée.
+// Doit rester avant UseRateLimiter : la limitation de dÃ©bit est partitionnÃ©e par l'IP dÃ©jÃ  corrigÃ©e.
 app.UseForwardedHeaders();
 app.UseMiddleware<ApiExceptionMiddleware>();
 app.UseAuthentication();
@@ -223,7 +227,7 @@ app.UseRateLimiter();
 app.MapOpenApi();
 app.MapGet("/", () => Results.Ok(new
 {
-    name = "Pressing Éclat API",
+    name = "Pressing Ã‰clat API",
     version = "2.0.0",
     documentation = "/openapi/v1.json",
     health = "/api/health"
@@ -267,7 +271,7 @@ static EmailOptions BuildEmailOptions(IConfiguration configuration)
         Provider = Read(configuration, "Email:Provider", "EMAIL_PROVIDER", "auto"),
         ResendApiKey = Read(configuration, "Email:ResendApiKey", "RESEND_API_KEY"),
         ResendFromEmail = Read(configuration, "Email:ResendFromEmail", "RESEND_FROM_EMAIL", "onboarding@resend.dev"),
-        ResendFromName = Read(configuration, "Email:ResendFromName", "RESEND_FROM_NAME", "Pressing Éclat"),
+        ResendFromName = Read(configuration, "Email:ResendFromName", "RESEND_FROM_NAME", "Pressing Ã‰clat"),
         SmtpHost = Read(configuration, "Email:SmtpHost", "SMTP_HOST"),
         SmtpPort = int.TryParse(Read(configuration, "Email:SmtpPort", "SMTP_PORT", "587"), out int port) ? port : 587,
         SmtpUseSsl = ReadBool(configuration, "Email:SmtpUseSsl", "SMTP_USE_SSL", true),

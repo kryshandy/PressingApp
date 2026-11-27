@@ -19,6 +19,24 @@ public class DatabaseInitializer
     {
         PressingDatabase.EnsureDirectory(_options.Path);
         await _db.Database.EnsureCreatedAsync(ct);
+
+        await _db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS ReminderLogs (
+                Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                OrderId INTEGER NOT NULL,
+                ClientId INTEGER NOT NULL,
+                ReminderType TEXT NOT NULL,
+                Channel TEXT NOT NULL,
+                SentAt TEXT NOT NULL,
+                Success INTEGER NOT NULL,
+                Error TEXT NULL
+            );
+            """, ct);
+
+        await _db.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_ReminderLogs_OrderId_ReminderType ON ReminderLogs (OrderId, ReminderType);", ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_ReminderLogs_SentAt ON ReminderLogs (SentAt);", ct);
         await _db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", ct);
         await _db.Database.ExecuteSqlRawAsync("PRAGMA synchronous=NORMAL;", ct);
         await _db.Database.ExecuteSqlRawAsync("PRAGMA busy_timeout=10000;", ct);
@@ -37,9 +55,9 @@ public class DatabaseInitializer
     }
 
     /// <summary>
-    /// Recalcule PhoneNormalized avec la règle courante (bases créées avec une ancienne règle).
-    /// Idempotent : ne touche que les clients dont la valeur diffère. Si deux clients aboutissent au même
-    /// numéro canonique (index unique), le second est laissé tel quel pour ne pas bloquer le démarrage.
+    /// Recalcule PhoneNormalized avec la rÃ¨gle courante (bases crÃ©Ã©es avec une ancienne rÃ¨gle).
+    /// Idempotent : ne touche que les clients dont la valeur diffÃ¨re. Si deux clients aboutissent au mÃªme
+    /// numÃ©ro canonique (index unique), le second est laissÃ© tel quel pour ne pas bloquer le dÃ©marrage.
     /// </summary>
     private async Task RenormalizePhonesAsync(CancellationToken ct)
     {
@@ -68,7 +86,7 @@ public class DatabaseInitializer
 
         if (changed)
         {
-            // Mise à jour en deux temps possible si des échanges de valeurs existent : les collisions sont ignorées plus haut.
+            // Mise Ã  jour en deux temps possible si des Ã©changes de valeurs existent : les collisions sont ignorÃ©es plus haut.
             await _db.SaveChangesAsync(ct);
         }
     }
