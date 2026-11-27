@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restauration
+        run: dotnet restore PressingApp.sln
+
+      - name: Compilation (avertissements = erreurs)
+        run: dotnet build PressingApp.sln --no-restore -c Release -warnaserror
+
+      - name: Tests
+        run: dotnet test PressingApp.sln --no-build -c Release --verbosity normal
+
+      # À activer quand l'autotest Desktop tourne sans fenêtre (à valider avec le script du dépôt) :
+      # - name: Autotest Desktop
+      #   run: ./scripts/build.ps1 -Tests
