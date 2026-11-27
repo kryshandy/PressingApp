@@ -19,6 +19,7 @@ public class DatabaseInitializer
     {
         PressingDatabase.EnsureDirectory(_options.Path);
         await _db.Database.EnsureCreatedAsync(ct);
+        await EnsureClientConsentColumnsAsync(ct);
 
         await _db.Database.ExecuteSqlRawAsync("""
             CREATE TABLE IF NOT EXISTS ReminderLogs (
@@ -88,6 +89,43 @@ public class DatabaseInitializer
         {
             // Mise Ã  jour en deux temps possible si des Ã©changes de valeurs existent : les collisions sont ignorÃ©es plus haut.
             await _db.SaveChangesAsync(ct);
+        }
+    }
+    private async Task EnsureClientConsentColumnsAsync(CancellationToken ct)
+    {
+        var columns = new HashSet<string>();
+
+        await using (var command = _db.Database.GetDbConnection().CreateCommand())
+        {
+            command.CommandText = "PRAGMA table_info('Clients');";
+
+            if (command.Connection!.State != System.Data.ConnectionState.Open)
+                await command.Connection.OpenAsync(ct);
+
+            await using var reader = await command.ExecuteReaderAsync(ct);
+
+            while (await reader.ReadAsync(ct))
+            {
+                columns.Add(reader.GetString(1));
+            }
+        }
+
+        if (!columns.Contains("NotificationPreference"))
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE Clients ADD COLUMN NotificationPreference TEXT NOT NULL DEFAULT 'None';", ct);
+        }
+
+        if (!columns.Contains("ConsentGivenAt"))
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE Clients ADD COLUMN ConsentGivenAt TEXT NULL;", ct);
+        }
+
+        if (!columns.Contains("ConsentRevokedAt"))
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE Clients ADD COLUMN ConsentRevokedAt TEXT NULL;", ct);
         }
     }
 }

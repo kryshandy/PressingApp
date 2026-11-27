@@ -1,10 +1,12 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Pressing.Core.Data;
 using Pressing.Core.Email;
 using Pressing.Core.Entities;
 using Pressing.Core.Messaging;
+using Pressing.Core.Options;
+using Pressing.Core.Security;
 
 namespace Pressing.Core.Services;
 
@@ -13,6 +15,8 @@ public sealed class ReminderService
     private readonly PressingDbContext _db;
     private readonly IWhatsAppTransport _whatsApp;
     private readonly EmailService _email;
+    private readonly EmailOptions _emailOptions;
+    private readonly TokenService _tokens;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<ReminderService> _logger;
 
@@ -20,12 +24,16 @@ public sealed class ReminderService
         PressingDbContext db,
         IWhatsAppTransport whatsApp,
         EmailService email,
+        EmailOptions emailOptions,
+        TokenService tokens,
         TimeProvider timeProvider,
         ILogger<ReminderService> logger)
     {
         _db = db;
         _whatsApp = whatsApp;
         _email = email;
+        _emailOptions = emailOptions;
+        _tokens = tokens;
         _timeProvider = timeProvider;
         _logger = logger;
     }
@@ -63,7 +71,9 @@ public sealed class ReminderService
         {
             ct.ThrowIfCancellationRequested();
 
-            if (order.Client is null || !order.Client.IsActive)
+            if (order.Client is null || !order.Client.IsActive ||
+                order.Client.NotificationPreference == ClientNotificationPreference.None ||
+                !order.Client.ConsentGivenAt.HasValue)
                 continue;
 
             var reminders = new List<(string Type, string Subject, string Body)>();
@@ -134,66 +144,70 @@ public sealed class ReminderService
                 bool delivered = false;
                 string channel = string.Empty;
 
-                string phone = !string.IsNullOrWhiteSpace(order.Client.WhatsApp)
-                    ? order.Client.WhatsApp
-                    : order.Client.Phone;
-
-                if (!string.IsNullOrWhiteSpace(phone))
+                if (order.Client.NotificationPreference == ClientNotificationPreference.WhatsApp)
                 {
-                    try
-                    {
-                        WhatsAppSendResult result = await _whatsApp.SendAsync(
-                            new WhatsAppMessage(phone, reminder.Body), ct);
+                    string phone = order.Client.WhatsApp;
 
-                        if (result.Success)
+                    if (!string.IsNullOrWhiteSpace(phone))
+                    {
+                        try
                         {
+                            WhatsAppSendResult result = await _whatsApp.SendAsync(
+                                new WhatsAppMessage(phone, reminder.Body), ct);
+
+                            if (result.Success)
+                            {
+                                delivered = true;
+                                channel = result.Simulated
+                                    ? "whatsapp-simulated"
+                                    : "whatsapp";
+                            }
+                            else
+                            {
+                                _logger.LogWarning(
+                                    "WhatsApp échoué pour la commande {OrderId}: {Error}",
+                                    order.Id, result.Error);
+                            }
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            _logger.LogError(ex,
+                                "Erreur WhatsApp pour la commande {OrderId}", order.Id);
+                        }
+                    }
+                }
+                else if (order.Client.NotificationPreference == ClientNotificationPreference.Email)
+                {
+                    if (!string.IsNullOrWhiteSpace(order.Client.Email))
+                    {
+                        try
+                        {
+                            string unsubscribeToken = _tokens.CreateUnsubscribeToken(order.ClientId);
+string unsubscribeUrl = $"{_emailOptions.AppBaseUrl}/api/public/unsubscribe?token={Uri.EscapeDataString(unsubscribeToken)}";
+string html = $"<p>{WebUtility.HtmlEncode(reminder.Body)}</p><hr><p style='font-size:12px;color:#666'>Vous recevez ce message parce que vous avez accepté les rappels par e-mail. <a href='{WebUtility.HtmlEncode(unsubscribeUrl)}'>Me désabonner</a></p>";
+
+                            await _email.QueueRawAsync(
+                                order.Client.Email,
+                                order.Client.FullName,
+                                reminder.Subject,
+                                html,
+                                reminder.Body,
+                                order.ClientId,
+                                order.Id,
+                                ct,
+                                template: "reminder");
+
                             delivered = true;
-                            channel = result.Simulated
-                                ? "whatsapp-simulated"
-                                : "whatsapp";
+                            channel = "email-queued";
                         }
-                        else
+                        catch (Exception ex) when (ex is not OperationCanceledException)
                         {
-                            _logger.LogWarning(
-                                "WhatsApp échoué pour la commande {OrderId}: {Error}",
-                                order.Id, result.Error);
+                            _logger.LogError(ex,
+                                "Mise en attente de l'e-mail échouée pour la commande {OrderId}",
+                                order.Id);
                         }
                     }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
-                    {
-                        _logger.LogError(ex,
-                            "Erreur WhatsApp pour la commande {OrderId}", order.Id);
-                    }
                 }
-
-                if (!delivered &&
-                    !string.IsNullOrWhiteSpace(order.Client.Email))
-                {
-                    try
-                    {
-                        string html = $"<p>{WebUtility.HtmlEncode(reminder.Body)}</p>";
-
-                        await _email.QueueRawAsync(
-                            order.Client.Email,
-                            order.Client.FullName,
-                            reminder.Subject,
-                            html,
-                            reminder.Body,
-                            order.ClientId,
-                            order.Id,
-                            ct);
-
-                        delivered = true;
-                        channel = "email-queued";
-                    }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
-                    {
-                        _logger.LogError(ex,
-                            "Mise en attente de l'e-mail échouée pour la commande {OrderId}",
-                            order.Id);
-                    }
-                }
-
                 if (!delivered)
                 {
                     _logger.LogWarning(

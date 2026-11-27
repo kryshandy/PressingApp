@@ -1,5 +1,6 @@
 using Pressing.Client;
 using Pressing.Core.Dtos;
+using Pressing.Core.Entities;
 using Pressing.Desktop.Ui;
 
 namespace Pressing.Desktop.Dialogs;
@@ -19,6 +20,7 @@ public sealed class ClientEditDialog : DialogForm
     private readonly InputBox _notes = new() { Multiline = true, PlaceholderText = "Préférences, remarques…" };
     private readonly ToggleBox _welcome = new() { Text = "Envoyer l'e-mail de bienvenue" };
     private readonly ToggleBox _active = new() { Text = "Client actif", Checked = true };
+    private readonly SelectBox _preference = new();
     private bool _whatsAppTouched;
 
     public ClientEditDialog(PressingApiClient api, ClientDto? existing = null)
@@ -37,6 +39,20 @@ public sealed class ClientEditDialog : DialogForm
         grid.AddField("Téléphone *", _phone);
         grid.AddField("WhatsApp *", _whatsApp);
         grid.AddField("E-mail", _email);
+        _preference.Format = value => value switch
+        {
+            ClientNotificationPreference.None => "Aucun rappel",
+            ClientNotificationPreference.WhatsApp => "WhatsApp",
+            ClientNotificationPreference.Email => "E-mail",
+            _ => value.ToString() ?? string.Empty
+        };
+        _preference.SetItems(new object[]
+        {
+            ClientNotificationPreference.None,
+            ClientNotificationPreference.WhatsApp,
+            ClientNotificationPreference.Email
+        });
+        grid.AddField("Canal de rappel", _preference, 2);
         if (existing is null)
         {
             grid.AddField("Mot de passe web", _password, 1, "Donne accès à l'espace client du site.");
@@ -76,6 +92,7 @@ public sealed class ClientEditDialog : DialogForm
             _phone.Text = existing.Phone;
             _whatsApp.Text = existing.WhatsApp;
             _email.Text = existing.Email ?? string.Empty;
+            _preference.SelectedItem = existing.NotificationPreference;
             _address.Text = existing.Address ?? string.Empty;
             _notes.Text = existing.Notes ?? string.Empty;
             _active.Checked = existing.IsActive;
@@ -143,12 +160,14 @@ public sealed class ClientEditDialog : DialogForm
                 string? password = string.IsNullOrEmpty(_password.Text) ? null : _password.Text;
                 Result = await _api.CreateClientAsync(new CreateClientRequest(
                     first, last, phone, whatsApp, email, address, notes, password,
-                    _welcome.Checked && email is not null && password is not null));
+                    _welcome.Checked && email is not null && password is not null,
+                    _preference.SelectedItem is ClientNotificationPreference createPreference ? createPreference : ClientNotificationPreference.None));
             }
             else
             {
                 Result = await _api.UpdateClientAsync(_existing.Id, new UpdateClientRequest(
-                    first, last, phone, whatsApp, email, address, notes, _active.Checked));
+                    first, last, phone, whatsApp, email, address, notes, _active.Checked,
+                    _preference.SelectedItem is ClientNotificationPreference updatePreference ? updatePreference : ClientNotificationPreference.None));
             }
         }, _existing is null ? "Création du client impossible" : "Modification impossible");
         if (ok)

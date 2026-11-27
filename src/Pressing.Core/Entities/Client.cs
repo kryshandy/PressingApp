@@ -40,6 +40,12 @@ public class Client
 
     public int LoyaltyPoints { get; set; }
 
+    public ClientNotificationPreference NotificationPreference { get; set; } = ClientNotificationPreference.None;
+
+    public DateTime? ConsentGivenAt { get; set; }
+
+    public DateTime? ConsentRevokedAt { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     public DateTime UpdatedAt { get; set; } = DateTime.Now;

@@ -58,6 +58,7 @@ public class PressingDbContext : DbContext
             entity.Property(c => c.LastName).HasMaxLength(80).IsRequired();
             entity.Property(c => c.Phone).HasMaxLength(30).IsRequired();
             entity.Property(c => c.WhatsApp).HasMaxLength(30).IsRequired();
+            entity.Property(c => c.NotificationPreference).HasConversion<string>();
         });
 
         modelBuilder.Entity<StaffUser>(entity =>

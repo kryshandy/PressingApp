@@ -61,7 +61,8 @@ public enum EmailStatus
     Pending = 0,
     Sent = 1,
     Failed = 2,
-    Simulated = 3
+    Simulated = 3,
+    Cancelled = 4
 }
 
 public enum PromotionType

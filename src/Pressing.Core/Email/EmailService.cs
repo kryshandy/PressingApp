@@ -100,7 +100,8 @@ public class EmailService
         string? text = null,
         int? clientId = null,
         int? orderId = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string template = "generic")
     {
         var message = new EmailMessage
         {
@@ -109,7 +110,7 @@ public class EmailService
             Subject = subject,
             HtmlBody = html,
             TextBody = text,
-            Template = "generic",
+            Template = template,
             Status = EmailStatus.Pending,
             CreatedAt = DateTime.Now,
             RelatedClientId = clientId,
@@ -240,6 +241,25 @@ public class EmailService
 
     private async Task<bool> ProcessMessageAsync(EmailMessage message, CancellationToken ct)
     {
+        if (message.Template == "reminder")
+        {
+            var client = message.RelatedClientId.HasValue
+                ? await _db.Clients.FirstOrDefaultAsync(
+                    c => c.Id == message.RelatedClientId.Value, ct)
+                : null;
+
+            if (client is null ||
+                client.NotificationPreference != ClientNotificationPreference.Email ||
+                !client.ConsentGivenAt.HasValue ||
+                client.ConsentRevokedAt.HasValue)
+            {
+                message.Status = EmailStatus.Cancelled;
+                message.Error = "Rappel annulé : consentement e-mail absent ou révoqué.";
+                await _db.SaveChangesAsync(ct);
+                return false;
+            }
+        }
+
         message.Attempts++;
         try
         {
