@@ -88,9 +88,9 @@ public sealed class AccountController : Controller
                 ModelState.AddModelError("", ex.Message);
             }
         }
+
         return View(form);
     }
-
     [AllowAnonymous]
     [HttpGet("reinitialiser")]
     public IActionResult Reset(string? token) => View(new ResetForm { Token = token ?? "" });
@@ -107,14 +107,21 @@ public sealed class AccountController : Controller
                 TempData["Success"] = r?.Message ?? "Votre mot de passe a été modifié. Vous pouvez vous connecter.";
                 return RedirectToAction(nameof(Login));
             }
+            catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.ServiceUnavailable)
+            {
+                TempData["Error"] = "Le service est temporairement indisponible. Réessayez dans quelques instants.";
+                return RedirectToAction(nameof(Reset), new { token = form.Token });
+            }
             catch (ApiException ex) when (IsFormError(ex))
             {
                 ModelState.AddModelError("", ex.Message);
             }
         }
+
         form.NewPassword = form.ConfirmPassword = "";
         return View(form);
     }
+
 
     // ---------------------------------------------------------------- Tableau de bord, commandes
 
