@@ -175,6 +175,18 @@ public record OrderDetailViewModel(OrderDto Order);
 
 public record LoyaltyViewModel(ClientDto Client, IReadOnlyList<LoyaltyTransactionDto> Transactions);
 
+/// <summary>Page /avis (lien de l'enquête de satisfaction).</summary>
+public class AvisViewModel
+{
+    public string Token { get; set; } = "";
+    /// <summary>null : lien invalide ou expiré.</summary>
+    public FeedbackFormDto? Form { get; set; }
+    public int? Note { get; set; }
+    public string? Comment { get; set; }
+    public string? Done { get; set; }
+    public string? Error { get; set; }
+}
+
 /// <summary>Page /desabonnement (lien des e-mails de rappel).</summary>
 public class UnsubscribeViewModel
 {

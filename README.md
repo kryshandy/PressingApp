@@ -37,9 +37,15 @@ Les trois partagent **la même base SQLite** à travers l'API : un dépôt enreg
 ### Sécurité et fiabilité
 - Mots de passe hachés (PBKDF2), jetons JWT revérifiés à chaque requête (compte désactivé ou rôle changé = accès coupé).
 - Un client ne voit **que ses propres** commandes et reçus.
-- Limitation des tentatives de connexion par adresse IP.
+- Limitation des tentatives de connexion par adresse IP ; **verrouillage d'un compte du personnel après 5 échecs
+  consécutifs (15 minutes)**, déverrouillable par un administrateur (écran Personnel).
+- **Double authentification (application Google/Microsoft Authenticator) pour les managers**, exigée par défaut ;
+  l'administrateur peut ne plus l'exiger (Paramètres → Sécurité) ou la réinitialiser pour un manager (écran Personnel).
+- Mots de passe du personnel : 8 caractères minimum, avec au moins une lettre et un chiffre.
+- **Enquête de satisfaction** : 2 h après le retrait complet, un client consentant reçoit un lien vers la page `/avis`
+  du site (note de 1 à 5 et commentaire) ; les avis et la moyenne sont dans l'écran Rappels et sur le tableau de bord.
 - Journal d'audit de toutes les opérations sensibles.
-- **253 tests automatisés** (calculs, paiements, retraits, droits, portail, suivi, reprise après panne de l'API,
+- **plus de 450 tests automatisés** (calculs, paiements, retraits, droits, portail, suivi, reprise après panne de l'API,
   migrations, rappels, désinscription, assistant vocal).
 
 ---
@@ -117,7 +123,7 @@ Créés automatiquement **au premier démarrage** de l'API (une base déjà cré
 | Rôle | Identifiant | Mot de passe |
 | --- | --- | --- |
 | Administrateur | `admin` | `Admin@2026!` (variables `PRESSING_ADMIN_USERNAME` / `PRESSING_ADMIN_PASSWORD`) |
-| Manager | `manager` | `Manager@2026!` |
+| Manager | `manager` | `Manager@2026!` (à la première connexion, le Desktop demande d'activer la double authentification) |
 | Caissier | `caisse` | `Caisse@2026!` |
 | Clients démo (site web) | leur téléphone ou e-mail (voir l'écran Clients) | `Client@2026!` |
 
@@ -271,6 +277,13 @@ automatiques voulus (confirmation, commande prête, reçu).
   statut *Approuvé* (quelques minutes à quelques heures chez Meta), puis redémarrez l'API. Un modèle qui n'a pas le
   bon nombre de variables est refusé par Meta : l'envoi est alors journalisé en échec dans l'écran Rappels. La relance
   manuelle part toujours en texte libre : elle n'aboutit que si le client a écrit au pressing dans les 24 dernières heures.
+- **Enquête de satisfaction** : mêmes règles de consentement, de plage horaire (8 h – 20 h) et de journal. Une demande part
+  une seule fois par commande, 2 h après le retrait complet, avec un lien `PRESSING_WEB_URL/avis?token=…` valable 14 jours.
+  Pour WhatsApp, créez un modèle « avis » (`{{1}}` prénom, `{{2}}` ticket, `{{3}}` lien) et renseignez
+  `WHATSAPP_TEMPLATE_FEEDBACK`. Le Desktop (Manager/Admin) montre la note moyenne des 30 jours sur le tableau de bord
+  et la liste des avis dans l'écran Rappels (bouton « Avis clients »).
+- **Double authentification** : sauvegardez le dossier `dataprotection-keys` (à côté de la base) avec la base ; sans lui, les
+  secrets enregistrés sont illisibles et un administrateur doit réinitialiser la 2FA des managers concernés.
 - Pour tout couper : `REMINDERS_ENABLED=false`.
 
 Pas encore disponibles (v3 en cours, voir `docs/Bilan-integration-et-attentes.pdf`) : l'assistant vocal IA, les

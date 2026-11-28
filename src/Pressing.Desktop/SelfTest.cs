@@ -792,6 +792,40 @@ internal static class SelfTest
             Check(!(await api.GetStaffAsync())!.Single(m => m.Username == "manager").TwoFactorEnabled, "2FA du manager réinitialisée");
         });
 
+        await Step("Satisfaction : liste des avis, carte du tableau de bord et section « Avis clients » de l'écran Rappels", async () =>
+        {
+            FeedbackPageDto? page = await api.GetFeedbackAsync(1, 10, 30);
+            Check(page is { Total: >= 0, Page: 1 }, "liste des avis");
+            using PressingApiClient cashier = new(apiUrl);
+            await cashier.LoginStaffAsync("caisse", "Caisse@2026!");
+            try
+            {
+                await cashier.GetFeedbackAsync();
+                Check(false, "la liste des avis est réservée au responsable");
+            }
+            catch (ApiException ex)
+            {
+                Check(ex.IsForbidden, "caissier : 403 attendu");
+            }
+
+            RemindersView reminders = new(fake);
+            hostForm.Controls.Add(reminders);
+            reminders.Dock = DockStyle.Fill;
+            await reminders.LoadAsync();
+            await (Task)typeof(RemindersView).GetMethod("ToggleFeedbackAsync", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(reminders, null)!;
+            await Capture(reminders, screensDir, "view-reminders-feedback");
+            hostForm.Controls.Remove(reminders);
+            reminders.Dispose();
+
+            DashboardView dashboard = new(fake);
+            hostForm.Controls.Add(dashboard);
+            dashboard.Dock = DockStyle.Fill;
+            await dashboard.LoadAsync();
+            await Capture(dashboard, screensDir, "view-dashboard-satisfaction");
+            hostForm.Controls.Remove(dashboard);
+            dashboard.Dispose();
+        });
+
         // Coque complète à plusieurs tailles de fenêtre (px logiques, DESIGN.md §6) : PRESSING_TEST_SIZES="1280x760,1600x900".
         foreach (Size logical in ShellSizes())
         {

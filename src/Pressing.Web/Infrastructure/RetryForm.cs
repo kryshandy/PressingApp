@@ -130,7 +130,7 @@ public static class RetryForm
         string path = (http.Request.Path.Value ?? "/").TrimEnd('/').ToLowerInvariant();
         switch (path)
         {
-            case "/compte/reinitialiser" or "/desabonnement":
+            case "/compte/reinitialiser" or "/desabonnement" or "/avis":
             {
                 string? token = FormValue(http, "Token");
                 return string.IsNullOrWhiteSpace(token) ? path : path + "?token=" + Uri.EscapeDataString(token);

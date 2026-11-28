@@ -630,3 +630,14 @@ body.has-tabbar { padding-bottom: 72px; }
 @media (min-width: 992px) {
     .filter-bar { position: sticky; top: calc(var(--header-h) + .5rem); z-index: 20; }
 }
+
+/* Enquête de satisfaction (/avis) : cinq choix de note, accessibles au clavier */
+.rating { border: 0; padding: 0; margin: 0 0 1.1rem; display: flex; flex-direction: column; gap: .5rem; }
+.rating legend { font-size: .875rem; font-weight: 600; color: var(--ink); padding: 0; margin-bottom: .25rem; }
+.rating-choices { display: flex; gap: .5rem; flex-wrap: wrap; }
+.rating-choices input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.rating-choices label { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: .1rem; min-width: 3.6rem; padding: .6rem .8rem; border: 1px solid var(--line, #d9d2c3); border-radius: .75rem; cursor: pointer; font-weight: 700; background: #fff; }
+.rating-choices label small { font-weight: 400; color: var(--muted); font-size: .7rem; }
+.rating-choices input:checked + label { background: var(--ink); color: #fff; border-color: var(--ink); }
+.rating-choices input:checked + label small { color: #fff; }
+.rating-choices input:focus-visible + label { outline: 3px solid var(--brass, #b08d3c); outline-offset: 2px; }

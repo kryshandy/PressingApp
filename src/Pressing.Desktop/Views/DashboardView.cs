@@ -16,6 +16,7 @@ public sealed class DashboardView : BaseView
     private readonly StatCard _ready;
     private readonly StatCard _overdue;
     private readonly StatCard _outstanding;
+    private readonly StatCard? _satisfaction;
     private readonly TitledCard _chartCard;
     private readonly RevenueChart _chart = new();
     private readonly StatusBars _status = new();
@@ -36,6 +37,12 @@ public sealed class DashboardView : BaseView
         _ready = new StatCard("Prêtes à retirer", "—", Theme.Green, "À remettre aux clients");
         _overdue = new StatCard("En retard", "—", Theme.Red, "Date de retrait dépassée");
         _outstanding = new StatCard("Impayés", "—", Theme.Amber, "Soldes à encaisser");
+        if (Session.IsManagerOrAdmin)
+        {
+            _satisfaction = new StatCard("Satisfaction", "—", Theme.Green, "Avis des 30 derniers jours");
+            _satisfaction.MakeClickable(() => Host.Navigate(NavRegistry.Reminders));
+        }
+
         _active.MakeClickable(() => Host.Navigate(NavRegistry.Orders));
         _ready.MakeClickable(() => Host.Navigate(NavRegistry.Orders, new OrdersFilter { OnlyReady = true }));
         _overdue.MakeClickable(() => Host.Navigate(NavRegistry.Orders));
@@ -55,7 +62,9 @@ public sealed class DashboardView : BaseView
 
         // Grille de 12 : KPI 4+4+4 sur deux lignes de même hauteur, 8+4 (graphique + statuts), 6+6 (listes).
         VStack page = new VStack()
-            .Add(new GridRow().Add(_revenueToday, 4).Add(_revenueMonth, 4).Add(_outstanding, 4))
+            .Add(_satisfaction is null
+                ? new GridRow().Add(_revenueToday, 4).Add(_revenueMonth, 4).Add(_outstanding, 4)
+                : new GridRow().Add(_revenueToday, 3).Add(_revenueMonth, 3).Add(_outstanding, 3).Add(_satisfaction, 3))
             .Add(new GridRow().Add(_active, 4).Add(_ready, 4).Add(_overdue, 4))
             .Add(new GridRow(352).Add(_chartCard, 8).Add(statusCard, 4))
             .Add(new GridRow().Add(recentCard, 6).Add(readyCard, 6));
@@ -111,6 +120,24 @@ public sealed class DashboardView : BaseView
         _ready.Set(data.ReadyOrders.ToString());
         _overdue.Set(data.OverdueOrders.ToString());
         _outstanding.Set(Fmt.Money(data.OutstandingTotal));
+        if (_satisfaction is not null)
+        {
+            FeedbackPageDto? feedback = await Api.GetFeedbackAsync(1, 1, 30);
+            if (!Alive)
+            {
+                return;
+            }
+
+            if (feedback is { Count: > 0, Average: { } average })
+            {
+                _satisfaction.Set($"{average:0.0} / 5", $"{feedback.Count} avis sur 30 jours");
+            }
+            else
+            {
+                _satisfaction.Set("—", "Aucun avis sur 30 jours");
+            }
+        }
+
         _chart.SetData(data.Last7Days);
         _chartCard.Subtitle = $"Total de la semaine : {Fmt.Money(data.Last7Days.Sum(p => p.Revenue))}";
         _status.SetData(data.StatusBreakdown);

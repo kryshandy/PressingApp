@@ -45,6 +45,28 @@ public sealed class RemindersView : BaseView
         public Color? GetTint(string columnName) => columnName == "ticket" ? Theme.Accent : null;
     }
 
+    private sealed class FeedbackRow : IPillRow
+    {
+        public FeedbackRow(FeedbackDto f)
+        {
+            Source = f;
+            Date = Fmt.DateTime(f.CreatedAt);
+            Ticket = f.TicketNumber;
+            Client = f.ClientName;
+            Comment = string.IsNullOrWhiteSpace(f.Comment) ? "—" : f.Comment.ReplaceLineEndings(" ");
+        }
+
+        public FeedbackDto Source { get; }
+        public string Date { get; }
+        public string Ticket { get; }
+        public string Client { get; }
+        public string Comment { get; }
+
+        public (string Text, Color Color)? GetPill(string columnName) => columnName == "note"
+            ? ($"{Source.Note} / 5", Source.Note >= 4 ? Theme.Green : Source.Note == 3 ? Theme.Amber : Theme.Red)
+            : null;
+    }
+
     private const int PageSize = 25;
 
     private readonly StatCard _total = new("Rappels journalisés", "—", Theme.Blue);
@@ -59,13 +81,25 @@ public sealed class RemindersView : BaseView
     {
         Text = "Relancer le client", Kind = ButtonKind.Secondary, IconGlyph = Icons.Mail, Enabled = false
     };
+    private readonly StatCard _average = new("Note moyenne (30 jours)", "—", Theme.Green);
+    private readonly StatCard _feedbackCount = new("Avis reçus (30 jours)", "—", Theme.Blue);
+    private readonly StatCard _feedbackLast = new("Dernier avis", "—", Theme.Violet);
+    private readonly GridCard _feedbackCard = new("Aucun avis pour le moment. Les clients consentants reçoivent le lien 2 h après le retrait.");
+    private readonly PagerBar _feedbackPager = new();
+    private readonly FlatButton _switch = new() { Text = "Avis clients", Kind = ButtonKind.Secondary, IconGlyph = Icons.Info };
+    private readonly List<Control> _journalBlocks = new();
+    private readonly List<Control> _feedbackBlocks = new();
+    private GridRow? _filters;
+    private bool _showFeedback;
     private int _page = 1;
+    private int _feedbackPage = 1;
     private int _version;
 
     public RemindersView(IAppHost host) : base(host)
     {
         PageHeader header = new("Rappels", "Journal des rappels WhatsApp et e-mail, et relance manuelle des clients consentants");
         header.AddAction("Actualiser", ButtonKind.Secondary, Icons.Refresh, async (_, _) => await RunAsync(RefreshAsync));
+        header.AddControl(_switch);
 
         _type.SetChoices(new[]
         {
@@ -76,7 +110,8 @@ public sealed class RemindersView : BaseView
             new Choice<string?>("uncollected-j14", "Dernier rappel (14 jours)"),
             new Choice<string?>("unpaid-balance", "Solde impayé"),
             new Choice<string?>("due-tomorrow", "Échéance demain"),
-            new Choice<string?>("manual", "Relance manuelle")
+            new Choice<string?>("manual", "Relance manuelle"),
+            new Choice<string?>("feedback", "Demande d'avis")
         }, null);
         _channel.SetChoices(new[]
         {
@@ -109,11 +144,40 @@ public sealed class RemindersView : BaseView
             "Sélectionnez une ligne puis « Relancer le client » : l'envoi exige le consentement du client", flushContent: true);
         list.AddAction(_resend);
 
+        ThemedGrid feedbackGrid = _feedbackCard.Grid;
+        feedbackGrid.AddText("date", "REÇU LE", nameof(FeedbackRow.Date), fixedWidth: 148);
+        feedbackGrid.AddText("ticket", "TICKET", nameof(FeedbackRow.Ticket), fixedWidth: 164);
+        feedbackGrid.AddText("client", "CLIENT", nameof(FeedbackRow.Client), 40, minWidth: 150);
+        feedbackGrid.AddPill("note", "NOTE", fixedWidth: 104);
+        feedbackGrid.AddText("comment", "COMMENTAIRE", nameof(FeedbackRow.Comment), 100, minWidth: 200);
+        feedbackGrid.SetOptional("ticket");
+        TitledCard feedbackList = new("Avis des clients", _feedbackCard,
+            "Réponses à l'enquête de satisfaction envoyée 2 h après le retrait complet d'une commande", flushContent: true);
+
+        GridRow journalKpis = new GridRow().Add(_total, 4).Add(_failed, 4).Add(_last, 4);
+        GridRow feedbackKpis = new GridRow().Add(_average, 4).Add(_feedbackCount, 4).Add(_feedbackLast, 4);
+        _journalBlocks.AddRange(new Control[] { journalKpis, list, _pager });
+        _feedbackBlocks.AddRange(new Control[] { feedbackKpis, feedbackList, _feedbackPager });
+        foreach (Control block in _feedbackBlocks)
+        {
+            block.Visible = false;
+        }
+
+        _filters = filters;
         VStack page = new VStack(16)
-            .Add(new GridRow().Add(_total, 4).Add(_failed, 4).Add(_last, 4), StackSize.Auto)
+            .Add(journalKpis, StackSize.Auto)
             .Add(list, StackSize.Fill)
-            .Add(_pager);
+            .Add(_pager)
+            .Add(feedbackKpis, StackSize.Auto)
+            .Add(feedbackList, StackSize.Fill)
+            .Add(_feedbackPager);
         SetPage(header, page, toolbar: filters);
+        _switch.Click += async (_, _) => await ToggleFeedbackAsync();
+        _feedbackPager.PageRequested += async (_, p) =>
+        {
+            _feedbackPage = p;
+            await RunAsync(QueryFeedbackAsync);
+        };
 
         _pager.PageRequested += async (_, p) =>
         {
@@ -128,9 +192,57 @@ public sealed class RemindersView : BaseView
 
     public override string Title => "Rappels";
 
-    public override Task LoadAsync() => QueryAsync();
+    public override Task LoadAsync() => _showFeedback ? QueryFeedbackAsync() : QueryAsync();
 
-    public override Task ReactivateAsync() => QueryAsync();
+    public override Task ReactivateAsync() => LoadAsync();
+
+    private async Task ToggleFeedbackAsync()
+    {
+        _showFeedback = !_showFeedback;
+        foreach (Control block in _journalBlocks)
+        {
+            block.Visible = !_showFeedback;
+        }
+
+        foreach (Control block in _feedbackBlocks)
+        {
+            block.Visible = _showFeedback;
+        }
+
+        if (_filters is not null)
+        {
+            _filters.Visible = !_showFeedback;
+        }
+
+        _switch.Text = _showFeedback ? "Journal des envois" : "Avis clients";
+        this.RequestPageLayout();
+        await RunAsync(LoadAsync);
+    }
+
+    private async Task QueryFeedbackAsync()
+    {
+        FeedbackPageDto? page = await Api.GetFeedbackAsync(_feedbackPage, PageSize);
+        FeedbackPageDto? month = await Api.GetFeedbackAsync(1, 1, 30);
+        if (!Alive || page is null || month is null)
+        {
+            return;
+        }
+
+        _feedbackCard.Grid.SetRows(page.Items.Select(f => new FeedbackRow(f)).ToList());
+        _feedbackCard.UpdateEmpty();
+        _feedbackPager.Update(page.Page, page.TotalPages, page.Total, "avis");
+        _average.Set(month.Average is { } avg ? $"{avg:0.0} / 5" : "—", month.Count == 0 ? "aucun avis sur 30 jours" : "moyenne des avis récents");
+        _feedbackCount.Set(month.Count.ToString(), "sur 30 jours");
+        if (page.Items.Count > 0)
+        {
+            FeedbackDto latest = page.Items[0];
+            _feedbackLast.Set($"{latest.Note} / 5", $"{latest.TicketNumber} · {Fmt.DateTime(latest.CreatedAt)}");
+        }
+        else
+        {
+            _feedbackLast.Set("—", "aucun avis");
+        }
+    }
 
     private async Task FilterChangedAsync()
     {
