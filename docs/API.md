@@ -156,20 +156,29 @@ de version du logiciel.
 
 ## Assistant vocal (v3 — lot M1/M2)
 
-> **Statut : contrat figé (T2.1).** Les routes sont implémentées par T2.3 ; tant que cette PR n'est pas fusionnée,
-> elles répondent `404`. Les DTO sont dans `src/Pressing.Core/Dtos/AssistantDtos.cs`.
+> **Statut : routes implémentées (T2.3), contrat figé (T2.1).** Les DTO sont dans `src/Pressing.Core/Dtos/AssistantDtos.cs`.
 > Principe non négociable : **l'IA ne touche jamais la base**. Ces routes ne créent aucune commande, aucun paiement,
 > aucun retrait : elles renvoient un **brouillon** que le caissier vérifie, puis valide par les routes existantes
 > (`POST /api/orders`, retraits, paiements, statuts).
 
 | Méthode | Route | Politique | Corps / query | Réponse |
 | --- | --- | --- | --- | --- |
-| GET | `/api/assistant/status` | StaffOnly | | `AssistantStatusDto` (activé ? moteurs prêts ? seuil de confiance) |
-| POST | `/api/assistant/transcribe` | StaffOnly | WAV, `multipart/form-data`, **2 Mo maximum** (`400` au-delà, `403` hors personnel) | `AssistantTranscriptionDto` — l'audio n'est jamais stocké |
+| GET | `/api/assistant/status` | StaffOnly | | `AssistantStatusDto` (activé ? moteurs prêts ? seuil de confiance, message) — répond même si l'assistant est désactivé |
+| POST | `/api/assistant/transcribe` | StaffOnly | Corps **brut** `audio/wav`, **2 Mo maximum** | `AssistantTranscriptionDto` — l'audio n'est jamais stocké |
 | POST | `/api/assistant/interpret` | StaffOnly | `AssistantInterpretRequest` (`text`, 1000 caractères maximum) | `OrderDraftDto` |
 
-Toutes trois sont soumises à la limitation de débit (`429`) et journalisées (`AuditService.LogAsync("assistant", …)`,
-le **texte** seul, jamais l'audio). Moteur arrêté ou assistant désactivé : `400` « L'assistant vocal n'est pas démarré ».
+Codes de réponse :
+
+| Code | Cas |
+| --- | --- |
+| `200` | Succès. |
+| `400` | Fichier de plus de 2 Mo, vide ou qui n'est pas un WAV (en-tête `RIFF`/`WAVE`) ; texte vide ou de plus de 1000 caractères. |
+| `401` / `403` | Pas de jeton / jeton non « personnel » (un client du portail reçoit `403`). |
+| `429` | Plus de 30 requêtes par minute et par utilisateur (limitation de débit). |
+| `503` | Assistant désactivé (`ASSISTANT_ENABLED=false`), moteurs non installés ou arrêtés : « L'assistant vocal n'est pas démarré ». |
+
+Chaque appel aboutissant est journalisé (`AuditService.LogAsync("assistant", …)`) avec le **texte** uniquement, jamais l'audio.
+Réglages : `ASSISTANT_ENABLED` (défaut `true`) et `ASSISTANT_CONFIDENCE_THRESHOLD` (défaut `0.6`), voir `.env.example`.
 
 ### Contrat d'intention (sortie du modèle de langage → `AssistantIntentDto`)
 
