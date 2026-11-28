@@ -98,7 +98,8 @@ dotnet test PressingApp.sln --no-build
 # Banc vocal TTS sans enregistrement humain (solution retenue, NON réel).
 .\tools\assistant\eval\generer-dataset-tts.ps1
 .\tools\assistant\eval\valider-dataset.ps1 -Dataset .\tools\assistant\eval\dataset-tts.jsonl -Source tts -Prefix T -RequireAudio -AudioRoot .\tools\assistant\eval
-.\tools\assistant\bench.ps1 -Dataset .\tools\assistant\eval\dataset-tts.jsonl -AudioRoot .\tools\assistant\eval -Source tts -Output .\tools\assistant\eval\resultats\banc-tts-150.md
+.\tools\assistant\bench.ps1 -Dataset .\tools\assistant\eval\dataset-tts.jsonl -AudioRoot .\tools\assistant\eval -Source tts -Output .\tools\assistant\eval\resultats\banc-tts-150.md -RawDump .\tools\assistant\eval\resultats\banc-tts-150-brut.jsonl
+dotnet tools\assistant\eval\EvaluationHarness\bin\Debug\net10.0\EvaluationHarness.dll --recompute-from-jsonl tools\assistant\eval\resultats\banc-tts-150-brut.jsonl tools\assistant\eval\resultats\banc-tts-150-apres-garde-fous 'banc-tts-150-apres-garde-fous'
 
 # Latence séparée du LLM (prompt / génération / HTTP / tokens) et de Whisper.
 .\tools\assistant\bench-latency.ps1 -Output .\tools\assistant\eval\latency\mesure.jsonl -Count 6

@@ -22,14 +22,15 @@ Aucun enregistrement client avec consentement n'a été fourni. Tout chiffre iss
 
 ## Solution retenue : banc vocal TTS sans enregistrement humain
 
-Aucun enregistrement n'étant prévu, la validation technique est assurée par un banc **reproductible et automatisable** : les 150 phrases sont synthétisées localement par la voix Windows en WAV 16 kHz mono PCM 16 bits, puis envoyées à la chaîne complète Whisper → LLM → garde-fous. Le jeu est `dataset-tts.jsonl` (`T001`–`T150`, `source: "tts"`, `consentement: "sans objet - voix de synthese Windows"`) ; les WAV sont dans `audio-tts/`, ignorés par Git.
+Aucun enregistrement n'étant prévu, la validation technique est assurée par un banc **reproductible et automatisable** : les 150 phrases sont synthétisées localement par la voix Windows en WAV 16 kHz mono PCM 16 bits, puis envoyées à Whisper et au LLM local. Le jeu est `dataset-tts.jsonl` (`T001`–`T150`, `source: "tts"`, `consentement: "sans objet - voix de synthese Windows"`) ; les WAV sont dans `audio-tts/`, ignorés par Git.
 
-Ce banc fournit une vérité terrain connue et mesure réellement la chaîne audio. Il **ne produit pas un WER client** : les résultats sont publiés dans `resultats/banc-tts-150.md` avec la mention « TTS synthétique — non réel ».
+Le banc trace les réponses brutes dans `resultats/banc-tts-150-brut.jsonl`, puis `EvaluationHarness --recompute-from-jsonl` les rejoue à travers les **vrais garde-fous C#** sans nouvel appel réseau. Le rapport distingue donc « sortie brute du LLM » et « sortie du produit après garde-fous ». Il **ne produit pas un WER client** : les résultats sont publiés dans `resultats/banc-tts-150.md` avec la mention « TTS synthétique — non réel ».
 
 ```powershell
 .\tools\assistant\eval\generer-dataset-tts.ps1
 .\tools\assistant\eval\valider-dataset.ps1 -Dataset .\tools\assistant\eval\dataset-tts.jsonl -Source tts -Prefix T -RequireAudio -AudioRoot .\tools\assistant\eval
-.\tools\assistant\bench.ps1 -Dataset .\tools\assistant\eval\dataset-tts.jsonl -AudioRoot .\tools\assistant\eval -Source tts -Output .\tools\assistant\eval\resultats\banc-tts-150.md
+.\tools\assistant\bench.ps1 -Dataset .\tools\assistant\eval\dataset-tts.jsonl -AudioRoot .\tools\assistant\eval -Source tts -Output .\tools\assistant\eval\resultats\banc-tts-150.md -RawDump .\tools\assistant\eval\resultats\banc-tts-150-brut.jsonl
+dotnet tools\assistant\eval\EvaluationHarness\bin\Debug\net10.0\EvaluationHarness.dll --recompute-from-jsonl tools\assistant\eval\resultats\banc-tts-150-brut.jsonl tools\assistant\eval\resultats\banc-tts-150-apres-garde-fous 'banc-tts-150-apres-garde-fous'
 ```
 
 Le validateur parcourt désormais les chunks RIFF : les WAV générés par SAPI contiennent des chunks supplémentaires avant `data`, que l'ancien lecture à offset fixe rejetait à tort.

@@ -20,7 +20,8 @@ param(
     [ValidateSet('base', 'small')]
     [string]$WhisperModel = 'base',
     [ValidateSet('reel', 'tts')]
-    [string]$Source = 'reel'
+    [string]$Source = 'reel',
+    [string]$RawDump
 )
 
 $ErrorActionPreference = 'Stop'
@@ -77,6 +78,9 @@ $script:schemaTotal = 0
 $script:schemaOk = 0
 $script:werTotal = 0.0
 $latencies = New-Object System.Collections.Generic.List[double]
+# Trace brute facultative : permet de rejouer les memes reponses a travers les
+# garde-fous C# avec EvaluationHarness --recompute-from-jsonl, sans nouvel appel reseau.
+$rawRecords = New-Object System.Collections.Generic.List[object]
 $rows = @([IO.File]::ReadAllLines($Dataset, [Text.Encoding]::UTF8) | Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json })
 
 function Get-Wer { param([string]$Reference, [string]$Hypothesis)
@@ -170,6 +174,17 @@ foreach ($row in $rows) {
     if ([string]::IsNullOrWhiteSpace($content)) { throw "LLM a renvoyé une réponse vide pour $($row.id)." }
     $actual = $content | ConvertFrom-Json
 
+    if ($RawDump) {
+        $rawRecords.Add([pscustomobject][ordered]@{
+            id           = [string]$row.id
+            source       = $Source
+            reference    = [string]$row.reference
+            expected     = $row.expected
+            raw          = $actual
+            totalSeconds = $watch.Elapsed.TotalSeconds
+        })
+    }
+
     $script:schemaTotal++
     if (Test-SchemaShape $actual) { $script:schemaOk++ }
 
@@ -248,5 +263,10 @@ La latence est mesurée entre l'envoi du WAV au STT et la réception du JSON du 
 $(if ($Source -eq 'tts') { "`nCe banc utilise une voix de synthese Windows : les WER et latences mesurent la chaine technique, pas la clientele reelle. Aucun resultat ne doit etre publie comme WER client." } else { '' })
 "@
 $report | Set-Content -Path $Output -Encoding UTF8
+if ($RawDump) {
+    $lines = @($rawRecords | ForEach-Object { $_ | ConvertTo-Json -Compress -Depth 20 })
+    [IO.File]::WriteAllLines((Join-Path (Split-Path -Parent $RawDump) ([IO.Path]::GetFileName($RawDump))), $lines, (New-Object Text.UTF8Encoding($false)))
+    Write-Host "Reponses brutes tracees dans $RawDump (rejouables sans appel reseau)" -ForegroundColor DarkCyan
+}
 Write-Host "Résultats écrits dans $Output" -ForegroundColor Green
 Write-Host $verdict -ForegroundColor $(if ($verdict.StartsWith('CONFORME')) { 'Green' } else { 'Yellow' })
