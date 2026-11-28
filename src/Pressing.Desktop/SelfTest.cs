@@ -354,6 +354,65 @@ internal static class SelfTest
             }
         });
 
+        await Step("Atelier : scan d'étiquettes piloté par la vue (avance, refus, commande prête, annulation)", async () =>
+        {
+            OrderDto wo = (await api.CreateOrderAsync(new CreateOrderRequest(
+                client.Id,
+                new[]
+                {
+                    new CreateOrderItemRequest(category.Id, price.ServiceType, 1, null, false, null, null, null),
+                    new CreateOrderItemRequest(category.Id, price.ServiceType, 2, null, false, null, null, null)
+                },
+                false, null, DeliveryType.StorePickup, null, 0, 0, null, 0, null, 0, PaymentMethod.Cash, null)))!;
+            byte[] labels = await api.GetLabelsPdfAsync(wo.Id);
+            Check(labels.Length > 1000 && labels[0] == (byte)'%', "planche d'étiquettes PDF");
+            string path = await LabelFileService.DownloadAsync(api, wo.Id, wo.TicketNumber);
+            Check(new FileInfo(path).Length > 1000, "planche enregistrée");
+
+            WorkshopView view = new(fake);
+            hostForm.Controls.Add(view);
+            view.Dock = DockStyle.Fill;
+            await view.LoadAsync();
+            ItemStatus StatusOf(OrderDto o, int index) => o.Items[index].Status;
+
+            await view.SubmitCodeAsync(wo.TicketNumber + "-01");
+            OrderDto cur = (await api.GetOrderAsync(wo.Id))!;
+            Check(StatusOf(cur, 0) == ItemStatus.InProgress, "premier scan : En traitement");
+            await Capture(view, screensDir, "view-workshop-scan");
+
+            await view.SubmitCodeAsync(wo.TicketNumber + "-01");
+            cur = (await api.GetOrderAsync(wo.Id))!;
+            Check(StatusOf(cur, 0) == ItemStatus.Ready, "second scan : Prêt");
+
+            await view.SubmitCodeAsync(wo.TicketNumber + "-01");
+            cur = (await api.GetOrderAsync(wo.Id))!;
+            Check(StatusOf(cur, 0) == ItemStatus.Ready, "troisième scan refusé, statut inchangé");
+            await Capture(view, screensDir, "view-workshop-refused");
+
+            await view.SubmitCodeAsync(wo.TicketNumber + "-02-b");
+            cur = (await api.GetOrderAsync(wo.Id))!;
+            Check(StatusOf(cur, 1) == ItemStatus.Deposited, "pièce -b : aucun changement");
+            await view.SubmitCodeAsync("code-n-importe-quoi");
+
+            await view.SubmitCodeAsync(wo.TicketNumber + "-02-a");
+            await view.SubmitCodeAsync(wo.TicketNumber + "-02-a");
+            cur = (await api.GetOrderAsync(wo.Id))!;
+            Check(cur.Status == OrderStatus.Ready, "tous les articles prêts : commande prête");
+            List<NotificationDto> notes = await api.GetNotificationsAsync(30) ?? new List<NotificationDto>();
+            Check(notes.Any(n => n.Title == "Commande prête" && n.Message.StartsWith(wo.TicketNumber, StringComparison.Ordinal)),
+                "notification « Commande prête » créée");
+            await Capture(view, screensDir, "view-workshop-ready");
+
+            await (Task)typeof(WorkshopView).GetMethod("UndoLastAsync", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(view, null)!;
+            cur = (await api.GetOrderAsync(wo.Id))!;
+            Check(StatusOf(cur, 1) == ItemStatus.InProgress && cur.Status == OrderStatus.InProgress,
+                "annulation : retour d'une seule étape (En traitement)");
+            await Capture(view, screensDir, "view-workshop-undo");
+            hostForm.Controls.Remove(view);
+            view.Dispose();
+        });
+
         await Step("Statut d'un article puis de toute la commande", async () =>
         {
             OrderDto? o = await api.UpdateItemStatusAsync(order.Id, order.Items[0].Id, ItemStatus.InProgress);

@@ -43,5 +43,6 @@ public static class Icons
     public const string Clock = "";
     public const string More = "";
     public const string Inbox = "";
+    public const string Workshop = "";
     public const string Coming = "";
 }
