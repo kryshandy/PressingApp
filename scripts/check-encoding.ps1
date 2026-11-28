@@ -23,7 +23,8 @@ $b = [string][char]0x00C2                              # Â
 $c = [string][char]0x00E2 + [char]0x20AC               # â€
 $pattern = [regex]('(' + $a + '|' + $b + '[ -¿]|' + $c + ')')
 
-$exclus = @('CONTRIBUTING.md', '.github/copilot-instructions.md')
+# Exclus : documents (et ce script) qui citent ces séquences en exemple.
+$exclus = @('CONTRIBUTING.md', '.github/copilot-instructions.md', 'scripts/check-encoding.ps1')
 $extensionsBinaires = @('.png', '.jpg', '.jpeg', '.gif', '.ico', '.pdf', '.dll', '.exe', '.zip', '.gguf',
     '.woff', '.woff2', '.ttf', '.otf', '.snk', '.db', '.bin', '.mp3', '.wav')
 
