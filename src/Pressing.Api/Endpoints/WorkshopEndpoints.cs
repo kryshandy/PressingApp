@@ -14,6 +14,7 @@ public static class WorkshopEndpoints
     {
         services.AddScoped<LabelService>();
         services.AddScoped<WorkshopService>();
+        services.AddScoped<WorkshopLoadService>();
         return services;
     }
 
