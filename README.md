@@ -176,6 +176,7 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Le f
 | `RESEND_*` ou `SMTP_*` | envoi réel des e-mails | vide |
 | `EMAIL_BACKGROUND_ENABLED` | traitement automatique de la file d'e-mails | `true` |
 | `REMINDERS_ENABLED` | rappels automatiques (WhatsApp / e-mail) aux clients consentants | `true` |
+| `BACKUP_SCHEDULE_ENABLED` / `BACKUP_HOUR` / `BACKUP_RETENTION_DAYS` / `BACKUP_COPY_PATH` | sauvegardes automatiques quotidiennes (voir 7.1) | `true` / `22` / `30` / vide |
 | `WHATSAPP_PROVIDER` | `simulated` ou `meta` | `simulated` |
 | `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | accès à l'API WhatsApp Business Cloud (Meta) | vide |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` / `WHATSAPP_APP_SECRET` | webhook Meta (réponse « STOP ») | vide |
@@ -275,6 +276,45 @@ Pas encore disponibles (v3 en cours, voir `docs/Bilan-integration-et-attentes.pd
   `pressing-avant-adoption-…db` ; toute nouvelle migration est précédée d'une sauvegarde `pressing-avant-migration-…db`
   (dans `PRESSING_BACKUP_PATH`).
 - Développeurs : `dotnet tool restore` installe `dotnet-ef` ; ajout d'une migration, voir CONTRIBUTING §5.
+
+### 7.1 Sauvegardes automatiques
+
+L'API crée **chaque jour** une sauvegarde vérifiée (`PRAGMA integrity_check`) dans le dossier de sauvegarde, sous le
+nom `pressing-auto-AAAAMMJJ-HHmmss.db`. Réglages dans le `.env` (modèle : `.env.example`) :
+
+| Variable | Rôle | Défaut |
+| --- | --- | --- |
+| `BACKUP_SCHEDULE_ENABLED` | `false` coupe les sauvegardes planifiées | `true` |
+| `BACKUP_HOUR` | heure locale (0 à 23) à partir de laquelle la sauvegarde du jour est faite | `22` |
+| `BACKUP_RETENTION_DAYS` | durée de conservation des sauvegardes **automatiques** | `30` |
+| `BACKUP_COPY_PATH` | copie secondaire de chaque sauvegarde automatique (autre disque, clé USB, dossier synchronisé) | vide (pas de copie) |
+
+- **Une seule fois par jour** : la présence d'un fichier `pressing-auto-<date du jour>-…` suffit à l'établir, même après
+  un redémarrage de l'API. Si l'API est arrêtée à l'heure dite, la sauvegarde est faite à son redémarrage le même jour
+  (après l'heure choisie).
+- **Rotation** : les sauvegardes automatiques de plus de `BACKUP_RETENTION_DAYS` jours sont supprimées, dans le dossier
+  principal **et** dans `BACKUP_COPY_PATH`. Les sauvegardes **manuelles** (`pressing-AAAAMMJJ-…db`) et celles
+  d'avant migration ou adoption (`pressing-avant-…db`) ne sont **jamais** supprimées automatiquement.
+- **Copie secondaire** : si le dossier est indisponible (clé retirée, disque absent), l'erreur est journalisée et la
+  sauvegarde locale est conservée ; la copie n'est pas rejouée ce jour-là. Pensez à vérifier ce dossier de temps en temps.
+- Une sauvegarde qui échoue au contrôle d'intégrité est supprimée et réessayée au passage suivant (toutes les 5 minutes).
+- Elles apparaissent dans **Paramètres → Sauvegardes** comme les sauvegardes manuelles.
+
+### 7.2 Restaurer une sauvegarde
+
+À faire **API arrêtée** (service Windows ou `scripts\stop.ps1`), sinon SQLite garde des fichiers ouverts :
+
+1. Arrêter l'API (et le site si vous voulez éviter les messages d'erreur).
+2. **Garder une copie** de la base actuelle (`pressing.db`) : si la restauration ne convient pas, on revient en arrière.
+3. Copier la sauvegarde choisie (ex. `pressing-auto-20261128-220000.db`) à la place de `pressing.db`, sous ce nom.
+4. **Supprimer `pressing.db-wal` et `pressing.db-shm`** à côté : ils appartiennent à l'ancienne base et ne doivent pas
+   être rejoués sur la sauvegarde.
+5. Redémarrer l'API. Si la sauvegarde date d'une version plus ancienne, les migrations s'appliquent seules
+   (après une sauvegarde `avant-migration`).
+
+Procédure testée sur une base jetable (28/11/2026) : base de démonstration (8 clients) → sauvegarde via l'API →
+ajout d'un client (9) → arrêt de l'API → remplacement de `pressing.db` par la sauvegarde, suppression de `-wal`/`-shm` →
+redémarrage : **8 clients**, le client ajouté après la sauvegarde a disparu, comme attendu.
 
 ## 8. Architecture
 

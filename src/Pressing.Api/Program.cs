@@ -138,6 +138,8 @@ if (!string.Equals(Environment.GetEnvironmentVariable("REMINDERS_ENABLED"), "fal
 {
     builder.Services.AddHostedService<ReminderBackgroundService>();
 }
+// Sauvegardes automatiques quotidiennes (BACKUP_SCHEDULE_ENABLED, BACKUP_HOUR, BACKUP_RETENTION_DAYS, BACKUP_COPY_PATH).
+builder.Services.AddScheduledBackups();
 
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
