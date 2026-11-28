@@ -18,7 +18,9 @@ param(
     [ValidateSet('1.5B', '3B')]
     [string]$LlmModel = '1.5B',
     [ValidateSet('base', 'small')]
-    [string]$WhisperModel = 'base'
+    [string]$WhisperModel = 'base',
+    [ValidateSet('reel', 'tts')]
+    [string]$Source = 'reel'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -81,17 +83,19 @@ function Get-Wer { param([string]$Reference, [string]$Hypothesis)
     $a = @($Reference -split '\s+' | Where-Object { $_ })
     $b = @($Hypothesis -split '\s+' | Where-Object { $_ })
     if ($a.Count -eq 0) { return $(if ($b.Count -eq 0) { 0.0 } else { 1.0 }) }
-    $d = @()
-    for ($i = 0; $i -le $a.Count; $i++) { $d += ,@(0) * ($b.Count + 1) }
-    for ($i = 0; $i -le $a.Count; $i++) { $d[$i][0] = $i }
-    for ($j = 0; $j -le $b.Count; $j++) { $d[0][$j] = $j }
+    $d = New-Object 'int[,]' ($a.Count + 1), ($b.Count + 1)
+    for ($i = 0; $i -le $a.Count; $i++) { $d[$i, 0] = $i }
+    for ($j = 0; $j -le $b.Count; $j++) { $d[0, $j] = $j }
     for ($i = 1; $i -le $a.Count; $i++) {
         for ($j = 1; $j -le $b.Count; $j++) {
             $cost = if ($a[$i - 1] -ceq $b[$j - 1]) { 0 } else { 1 }
-            $d[$i][$j] = [Math]::Min([Math]::Min($d[$i - 1][$j] + 1, $d[$i][$j - 1] + 1), $d[$i - 1][$j - 1] + $cost)
+            $up = $d[($i - 1), $j] + 1
+            $left = $d[$i, ($j - 1)] + 1
+            $diagonal = $d[($i - 1), ($j - 1)] + $cost
+            $d[$i, $j] = [Math]::Min([Math]::Min($up, $left), $diagonal)
         }
     }
-    return ([double]$d[$a.Count][$b.Count] / [double]$a.Count)
+    return ([double]$d[$a.Count, $b.Count] / [double]$a.Count)
 }
 
 function Assert-FieldEqual {
@@ -119,12 +123,15 @@ function Test-SchemaShape { param($Object)
 }
 
 foreach ($row in $rows) {
-    if ([string]$row.source -cne 'reel') {
-        throw "Ligne $($row.id) : source 'reel' attendue. Aucun résultat n'est écrit."
+    if ([string]$row.source -cne $Source) {
+        throw "Ligne $($row.id) : source '$Source' attendue. Aucun résultat n'est écrit."
     }
     $consentement = [string]$row.consentement
-    if ([string]::IsNullOrWhiteSpace($consentement) -or $consentement -match 'attente|à recueillir|a recueillir') {
+    if ($Source -eq 'reel' -and ([string]::IsNullOrWhiteSpace($consentement) -or $consentement -match 'attente|à recueillir|a recueillir')) {
         throw "Ligne $($row.id) : consentement explicite non renseigné. Aucun résultat n'est écrit."
+    }
+    if ($Source -eq 'tts' -and $consentement -notmatch 'sans objet|synthese') {
+        throw "Ligne $($row.id) : jeu TTS attendu avec consentement 'sans objet - voix de synthese'."
     }
     $audio = [string]$row.audio
     if ([string]::IsNullOrWhiteSpace($audio)) { throw "Ligne $($row.id) : champ audio absent." }
@@ -209,7 +216,7 @@ function Get-Percent { param([int]$Ok, [int]$Total)
 
 $complete = $rows.Count -eq 150
 $verdict = if ($complete -and ($script:intentOk / $script:intentTotal) -ge 0.9 -and ($script:itemOk / $script:itemTotal) -ge 0.85 -and $p95 -lt 5.0 -and $script:schemaOk -eq $script:schemaTotal) {
-    'CONFORME aux seuils de la feuille de route v3.'
+    if ($Source -eq 'tts') { 'BANC TTS (non réel) - CONFORME aux seuils techniques.' } else { 'CONFORME aux seuils de la feuille de route v3.' }
 } else {
     'NON CONFORME ou jeu incomplet : ne pas publier comme validation.'
 }
@@ -217,9 +224,10 @@ $verdict = if ($complete -and ($script:intentOk / $script:intentTotal) -ge 0.9 -
 $report = @"
 # Résultats du banc d'essai — assistant vocal local
 
-## Mesure réelle du $(Get-Date -Format 'yyyy-MM-dd HH:mm')
+## Mesure $(if ($Source -eq 'reel') { 'réelle' } else { 'TTS synthétique - non réel' }) du $(Get-Date -Format 'yyyy-MM-dd HH:mm')
 
 - Jeu : $Dataset
+- Source : $Source
 - Phrases traitées : $($rows.Count) / 150 $(if ($complete) { '(complet)' } else { '(INCOMPLET)' })
 - LLM : $LlmModel · STT : $WhisperModel
 - Serveurs : $LlmUrl et $SttUrl (127.0.0.1 uniquement)
@@ -237,6 +245,7 @@ $report = @"
 Verdict : $verdict
 
 La latence est mesurée entre l'envoi du WAV au STT et la réception du JSON du LLM. Aucune donnée n'est envoyée hors de la machine.
+$(if ($Source -eq 'tts') { "`nCe banc utilise une voix de synthese Windows : les WER et latences mesurent la chaine technique, pas la clientele reelle. Aucun resultat ne doit etre publie comme WER client." } else { '' })
 "@
 $report | Set-Content -Path $Output -Encoding UTF8
 Write-Host "Résultats écrits dans $Output" -ForegroundColor Green

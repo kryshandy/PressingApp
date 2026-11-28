@@ -16,7 +16,7 @@ param(
     [string]$Catalogue = (Join-Path $env:LOCALAPPDATA 'Pressing\ai\catalogue.json'),
     [int]$Count = 150,
     [string]$Prefix = 'S',
-    [ValidateSet('synthetique', 'reel')]
+    [ValidateSet('synthetique', 'reel', 'tts')]
     [string]$Source = 'synthetique',
     [switch]$RequireAudio,
     [string]$AudioRoot = $PSScriptRoot
@@ -46,21 +46,41 @@ function Test-RealWav {
     param([string]$Path)
     if (-not (Test-Path $Path)) { return "fichier absent : $Path" }
     $bytes = [IO.File]::ReadAllBytes($Path)
-    if ($bytes.Length -lt 44) { return 'WAV trop court' }
+    if ($bytes.Length -lt 12) { return 'WAV trop court' }
     $riff = [Text.Encoding]::ASCII.GetString($bytes, 0, 4)
     $wave = [Text.Encoding]::ASCII.GetString($bytes, 8, 4)
     if ($riff -cne 'RIFF' -or $wave -cne 'WAVE') { return 'en-tete RIFF/WAVE invalide' }
-    $format = [BitConverter]::ToUInt16($bytes, 20)
-    $channels = [BitConverter]::ToUInt16($bytes, 22)
-    $sampleRate = [BitConverter]::ToInt32($bytes, 24)
-    $bits = [BitConverter]::ToUInt16($bytes, 34)
-    $dataLength = [BitConverter]::ToInt32($bytes, 40)
-    if ($format -ne 1) { return 'format PCM requis' }
-    if ($channels -ne 1) { return 'mono requis' }
-    if ($sampleRate -ne 16000) { return '16 kHz requis' }
-    if ($bits -ne 16) { return 'PCM 16 bits requis' }
+
+    # Parcours des chunks : les WAV produits par SAPI contiennent des chunks
+    # supplementaires avant 'data'. Les offsets fixes 20/40 ne sont pas surs.
+    $position = 12
+    $fmt = $null
+    $dataLength = 0
+    while ($position + 8 -le $bytes.Length) {
+        $id = [Text.Encoding]::ASCII.GetString($bytes, $position, 4)
+        $size = [BitConverter]::ToInt32($bytes, $position + 4)
+        $body = $position + 8
+        if ($size -lt 0 -or $body + $size -gt $bytes.Length) { return 'chunk WAV tronque' }
+        if ($id -ceq 'fmt ' -and $size -ge 16) {
+            $fmt = @{
+                Format     = [BitConverter]::ToUInt16($bytes, $body)
+                Channels   = [BitConverter]::ToUInt16($bytes, $body + 2)
+                SampleRate = [BitConverter]::ToInt32($bytes, $body + 4)
+                Bits       = [BitConverter]::ToUInt16($bytes, $body + 14)
+            }
+        }
+        elseif ($id -ceq 'data') { $dataLength = $size }
+        $position = $body + $size
+        if ($size % 2 -ne 0) { $position++ }
+    }
+
+    if (-not $fmt) { return 'chunk fmt absent' }
+    if ($fmt.Format -ne 1) { return 'format PCM requis' }
+    if ($fmt.Channels -ne 1) { return 'mono requis' }
+    if ($fmt.SampleRate -ne 16000) { return '16 kHz requis' }
+    if ($fmt.Bits -ne 16) { return 'PCM 16 bits requis' }
     if ($dataLength -le 0) { return 'donnees audio vides' }
-    $seconds = $dataLength / ([double]$sampleRate * $channels * ($bits / 8))
+    $seconds = $dataLength / ([double]$fmt.SampleRate * $fmt.Channels * ($fmt.Bits / 8))
     if ($seconds -gt 20) { return "duree $seconds s > 20 s" }
     return $null
 }
@@ -72,11 +92,14 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
     if (-not $ids.Add($id)) { $errors.Add("$id : identifiant duplique") }
     if ($id -ne ('{0}{1:D3}' -f $Prefix, ($i + 1))) { $errors.Add("Ligne $($i + 1) : identifiant inattendu $id") }
     if ([string]$row.source -cne $Source) { $errors.Add("$id : source attendue $Source") }
+    $consentement = [string]$row.consentement
     if ($Source -eq 'reel') {
-        $consentement = [string]$row.consentement
         if ([string]::IsNullOrWhiteSpace($consentement) -or $consentement -match 'attente|à recueillir|a recueillir') {
             $errors.Add("$id : consentement explicite non renseigne")
         }
+    }
+    elseif ($Source -eq 'tts' -and $consentement -notmatch 'sans objet|synthese') {
+        $errors.Add("$id : source TTS attendue avec consentement 'sans objet - voix de synthese'")
     }
     if ($RequireAudio) {
         $audio = [string]$row.audio

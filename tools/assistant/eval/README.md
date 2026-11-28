@@ -20,6 +20,20 @@ Les mesures se répartissent ainsi :
 
 Aucun enregistrement client avec consentement n'a été fourni. Tout chiffre issu du jeu synthétique ou du TTS doit être qualifié comme tel.
 
+## Solution retenue : banc vocal TTS sans enregistrement humain
+
+Aucun enregistrement n'étant prévu, la validation technique est assurée par un banc **reproductible et automatisable** : les 150 phrases sont synthétisées localement par la voix Windows en WAV 16 kHz mono PCM 16 bits, puis envoyées à la chaîne complète Whisper → LLM → garde-fous. Le jeu est `dataset-tts.jsonl` (`T001`–`T150`, `source: "tts"`, `consentement: "sans objet - voix de synthese Windows"`) ; les WAV sont dans `audio-tts/`, ignorés par Git.
+
+Ce banc fournit une vérité terrain connue et mesure réellement la chaîne audio. Il **ne produit pas un WER client** : les résultats sont publiés dans `resultats/banc-tts-150.md` avec la mention « TTS synthétique — non réel ».
+
+```powershell
+.\tools\assistant\eval\generer-dataset-tts.ps1
+.\tools\assistant\eval\valider-dataset.ps1 -Dataset .\tools\assistant\eval\dataset-tts.jsonl -Source tts -Prefix T -RequireAudio -AudioRoot .\tools\assistant\eval
+.\tools\assistant\bench.ps1 -Dataset .\tools\assistant\eval\dataset-tts.jsonl -AudioRoot .\tools\assistant\eval -Source tts -Output .\tools\assistant\eval\resultats\banc-tts-150.md
+```
+
+Le validateur parcourt désormais les chunks RIFF : les WAV générés par SAPI contiennent des chunks supplémentaires avant `data`, que l'ancien lecture à offset fixe rejetait à tort.
+
 ## Jeu réel attendu
 
 L'équipe doit enregistrer 150 phrases au comptoir, avec des voix et accents variés, du bruit de fond réaliste, le consentement explicite de chaque locuteur, une durée ≤ 20 s en WAV 16 kHz mono PCM 16 bits, un stockage hors Git (`eval/audio/`, ignoré) et une transcription de référence plus le JSON attendu dans `dataset.jsonl` (ignoré).

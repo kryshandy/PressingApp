@@ -22,6 +22,9 @@ TestResults/
 /tools/assistant/eval/dataset.jsonl
 /tools/assistant/eval/audio/
 
+# Banc vocal TTS : audio généré localement, non versionné
+/tools/assistant/eval/audio-tts/
+
 # Secrets / environment
 .env
 .env.local

@@ -92,8 +92,13 @@ dotnet test PressingApp.sln --no-build
 .\tools\assistant\consultation.ps1 -Texte "Où en est le ticket 142 ?"
 .\tools\assistant\consultation.ps1 -Wav "C:\temp\question.wav"
 
-# Banc officiel : s'arrête sans 150 WAV réels ni consentements, n'écrit aucun résultat simulé.
+# Banc officiel réel : s'arrête sans 150 WAV ni consentements, n'écrit aucun résultat simulé.
 .\tools\assistant\bench.ps1
+
+# Banc vocal TTS sans enregistrement humain (solution retenue, NON réel).
+.\tools\assistant\eval\generer-dataset-tts.ps1
+.\tools\assistant\eval\valider-dataset.ps1 -Dataset .\tools\assistant\eval\dataset-tts.jsonl -Source tts -Prefix T -RequireAudio -AudioRoot .\tools\assistant\eval
+.\tools\assistant\bench.ps1 -Dataset .\tools\assistant\eval\dataset-tts.jsonl -AudioRoot .\tools\assistant\eval -Source tts -Output .\tools\assistant\eval\resultats\banc-tts-150.md
 
 # Latence séparée du LLM (prompt / génération / HTTP / tokens) et de Whisper.
 .\tools\assistant\bench-latency.ps1 -Output .\tools\assistant\eval\latency\mesure.jsonl -Count 6
