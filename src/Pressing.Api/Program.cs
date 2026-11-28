@@ -58,24 +58,6 @@ TokenOptions tokenOptions = new()
 builder.Services.AddSingleton(databaseOptions);
 builder.Services.AddSingleton(emailOptions);
 
-WhatsAppOptions whatsAppOptions =
-    builder.Configuration.GetSection("WhatsApp").Get<WhatsAppOptions>()
-    ?? new WhatsAppOptions();
-// Variables du .env (même convention que EMAIL_* / SMTP_*), prioritaires sur la section « WhatsApp ».
-whatsAppOptions.Provider = EnvOr("WHATSAPP_PROVIDER", whatsAppOptions.Provider);
-whatsAppOptions.AccessToken = EnvOr("WHATSAPP_ACCESS_TOKEN", whatsAppOptions.AccessToken);
-whatsAppOptions.PhoneNumberId = EnvOr("WHATSAPP_PHONE_NUMBER_ID", whatsAppOptions.PhoneNumberId);
-whatsAppOptions.ApiVersion = EnvOr("WHATSAPP_API_VERSION", whatsAppOptions.ApiVersion);
-whatsAppOptions.WebhookVerifyToken = EnvOr("WHATSAPP_WEBHOOK_VERIFY_TOKEN", whatsAppOptions.WebhookVerifyToken);
-whatsAppOptions.AppSecret = EnvOr("WHATSAPP_APP_SECRET", whatsAppOptions.AppSecret);
-
-static string EnvOr(string name, string fallback)
-{
-    string? value = Environment.GetEnvironmentVariable(name);
-    return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
-}
-
-builder.Services.AddSingleton(whatsAppOptions);
 builder.Services.AddSingleton(tokenOptions);
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddHttpContextAccessor();
@@ -106,7 +88,7 @@ builder.Services.AddScoped<StaffService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
-builder.Services.AddScoped<ReminderService>();
+builder.Services.AddReminders(builder.Configuration);
 
 if (emailOptions.EffectiveProvider == "resend")
 {
@@ -121,24 +103,10 @@ else
     builder.Services.AddSingleton<IEmailTransport, SimulatedEmailTransport>();
 }
 
-if (whatsAppOptions.Provider.Equals("meta", StringComparison.OrdinalIgnoreCase))
-{
-    builder.Services.AddHttpClient<IWhatsAppTransport, MetaWhatsAppTransport>();
-}
-else
-{
-    builder.Services.AddSingleton<IWhatsAppTransport, SimulatedWhatsAppTransport>();
-}
 if (emailOptions.BackgroundEnabled)
 {
     builder.Services.AddHostedService<EmailBackgroundService>();
 }
-// Rappels automatiques (WhatsApp / e-mail, clients ayant donné leur consentement). REMINDERS_ENABLED=false les coupe.
-if (!string.Equals(Environment.GetEnvironmentVariable("REMINDERS_ENABLED"), "false", StringComparison.OrdinalIgnoreCase))
-{
-    builder.Services.AddHostedService<ReminderBackgroundService>();
-}
-
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -251,6 +219,7 @@ app.MapGet("/", () => Results.Ok(new
 }));
 
 app.MapPublicEndpoints();
+app.MapMessagingEndpoints();
 app.MapAuthEndpoints();
 app.MapClientEndpoints();
 app.MapCatalogEndpoints();
