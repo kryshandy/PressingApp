@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Pressing.Core;
 using Pressing.Core.Data;
 using Pressing.Core.Entities;
 using Pressing.Core.Options;
@@ -69,9 +70,66 @@ public sealed class MigrationTests : IDisposable
 
         await using var db = NewContext();
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
-        Assert.Equal(2, (await db.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(db.Database.GetMigrations().Count(), (await db.Database.GetAppliedMigrationsAsync()).Count());
         Assert.Equal(ClientNotificationPreference.None,
             (await db.Clients.SingleAsync(c => c.LastName == "Ancienne")).NotificationPreference);
+    }
+
+    [Fact]
+    public async Task Base_v2_passe_a_ClotureDeCaisse_sans_perte()
+    {
+        await CreateV2DatabaseAsync();
+        await InsertClientAsync();
+
+        await InitializeAsync();
+
+        await using var db = NewContext();
+        Assert.Contains(await db.Database.GetAppliedMigrationsAsync(), m => m.EndsWith("_ClotureDeCaisse", StringComparison.Ordinal));
+        Assert.Empty(await db.Database.GetPendingMigrationsAsync());
+        Assert.Equal("Ancienne", (await db.Clients.SingleAsync()).LastName);
+        Assert.Empty(await db.CashClosings.ToListAsync());
+        await AssertCashClosingSchemaAsync();
+    }
+
+    [Fact]
+    public async Task Base_a_la_migration_precedente_passe_a_ClotureDeCaisse_sans_perte()
+    {
+        await using (var previous = NewContext())
+        {
+            string target = previous.Database.GetMigrations().Single(m => m.EndsWith("_RappelsEtConsentement", StringComparison.Ordinal));
+            await previous.GetService<IMigrator>().MigrateAsync(target);
+        }
+
+        await InsertClientAsync();
+        await ExecuteAsync("INSERT INTO ReminderLogs (OrderId, ClientId, ReminderType, Channel, SentAt, Success) VALUES (1, 1, 'Ready', 'WhatsApp', '2026-11-02 09:00:00', 1);");
+
+        await InitializeAsync();
+
+        await using var db = NewContext();
+        Assert.Contains(await db.Database.GetAppliedMigrationsAsync(), m => m.EndsWith("_ClotureDeCaisse", StringComparison.Ordinal));
+        Assert.Empty(await db.Database.GetPendingMigrationsAsync());
+        Assert.Equal("Ancienne", (await db.Clients.SingleAsync()).LastName);
+        Assert.Single(await db.ReminderLogs.ToListAsync());
+        Assert.NotEmpty(Directory.GetFiles(Path.Combine(_directory, "Backups"), "pressing-avant-migration-*.db"));
+        await AssertCashClosingSchemaAsync();
+    }
+
+    /// <summary>Une ligne insérée sans statut reçoit « Draft » (jamais ""), et l'index unique ne vise que les clôtures validées.</summary>
+    private async Task AssertCashClosingSchemaAsync()
+    {
+        const string columns = "BusinessDate, OpeningFloat, ExpectedCash, ExpectedMobileMoney, ExpectedCard, ExpectedTransfer, ExpectedOther, CountedCash, Variance, CreatedByName, CreatedAt, UpdatedAt";
+        const string values = "'2026-11-01 00:00:00', 0, 0, 0, 0, 0, 0, 0, 0, 'Test', '2026-11-01 20:00:00', '2026-11-01 20:00:00'";
+        await ExecuteAsync($"INSERT INTO CashClosings ({columns}) VALUES ({values});");
+        await ExecuteAsync($"INSERT INTO CashClosings ({columns}) VALUES ({values});");
+
+        await using var db = NewContext();
+        List<CashClosing> rows = await db.CashClosings.ToListAsync();
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, r => Assert.Equal(CashClosingStatus.Draft, r.Status));
+
+        await ExecuteAsync($"INSERT INTO CashClosings ({columns}, Status) VALUES ({values}, 'Validated');");
+        await Assert.ThrowsAnyAsync<SqliteException>(() =>
+            ExecuteAsync($"INSERT INTO CashClosings ({columns}, Status) VALUES ({values}, 'Validated');"));
     }
 
     [Fact]

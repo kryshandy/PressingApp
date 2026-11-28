@@ -54,6 +54,7 @@ public sealed class TestDb : IDisposable
         services.AddScoped<EmailService>();
         services.AddScoped<OrderService>();
         services.AddScoped<DashboardService>();
+        services.AddScoped<CashClosingService>();
 
         _provider = services.BuildServiceProvider();
         _scope = _provider.CreateScope();

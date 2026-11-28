@@ -27,6 +27,7 @@ public class PressingDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<ReminderLog> ReminderLogs => Set<ReminderLog>();
+    public DbSet<CashClosing> CashClosings => Set<CashClosing>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -213,6 +214,24 @@ public class PressingDbContext : DbContext
         {
             entity.HasIndex(r => new { r.OrderId, r.ReminderType }).IsUnique();
             entity.HasIndex(r => r.SentAt);
+        });
+
+        modelBuilder.Entity<CashClosing>(entity =>
+        {
+            entity.Property(c => c.Status).HasConversion<string>().HasDefaultValue(CashClosingStatus.Draft);
+            // Une seule clôture validée par jour de caisse (les brouillons ne sont pas concernés).
+            entity.HasIndex(c => c.BusinessDate)
+                .IsUnique()
+                .HasDatabaseName("IX_CashClosings_BusinessDate_Validated")
+                .HasFilter("\"Status\" = 'Validated'");
+            entity.HasOne<StaffUser>()
+                .WithMany()
+                .HasForeignKey(c => c.CreatedByStaffId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne<StaffUser>()
+                .WithMany()
+                .HasForeignKey(c => c.ValidatedByStaffId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<AppSetting>(entity =>

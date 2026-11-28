@@ -1,14 +1,58 @@
 using Pressing.Client;
 using Pressing.Core;
 using Pressing.Core.Dtos;
+using Pressing.Desktop.Dialogs;
 using Pressing.Desktop.Services;
 using Pressing.Desktop.Ui;
 
 namespace Pressing.Desktop.Views;
 
-/// <summary>Caisse : paiements de la période, totaux par mode de paiement et total du jour.</summary>
+/// <summary>
+/// Caisse : paiements de la période, totaux par mode de paiement et total du jour ; clôture de caisse journalière
+/// (« Z de caisse ») et, pour un Manager ou un Administrateur, historique des clôtures avec validation et PDF.
+/// </summary>
 public sealed class CashView : BaseView
 {
+    /// <summary>Ligne de l'historique des clôtures de caisse.</summary>
+    private sealed class ClosingRow : IPillRow, ITintRow
+    {
+        public ClosingRow(CashClosingDto c)
+        {
+            Source = c;
+            Day = Fmt.Date(c.Date);
+            Float = Fmt.Money(c.OpeningFloat);
+            Expected = Fmt.Money(c.ExpectedCashInDrawer);
+            Counted = Fmt.Money(c.CountedCash);
+            Variance = c.Variance == 0 ? "Aucun" : (c.Variance > 0 ? "+ " : "− ") + Fmt.Money(Math.Abs(c.Variance));
+            CreatedBy = c.CreatedBy;
+            ValidatedBy = c.ValidatedBy is null ? "—" : $"{c.ValidatedBy} · {Fmt.Date(c.ValidatedAt ?? c.Date)}";
+            Comment = string.IsNullOrWhiteSpace(c.Comment) ? "—" : c.Comment!;
+        }
+
+        public CashClosingDto Source { get; }
+        public string Day { get; }
+        public string Float { get; }
+        public string Expected { get; }
+        public string Counted { get; }
+        public string Variance { get; }
+        public string CreatedBy { get; }
+        public string ValidatedBy { get; }
+        public string Comment { get; }
+
+        public (string Text, Color Color)? GetPill(string columnName) => columnName == "state"
+            ? (Source.Status.Label(), Source.Status == CashClosingStatus.Validated ? Theme.Green : Theme.Amber)
+            : null;
+
+        public Color? GetTint(string columnName) => columnName switch
+        {
+            "variance" when Source.Variance < 0 => Theme.Red,
+            "variance" when Source.Variance > 0 => Theme.Amber,
+            "variance" => Theme.Green,
+            "day" => Theme.Accent,
+            _ => null
+        };
+    }
+
     private enum Period
     {
         Today,
@@ -32,6 +76,9 @@ public sealed class CashView : BaseView
     private readonly StatCard _count = new("Opérations", "—", Theme.Blue);
     private readonly UniformRow _methods = new();
     private readonly GridCard _card = new("Aucun paiement sur cette période.");
+    private readonly GridCard _closingsCard = new("Aucune clôture de caisse enregistrée.") { AutoHeightRows = 3, MaxRows = 8 };
+    private readonly FlatButton _validate = new() { Text = "Valider", Kind = ButtonKind.Secondary, IconGlyph = Icons.Check, Enabled = false };
+    private readonly FlatButton _pdf = new() { Text = "PDF", Kind = ButtonKind.Secondary, IconGlyph = Icons.Pdf, Enabled = false };
     private readonly TextLabel _limit = new() { ForeColor = Theme.Amber, Font = Theme.F(9.5f), Visible = false };
     private readonly System.Windows.Forms.Timer _debounce = new() { Interval = 450 };
     private int _version;
@@ -40,6 +87,7 @@ public sealed class CashView : BaseView
     {
         PageHeader header = new("Caisse", "Encaissements, remboursements et totaux par mode de paiement");
         header.AddAction("Actualiser", ButtonKind.Secondary, Icons.Refresh, async (_, _) => await RunAsync(RefreshAsync));
+        header.AddAction("Clôturer la journée", ButtonKind.Primary, Icons.Check, async (_, _) => await CloseDayAsync());
 
         _period.SetChoices(new[]
         {
@@ -84,6 +132,36 @@ public sealed class CashView : BaseView
             .Add(methods)
             .Add(list, StackSize.Fill)
             .Add(_limit);
+        if (Session.IsManagerOrAdmin)
+        {
+            ThemedGrid closings = _closingsCard.Grid;
+            closings.AddText("day", "JOUR", nameof(ClosingRow.Day), fixedWidth: 112);
+            closings.AddPill("state", "STATUT", fixedWidth: 112);
+            closings.AddText("float", "FOND", nameof(ClosingRow.Float), right: true, fixedWidth: 120);
+            closings.AddText("expected", "ATTENDU EN CAISSE", nameof(ClosingRow.Expected), right: true, fixedWidth: 152);
+            closings.AddText("counted", "COMPTÉ", nameof(ClosingRow.Counted), right: true, fixedWidth: 120);
+            closings.AddText("variance", "ÉCART", nameof(ClosingRow.Variance), right: true, fixedWidth: 120);
+            closings.AddText("created", "ÉTABLIE PAR", nameof(ClosingRow.CreatedBy), 30, minWidth: 110);
+            closings.AddText("validated", "VALIDÉE PAR", nameof(ClosingRow.ValidatedBy), 40, minWidth: 130);
+            closings.AddText("comment", "COMMENTAIRE", nameof(ClosingRow.Comment), 50, minWidth: 120);
+            closings.SetOptional("comment", "created");
+            closings.SelectionChanged += (_, _) => UpdateClosingButtons();
+            closings.CellDoubleClick += async (_, e) =>
+            {
+                if (e.RowIndex >= 0 && closings.Rows[e.RowIndex].DataBoundItem is ClosingRow)
+                {
+                    await OpenClosingPdfAsync();
+                }
+            };
+            _validate.Click += async (_, _) => await ValidateClosingAsync();
+            _pdf.Click += async (_, _) => await OpenClosingPdfAsync();
+
+            TitledCard history = new("Clôtures de caisse", _closingsCard, "Une clôture validée n'est plus modifiable", flushContent: true, autoHeight: true);
+            history.AddAction(_pdf);
+            history.AddAction(_validate);
+            page.Add(history);
+        }
+
         SetPage(header, page, scroll: true, toolbar: toolbar);
 
         _debounce.Tick += async (_, _) =>
@@ -108,9 +186,13 @@ public sealed class CashView : BaseView
 
     public override string Title => "Caisse";
 
-    public override Task LoadAsync() => QueryAsync();
+    public override async Task LoadAsync()
+    {
+        await QueryAsync();
+        await LoadClosingsAsync();
+    }
 
-    public override Task ReactivateAsync() => QueryAsync();
+    public override Task ReactivateAsync() => LoadAsync();
 
     protected override void Dispose(bool disposing)
     {
@@ -120,6 +202,106 @@ public sealed class CashView : BaseView
         }
 
         base.Dispose(disposing);
+    }
+
+    /// <summary>Jour à clôturer : le jour affiché s'il s'agit d'un jour passé unique, sinon aujourd'hui.</summary>
+    private DateTime ClosingDay()
+    {
+        (DateTime from, DateTime to) = Range();
+        return from.Date == to.Date && from.Date < DateTime.Today ? from.Date : DateTime.Today;
+    }
+
+    private async Task CloseDayAsync()
+    {
+        DateTime day = ClosingDay();
+        CashClosingPreviewDto? preview = null;
+        CashClosingDto? draft = null;
+        bool loaded = await RunAsync(async () =>
+        {
+            preview = await Api.PreviewCashClosingAsync(day);
+            if (preview?.ExistingStatus == CashClosingStatus.Draft && preview.ExistingClosingId is int id)
+            {
+                draft = await Api.GetCashClosingAsync(id);
+            }
+        }, "Clôture impossible");
+        if (!loaded || preview is null || !Alive)
+        {
+            return;
+        }
+
+        if (preview.ExistingStatus == CashClosingStatus.Validated)
+        {
+            AppDialogs.Info(this, "Caisse déjà clôturée",
+                $"La caisse du {Fmt.Date(day)} est déjà clôturée et validée : elle n'est plus modifiable.", MessageKind.Info);
+            return;
+        }
+
+        using CashClosingDialog dialog = new(Api, preview, draft);
+        if (dialog.ShowDialog(FindForm()) == DialogResult.OK)
+        {
+            Host.Toast(Session.IsManagerOrAdmin
+                ? "Clôture enregistrée : elle peut maintenant être validée."
+                : "Clôture enregistrée : un manager doit la valider.");
+            await RunAsync(LoadClosingsAsync);
+        }
+    }
+
+    private async Task LoadClosingsAsync()
+    {
+        if (!Session.IsManagerOrAdmin)
+        {
+            return;
+        }
+
+        List<CashClosingDto>? closings = await Api.GetCashClosingsAsync();
+        if (!Alive || closings is null)
+        {
+            return;
+        }
+
+        _closingsCard.Grid.SetRows(closings.Select(c => new ClosingRow(c)).ToList());
+        _closingsCard.UpdateEmpty();
+        UpdateClosingButtons();
+        _closingsCard.RequestPageLayout();
+    }
+
+    private void UpdateClosingButtons()
+    {
+        ClosingRow? row = _closingsCard.Grid.SelectedItem<ClosingRow>();
+        _pdf.Enabled = row is not null;
+        _validate.Enabled = row is { Source.Status: CashClosingStatus.Draft };
+    }
+
+    private async Task ValidateClosingAsync()
+    {
+        if (_closingsCard.Grid.SelectedItem<ClosingRow>() is not { Source.Status: CashClosingStatus.Draft } row)
+        {
+            return;
+        }
+
+        string variance = row.Source.Variance == 0 ? "sans écart" : $"écart de {row.Variance}";
+        if (!AppDialogs.Confirm(this, "Valider la clôture",
+                $"Valider la clôture du {row.Day} ({variance}) ? Une fois validée, elle ne sera plus modifiable.", "Valider"))
+        {
+            return;
+        }
+
+        bool ok = await RunAsync(async () => await Api.ValidateCashClosingAsync(row.Source.Id), "Validation impossible");
+        if (ok && Alive)
+        {
+            Host.Toast("Clôture validée.");
+            await RunAsync(LoadClosingsAsync);
+        }
+    }
+
+    private async Task OpenClosingPdfAsync()
+    {
+        if (_closingsCard.Grid.SelectedItem<ClosingRow>() is not { } row)
+        {
+            return;
+        }
+
+        await RunAsync(async () => await CashClosingFiles.OpenAsync(Api, row.Source.Id, row.Source.Date), "PDF indisponible");
     }
 
     private async Task FilterChangedAsync()

@@ -77,6 +77,87 @@ namespace Pressing.Core.Data.Migrations
                     b.ToTable("AuditLogs");
                 });
 
+            modelBuilder.Entity("Pressing.Core.Entities.CashClosing", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("BusinessDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("CountedCash")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreatedByName")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("CreatedByStaffId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ExpectedCard")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ExpectedCash")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ExpectedMobileMoney")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ExpectedOther")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("ExpectedTransfer")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("OpeningFloat")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Draft");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ValidatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ValidatedByName")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ValidatedByStaffId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Variance")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessDate")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CashClosings_BusinessDate_Validated")
+                        .HasFilter("\"Status\" = 'Validated'");
+
+                    b.HasIndex("CreatedByStaffId");
+
+                    b.HasIndex("ValidatedByStaffId");
+
+                    b.ToTable("CashClosings");
+                });
+
             modelBuilder.Entity("Pressing.Core.Entities.Category", b =>
                 {
                     b.Property<int>("Id")
@@ -830,6 +911,19 @@ namespace Pressing.Core.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("StaffUsers");
+                });
+
+            modelBuilder.Entity("Pressing.Core.Entities.CashClosing", b =>
+                {
+                    b.HasOne("Pressing.Core.Entities.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByStaffId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Pressing.Core.Entities.StaffUser", null)
+                        .WithMany()
+                        .HasForeignKey("ValidatedByStaffId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Pressing.Core.Entities.CategoryPrice", b =>
