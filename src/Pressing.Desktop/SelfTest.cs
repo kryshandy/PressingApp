@@ -473,6 +473,36 @@ internal static class SelfTest
             Write("       reçu : " + path + " (" + new FileInfo(path).Length + " octets)");
         });
 
+        await Step("Ticket 80 mm : non configuré, puis configuré (aucune impression réelle en autotest)", async () =>
+        {
+            (TicketPrintOutcome outcome, _) = await TicketPrintService.PrintAsync(api, order.Id, order.TicketNumber);
+            Check(outcome == TicketPrintOutcome.NotConfigured, "sans imprimante : explication attendue, obtenu " + outcome);
+            Check(TicketPrintService.HowToConfigure.Contains("Paramètres", StringComparison.Ordinal), "message d'aide");
+
+            await api.UpdateSettingsAsync(new Dictionary<string, string>
+            {
+                [SettingsKeys.TicketPrinterName] = "IMPRIMANTE-AUTOTEST",
+                [SettingsKeys.TicketPrinterOpenDrawer] = "true"
+            });
+            try
+            {
+                (outcome, string printer) = await TicketPrintService.PrintAsync(api, order.Id, order.TicketNumber);
+                Check(outcome == TicketPrintOutcome.Skipped && printer == "IMPRIMANTE-AUTOTEST", "autotest : impression ignorée, obtenu " + outcome);
+                byte[] bytes = await api.GetThermalTicketAsync(order.Id);
+                Check(bytes.Length > 100 && bytes[0] == 0x1B && bytes[1] == 0x40, "octets ESC/POS");
+                Check(await TicketPrintService.PrintTestAsync("IMPRIMANTE-AUTOTEST", true) == TicketPrintOutcome.Skipped, "ticket de test ignoré");
+                Write("       ticket ESC/POS : " + bytes.Length + " octets (non imprimé)");
+            }
+            finally
+            {
+                await api.UpdateSettingsAsync(new Dictionary<string, string>
+                {
+                    [SettingsKeys.TicketPrinterName] = string.Empty,
+                    [SettingsKeys.TicketPrinterOpenDrawer] = "false"
+                });
+            }
+        });
+
         await Step("Reçu par e-mail", async () =>
         {
             MessageResponse? response = await api.EmailReceiptAsync(order.Id);

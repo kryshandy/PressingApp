@@ -208,6 +208,12 @@ public class SettingsService
 
     private static void ValidateSetting(string key, string value)
     {
+        if (key == SettingsKeys.TicketPrinterName
+            && (value.Length > 120 || value.Any(char.IsControl)))
+        {
+            throw new InvalidOperationException("Le nom de l'imprimante de tickets est invalide (120 caractères au plus, sans caractère de contrôle).");
+        }
+
         if (key is SettingsKeys.DefaultProcessingDays or SettingsKeys.ExpressProcessingDays
             or SettingsKeys.MaxDiscountPercent or SettingsKeys.LoyaltyPointsPerAmount)
         {
@@ -228,7 +234,8 @@ public class SettingsService
         if (key is SettingsKeys.AllowPickupWithBalance or SettingsKeys.LoyaltyEnabled
             or SettingsKeys.EmailNotifications or SettingsKeys.EmailOrderConfirmation
             or SettingsKeys.EmailOrderReady or SettingsKeys.EmailReceipt
-            or SettingsKeys.ReceiptShowQr or SettingsKeys.ReceiptShowBarcode)
+            or SettingsKeys.ReceiptShowQr or SettingsKeys.ReceiptShowBarcode
+            or SettingsKeys.TicketPrinterOpenDrawer)
         {
             if (!bool.TryParse(value, out _))
             {

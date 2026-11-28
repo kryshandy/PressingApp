@@ -232,6 +232,12 @@ JSON camelCase habituel de l'API, énumérations en texte. Le brouillon n'est **
 | GET | `/api/orders/{id}/labels` | StaffOnly | | `application/pdf` (planche A4, 3 × 8 étiquettes) · 404 |
 | POST | `/api/workshop/scan` | StaffOnly | `WorkshopScanRequest` — `code` | `WorkshopScanResultDto` · 400 (code illisible, article déjà prêt / retiré / annulé, pièce secondaire) · 404 (ticket ou article inconnu) |
 | POST | `/api/workshop/undo` | StaffOnly | `WorkshopUndoRequest` — `code`, `fromStatus` (statut obtenu par le scan à annuler) | `WorkshopScanResultDto` · 400 si l'article n'est plus à `fromStatus` ou est déjà `Deposited` |
+| GET | `/api/orders/{id}/receipt/escpos` | StaffOnly | | `application/octet-stream` : octets ESC/POS du ticket 80 mm (48 colonnes, CP858, QR natif `GS ( k`, coupe `GS V`, tiroir `ESC p` si réglé) · 404 |
+| GET | `/api/printing/ticket-printer` | StaffOnly | | `TicketPrinterSettingsDto` — `printerName`, `enabled`, `openCashDrawer` (lisible par tout le personnel) |
+
+L'impression elle-même est faite par le Desktop (winspool, type RAW) sur l'imprimante nommée dans le réglage
+`Printer.TicketName` (vide = désactivée) ; `Printer.OpenCashDrawer` (`true`/`false`) ajoute l'impulsion d'ouverture du
+tiroir-caisse. Ces deux réglages se modifient par `PUT /api/settings` (ManagerOrAdmin), sans migration (table `AppSettings`).
 
 **Format du code d'étiquette** (dérivé du ticket, aucune colonne en base) : `PRESS-AAAA-NNNNN-II` = ticket + rang de la
 ligne d'article (2 chiffres, lignes triées par identifiant). Une ligne de quantité > 1 produit une étiquette par pièce
