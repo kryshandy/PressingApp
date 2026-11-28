@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Pressing.Core.Data;
@@ -71,6 +71,9 @@ public sealed class TestDb : IDisposable
     public ReceiptService Receipts => _scope.ServiceProvider.GetRequiredService<ReceiptService>();
     public PressingDatabaseOptions DbOptions => _scope.ServiceProvider.GetRequiredService<PressingDatabaseOptions>();
     public ClientService Clients => _scope.ServiceProvider.GetRequiredService<ClientService>();
+
+    /// <summary>Service enregistré dans la portée de test (ex. EmailService).</summary>
+    public T Get<T>() where T : notnull => _scope.ServiceProvider.GetRequiredService<T>();
 
     public CurrentUser Cashier { get; } = new() { StaffId = 1, Name = "Test", Role = "Cashier" };
 

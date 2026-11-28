@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using Pressing.Client;
 using Pressing.Web.Infrastructure;
@@ -102,6 +102,40 @@ public sealed class HomeController : Controller
         }
 
         return View(new ContactViewModel { Form = form, Shop = await _shop.GetShopAsync(ct) });
+    }
+
+    [HttpGet("desabonnement")]
+    public async Task<IActionResult> Desabonnement(string? token, CancellationToken ct)
+    {
+        var vm = new UnsubscribeViewModel { Token = token ?? "" };
+        if (string.IsNullOrWhiteSpace(token)) return View(vm);
+
+        try
+        {
+            vm.Active = (await _portal.Api.GetUnsubscribeStatusAsync(token, ct))?.Active;
+        }
+        catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            vm.Active = null;
+        }
+        return View(vm);
+    }
+
+    [HttpPost("desabonnement")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Desabonnement(UnsubscribeViewModel form, CancellationToken ct)
+    {
+        var vm = new UnsubscribeViewModel { Token = form.Token ?? "" };
+        try
+        {
+            vm.Done = await _portal.Api.UnsubscribeAsync(vm.Token, ct);
+            vm.Active = false;
+        }
+        catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            vm.Active = null;
+        }
+        return View(vm);
     }
 
     [HttpGet("mentions-legales")]

@@ -1,0 +1,44 @@
+﻿@model UnsubscribeViewModel
+@{
+    ViewData["Title"] = "Rappels par e-mail";
+    ViewData["BodyClass"] = "auth-page";
+}
+
+<section class="auth">
+    <div class="container">
+        <div class="auth-card auth-card-single">
+            <div class="auth-form">
+                <p class="eyebrow">Rappels par e-mail</p>
+                @if (Model.Done is not null)
+                {
+                    <h1 class="display-3">Désinscription confirmée</h1>
+                    <div class="flash flash-success" role="status">@Icons.Svg("check", size: 20)<p>@Model.Done</p></div>
+                    <p>Vous pouvez réactiver les rappels à tout moment en le demandant en boutique.</p>
+                    <a class="btn btn-ink" href="/">Retour à l'accueil</a>
+                }
+                else if (Model.Active is null)
+                {
+                    <h1 class="display-3">Lien invalide</h1>
+                    <div class="flash flash-error" role="alert">@Icons.Svg("alert", size: 20)<p>Ce lien de désinscription est invalide ou a expiré. Contactez la boutique pour arrêter les rappels.</p></div>
+                    <a class="btn btn-ink" href="/contact">Nous contacter</a>
+                }
+                else if (Model.Active == false)
+                {
+                    <h1 class="display-3">Rappels déjà désactivés</h1>
+                    <p>Vous ne recevez plus de rappels par e-mail de notre part.</p>
+                    <a class="btn btn-ink" href="/">Retour à l'accueil</a>
+                }
+                else
+                {
+                    <h1 class="display-3">Ne plus recevoir de rappels ?</h1>
+                    <p>Vous ne recevrez plus de rappels par e-mail (commande en attente, solde, échéance). Les reçus et la confirmation de vos dépôts restent envoyés.</p>
+                    <form method="post" action="/desabonnement" novalidate>
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="Token" />
+                        <button class="btn btn-ink btn-block" type="submit">Confirmer la désinscription</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</section>

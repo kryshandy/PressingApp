@@ -55,6 +55,13 @@ de version du logiciel.
 | GET | `/api/public/catalog` | | `CategoryDto[]` |
 | GET | `/api/public/tracking/{ticket}` | `?phone=` (obligatoire) | `TrackingDto` · 404 |
 | POST | `/api/public/contact` | `{ name, email, phone?, message }` | `{ message }` |
+| GET | `/api/public/unsubscribe` | `?token=` (lien des e-mails de rappel) | `{ active }` · 400 lien invalide ou expiré |
+| POST | `/api/public/unsubscribe` | `{ token }` | `{ message }` · 400 — passe le client en « aucun rappel » et date la révocation |
+| GET | `/api/public/whatsapp/webhook` | `?hub.mode=subscribe&hub.verify_token&hub.challenge` (vérification Meta) | le `challenge` · 401 |
+| POST | `/api/public/whatsapp/webhook` | notification Meta signée (`X-Hub-Signature-256`, `WHATSAPP_APP_SECRET`) | 200 · 401 signature invalide · 503 secret absent — « STOP » révoque le consentement WhatsApp |
+
+Le lien de désinscription des e-mails ouvre la page **`/desabonnement?token=`** du site, qui appelle les deux routes
+`unsubscribe`. Le jeton (`token_type = unsubscribe`, 180 jours) ne donne accès à aucune autre route.
 
 ## Authentification
 
@@ -79,6 +86,10 @@ de version du logiciel.
 | PUT | `/api/clients/{id}` | StaffOnly | `UpdateClientRequest` | `ClientDto` |
 | POST | `/api/clients/{id}/password` | StaffOnly | `SetClientPasswordRequest` | `ClientDto` |
 | POST | `/api/clients/{id}/loyalty` | ManagerOrAdmin | `AdjustLoyaltyRequest { points, note }` | `ClientDto` |
+
+`CreateClientRequest`, `UpdateClientRequest` et `UpdateProfileRequest` acceptent `notificationPreference`
+(`None` · `WhatsApp` · `Email`). Choisir un canal date le consentement (`consentGivenAt`) ; revenir à `None` date la
+révocation (`consentRevokedAt`). Un canal exige le numéro WhatsApp ou l'e-mail correspondant (400 sinon).
 
 ## Catalogue, tarifs et promotions
 

@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -91,6 +91,17 @@ public sealed class PressingApiClient : IDisposable
     public async Task<string> SendContactAsync(string name, string email, string? phone, string message, CancellationToken ct = default)
     {
         var r = await PostAsync<MessageResponse>("api/public/contact", new { name, email, phone, message }, ct, anonymous: true);
+        return r?.Message ?? string.Empty;
+    }
+
+    /// <summary>Rappels e-mail encore actifs pour ce lien de désinscription (400 si le lien est invalide).</summary>
+    public Task<UnsubscribeStatusDto?> GetUnsubscribeStatusAsync(string token, CancellationToken ct = default) =>
+        GetAsync<UnsubscribeStatusDto>("api/public/unsubscribe" + Query(("token", token)), ct);
+
+    /// <summary>Désactive les rappels e-mail ; retourne le message de confirmation.</summary>
+    public async Task<string> UnsubscribeAsync(string token, CancellationToken ct = default)
+    {
+        var r = await PostAsync<MessageResponse>("api/public/unsubscribe", new UnsubscribeRequest(token), ct, anonymous: true);
         return r?.Message ?? string.Empty;
     }
 

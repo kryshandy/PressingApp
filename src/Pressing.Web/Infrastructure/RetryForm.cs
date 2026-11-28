@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 
@@ -130,7 +130,7 @@ public static class RetryForm
         string path = (http.Request.Path.Value ?? "/").TrimEnd('/').ToLowerInvariant();
         switch (path)
         {
-            case "/compte/reinitialiser":
+            case "/compte/reinitialiser" or "/desabonnement":
             {
                 string? token = FormValue(http, "Token");
                 return string.IsNullOrWhiteSpace(token) ? path : path + "?token=" + Uri.EscapeDataString(token);

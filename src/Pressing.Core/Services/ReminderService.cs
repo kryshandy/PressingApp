@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Pressing.Core.Data;
@@ -73,13 +73,19 @@ public sealed class ReminderService
 
             if (order.Client is null || !order.Client.IsActive ||
                 order.Client.NotificationPreference == ClientNotificationPreference.None ||
-                !order.Client.ConsentGivenAt.HasValue)
+                !order.Client.ConsentGivenAt.HasValue ||
+                order.Client.ConsentRevokedAt.HasValue)
                 continue;
+
+            bool waitingPickup = order.Status is OrderStatus.Ready or OrderStatus.PartiallyPickedUp;
 
             var reminders = new List<(string Type, string Subject, string Body)>();
 
+            // « Prête » par WhatsApp seulement : l'e-mail « commande prête » existe déjà (EmailService).
             if (order.Status == OrderStatus.Ready &&
-                order.ReadyNotifiedAt.HasValue)
+                order.ReadyNotifiedAt.HasValue &&
+                (now.Date - order.ReadyNotifiedAt.Value.Date).Days < 3 &&
+                order.Client.NotificationPreference == ClientNotificationPreference.WhatsApp)
             {
                 reminders.Add((
                     "ready",
@@ -88,20 +94,20 @@ public sealed class ReminderService
                 ));
             }
 
-            if ((order.Status == OrderStatus.Ready ||
-                 order.Status == OrderStatus.PartiallyPickedUp) &&
-                order.ReadyNotifiedAt.HasValue)
+            if (waitingPickup && order.ReadyNotifiedAt.HasValue)
             {
                 int days = (now.Date - order.ReadyNotifiedAt.Value.Date).Days;
 
-                if (days >= 3)
+                // Un seul palier à la fois (le plus élevé atteint) : à l'activation des rappels, une commande
+                // prête depuis 14 jours reçoit le dernier rappel, pas trois messages d'un coup.
+                if (days >= 3 && days < 7)
                     reminders.Add((
                         "uncollected-j3",
                         "Rappel : commande non récupérée",
                         $"Bonjour {order.Client.FirstName}, votre commande {order.TicketNumber} attend toujours d'être récupérée depuis 3 jours."
                     ));
 
-                if (days >= 7)
+                if (days >= 7 && days < 14)
                     reminders.Add((
                         "uncollected-j7",
                         "Rappel : commande en attente",
@@ -116,7 +122,8 @@ public sealed class ReminderService
                     ));
             }
 
-            if (order.Balance > 0.005m)
+            // Solde rappelé quand le client peut venir payer et retirer, pas juste après le dépôt.
+            if (waitingPickup && order.Balance > 0.005m)
             {
                 reminders.Add((
                     "unpaid-balance",
@@ -125,7 +132,7 @@ public sealed class ReminderService
                 ));
             }
 
-            if (order.DueDate.Date == now.Date.AddDays(1))
+            if (!waitingPickup && order.DueDate.Date == now.Date.AddDays(1))
             {
                 reminders.Add((
                     "due-tomorrow",
@@ -183,8 +190,9 @@ public sealed class ReminderService
                         try
                         {
                             string unsubscribeToken = _tokens.CreateUnsubscribeToken(order.ClientId);
-string unsubscribeUrl = $"{_emailOptions.AppBaseUrl}/api/public/unsubscribe?token={Uri.EscapeDataString(unsubscribeToken)}";
-string html = $"<p>{WebUtility.HtmlEncode(reminder.Body)}</p><hr><p style='font-size:12px;color:#666'>Vous recevez ce message parce que vous avez accepté les rappels par e-mail. <a href='{WebUtility.HtmlEncode(unsubscribeUrl)}'>Me désabonner</a></p>";
+                            // Page servie par le site (PRESSING_WEB_URL) : l'API n'est pas forcément joignable du public.
+                            string unsubscribeUrl = $"{_emailOptions.AppBaseUrl}/desabonnement?token={Uri.EscapeDataString(unsubscribeToken)}";
+                            string html = $"<p>{WebUtility.HtmlEncode(reminder.Body)}</p><hr><p style='font-size:12px;color:#666'>Vous recevez ce message parce que vous avez accepté les rappels par e-mail. <a href='{WebUtility.HtmlEncode(unsubscribeUrl)}'>Me désabonner</a></p>";
 
                             await _email.QueueRawAsync(
                                 order.Client.Email,

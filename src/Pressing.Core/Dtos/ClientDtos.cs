@@ -1,4 +1,4 @@
-using Pressing.Core.Entities;
+﻿using Pressing.Core.Entities;
 
 namespace Pressing.Core.Dtos;
 
@@ -87,3 +87,8 @@ public record ClientDetailDto(
     IReadOnlyList<LoyaltyTransactionDto> LoyaltyTransactions);
 
 public record AdjustLoyaltyRequest(int Points, string Note);
+
+/// <summary>État des rappels e-mail pour la page de désinscription.</summary>
+public record UnsubscribeStatusDto(bool Active);
+
+public record UnsubscribeRequest(string Token);

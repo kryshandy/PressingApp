@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -20,7 +20,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         "PRESSING_DB_PATH", "PRESSING_BACKUP_PATH", "PRESSING_JWT_KEY", "PRESSING_SEED_DEMO",
         "PRESSING_ADMIN_USERNAME", "PRESSING_ADMIN_PASSWORD",
         "EMAIL_PROVIDER", "EMAIL_BACKGROUND_ENABLED",
-        "RESEND_API_KEY", "SMTP_HOST", "SMTP_USER", "SMTP_APP_PASSWORD"
+        "RESEND_API_KEY", "SMTP_HOST", "SMTP_USER", "SMTP_APP_PASSWORD",
+        "REMINDERS_ENABLED", "WHATSAPP_PROVIDER"
     ];
 
     private readonly Dictionary<string, string?> _previous = new();
@@ -52,6 +53,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("SMTP_HOST", null);
         Environment.SetEnvironmentVariable("SMTP_USER", null);
         Environment.SetEnvironmentVariable("SMTP_APP_PASSWORD", null);
+        // Les rappels sont testés directement (ReminderServiceTests) : pas de tâche de fond pendant les tests d'API.
+        Environment.SetEnvironmentVariable("REMINDERS_ENABLED", "false");
+        Environment.SetEnvironmentVariable("WHATSAPP_PROVIDER", "simulated");
     }
 
     public const string AdminPassword = "Admin@2026!";

@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using Pressing.Client;
 using Pressing.Core.Dtos;
 
@@ -144,3 +144,12 @@ public record OrdersViewModel(
 public record OrderDetailViewModel(OrderDto Order);
 
 public record LoyaltyViewModel(ClientDto Client, IReadOnlyList<LoyaltyTransactionDto> Transactions);
+
+/// <summary>Page /desabonnement (lien des e-mails de rappel).</summary>
+public class UnsubscribeViewModel
+{
+    public string Token { get; set; } = "";
+    /// <summary>null : lien invalide ou expiré.</summary>
+    public bool? Active { get; set; }
+    public string? Done { get; set; }
+}

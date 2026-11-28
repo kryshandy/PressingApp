@@ -1,0 +1,131 @@
+﻿using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Pressing.Core.Data;
+using Pressing.Core.Entities;
+using Pressing.Core.Options;
+
+namespace Pressing.Tests.Integration;
+
+/// <summary>
+/// Passage aux migrations sans perte : base neuve, base v2 créée par EnsureCreated, et base passée par la
+/// version du 27/11 (schéma de consentement et de rappels ajouté en SQL brut).
+/// </summary>
+public sealed class MigrationTests : IDisposable
+{
+    private readonly string _directory = Path.Combine(Path.GetTempPath(), "pressing-migrations-" + Guid.NewGuid().ToString("N"));
+    private readonly string _path;
+
+    public MigrationTests()
+    {
+        Directory.CreateDirectory(_directory);
+        _path = Path.Combine(_directory, "pressing.db");
+    }
+
+    [Fact]
+    public async Task Base_neuve_recoit_toutes_les_migrations()
+    {
+        await InitializeAsync();
+
+        await using var db = NewContext();
+        Assert.Empty(await db.Database.GetPendingMigrationsAsync());
+        Assert.True(await db.Categories.AnyAsync(), "catalogue initial");
+        Assert.Empty(await db.ReminderLogs.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Base_v2_sans_historique_est_adoptee_et_completee_sans_perte()
+    {
+        await CreateV2DatabaseAsync();
+        await InsertClientAsync();
+
+        await InitializeAsync();
+
+        await using var db = NewContext();
+        Assert.Empty(await db.Database.GetPendingMigrationsAsync());
+        Pressing.Core.Entities.Client client = await db.Clients.SingleAsync(c => c.LastName == "Ancienne");
+        Assert.Equal(ClientNotificationPreference.None, client.NotificationPreference);
+        Assert.Null(client.ConsentGivenAt);
+        Assert.NotEmpty(Directory.GetFiles(Path.Combine(_directory, "Backups"), "pressing-avant-adoption-*.db"));
+    }
+
+    [Fact]
+    public async Task Base_du_27_11_modifiee_en_sql_brut_est_adoptee_sans_erreur()
+    {
+        await CreateV2DatabaseAsync();
+        await ExecuteAsync("""
+            ALTER TABLE Clients ADD COLUMN NotificationPreference TEXT NOT NULL DEFAULT 'None';
+            ALTER TABLE Clients ADD COLUMN ConsentGivenAt TEXT NULL;
+            ALTER TABLE Clients ADD COLUMN ConsentRevokedAt TEXT NULL;
+            CREATE TABLE IF NOT EXISTS ReminderLogs (
+                Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, OrderId INTEGER NOT NULL, ClientId INTEGER NOT NULL,
+                ReminderType TEXT NOT NULL, Channel TEXT NOT NULL, SentAt TEXT NOT NULL, Success INTEGER NOT NULL, Error TEXT NULL);
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_ReminderLogs_OrderId_ReminderType ON ReminderLogs (OrderId, ReminderType);
+            """);
+        await InsertClientAsync();
+
+        await InitializeAsync();
+
+        await using var db = NewContext();
+        Assert.Empty(await db.Database.GetPendingMigrationsAsync());
+        Assert.Equal(2, (await db.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(ClientNotificationPreference.None,
+            (await db.Clients.SingleAsync(c => c.LastName == "Ancienne")).NotificationPreference);
+    }
+
+    [Fact]
+    public async Task Deuxieme_demarrage_ne_refait_rien()
+    {
+        await InitializeAsync();
+        await InitializeAsync();
+
+        await using var db = NewContext();
+        Assert.Empty(await db.Database.GetPendingMigrationsAsync());
+    }
+
+    // ------------------------------------------------------------------ outils
+
+    /// <summary>Schéma v2 : Baseline seule, sans table d'historique (comme EnsureCreated).</summary>
+    private async Task CreateV2DatabaseAsync()
+    {
+        await using (var db = NewContext())
+        {
+            string baseline = db.Database.GetMigrations().First();
+            await db.GetService<IMigrator>().MigrateAsync(baseline);
+        }
+
+        await ExecuteAsync("DROP TABLE \"__EFMigrationsHistory\";");
+    }
+
+    private Task InsertClientAsync() => ExecuteAsync("""
+        INSERT INTO Clients (FirstName, LastName, Phone, PhoneNormalized, WhatsApp, IsActive, WebAccessEnabled,
+                             LoyaltyPoints, CreatedAt, UpdatedAt)
+        VALUES ('Cliente', 'Ancienne', '0700000000', '2250700000000', '0700000000', 1, 0, 0,
+                '2026-11-01 10:00:00', '2026-11-01 10:00:00');
+        """);
+
+    private async Task ExecuteAsync(string sql)
+    {
+        await using var connection = new SqliteConnection($"Data Source={_path}");
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private async Task InitializeAsync()
+    {
+        await using var db = NewContext();
+        var options = new PressingDatabaseOptions { Path = _path, SeedDemoData = false };
+        await new DatabaseInitializer(db, options).InitializeAsync();
+    }
+
+    private PressingDbContext NewContext() => new(PressingDatabase.CreateOptions(_path));
+
+    public void Dispose()
+    {
+        SqliteConnection.ClearAllPools();
+        try { Directory.Delete(_directory, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+    }
+}

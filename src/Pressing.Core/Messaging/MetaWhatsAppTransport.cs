@@ -43,7 +43,9 @@ public sealed class MetaWhatsAppTransport : IWhatsAppTransport
             {
                 messaging_product = "whatsapp",
                 recipient_type = "individual",
-                to = message.To,
+                // Meta attend l'indicatif international en chiffres seuls (« 2250700112233 ») :
+                // les espaces, « + » et tirets saisis dans la fiche client sont retirés.
+                to = new string(message.To.Where(char.IsDigit).ToArray()),
                 type = "text",
                 text = new { body = message.Body }
             });
