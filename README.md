@@ -24,7 +24,7 @@ Les trois partagent **la même base SQLite** à travers l'API : un dépôt enreg
 - **Paiements** en plusieurs fois (espèces, Mobile Money, carte, virement), solde calculé automatiquement.
 - **Retraits** totaux ou **partiels** (choix des articles et quantités), avec encaissement du reste ; retrait refusé tant que le solde n'est pas réglé (paramétrable).
 - **Reçu PDF** (A5, QR code) à imprimer ou envoyer par e-mail.
-- **Caisse** : encaissements de la période par mode de paiement. **Impayés** : liste et total des soldes.
+- **Caisse** : encaissements de la période par mode de paiement ; **clôture de caisse journalière** (« Z de caisse ») : fond de caisse, espèces comptées, écart calculé en direct (commentaire obligatoire en cas d'écart), validation par un Manager ou un Administrateur (la clôture validée n'est plus modifiable), historique et PDF. **Impayés** : liste et total des soldes.
 - **Tarifs** : grille catégorie × service, supplément express, délai.
 - **Annulation et remboursement** (Manager/Admin), avec remboursement par mode de paiement d'origine.
 - **Administration** : promotions, rapports par période avec export CSV, gestion du personnel, paramètres de la boutique, configuration des e-mails, **sauvegarde vérifiée de la base**, journal d'audit.

@@ -9,6 +9,7 @@ Application du personnel. API : variable `PRESSING_PUBLIC_API_URL` (défaut `htt
 
 ## Écrans
 Tableau de bord, Nouveau dépôt, Commandes (+ détail), Clients (+ fiche), Retraits, Caisse, Impayés, Tarifs, Mon compte, puis l'administration :
+- **Caisse** (`CashView`) : paiements et totaux par mode ; bouton « Clôturer la journée » (`CashClosingDialog` : attendus par mode, fond de caisse, espèces comptées, écart en direct, commentaire obligatoire si écart) ; Manager/Admin : historique des clôtures, validation (clôture figée) et PDF.
 - **Promotions** (`PromotionsView`, `PromotionDialog`) : codes promo, Manager/Admin.
 - **Rapports** (`ReportsView`) : période, chiffres clés, graphique, tableaux, export CSV, Manager/Admin.
 - **Personnel** (`StaffView`, `StaffDialogs`) : comptes, rôles, mots de passe, Admin.

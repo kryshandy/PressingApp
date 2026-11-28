@@ -392,6 +392,72 @@ internal static class SelfTest
             await Capture(message, screensDir, "dialog-message");
         });
 
+        await Step("Clôture de caisse : aperçu, écart, brouillon, validation figée, PDF, dialogue et écran", async () =>
+        {
+            DateTime today = DateTime.Today;
+            DateTime yesterday = today.AddDays(-1);
+            CashClosingPreviewDto preview = (await api.PreviewCashClosingAsync(today))!;
+            Check(preview.TotalExpected == preview.ExpectedCash + preview.ExpectedMobileMoney + preview.ExpectedCard
+                  + preview.ExpectedTransfer + preview.ExpectedOther, "total de l'aperçu");
+
+            using (CashClosingDialog fresh = new(api, preview))
+            {
+                await Capture(fresh, screensDir, "dialog-cash-closing");
+            }
+
+            if (preview.ExistingStatus is null)
+            {
+                try
+                {
+                    await api.CreateCashClosingAsync(new CashClosingRequest(today, 0, preview.ExpectedCash - 500, null));
+                    Check(false, "un écart sans commentaire aurait dû être refusé");
+                }
+                catch (ApiException ex)
+                {
+                    Check(ex.Message.Contains("commentaire", StringComparison.OrdinalIgnoreCase), "message d'écart : " + ex.Message);
+                }
+
+                CashClosingDto draft = (await api.CreateCashClosingAsync(
+                    new CashClosingRequest(today, 0, preview.ExpectedCash - 500, "Auto-test : 500 FCFA manquants")))!;
+                Check(draft.Status == CashClosingStatus.Draft && draft.Variance == -500, "brouillon avec écart de −500");
+
+                using (CashClosingDialog editing = new(api, preview, draft))
+                {
+                    await Capture(editing, screensDir, "dialog-cash-closing-variance");
+                }
+
+                CashClosingDto validated = (await api.ValidateCashClosingAsync(draft.Id))!;
+                Check(validated.Status == CashClosingStatus.Validated && validated.ValidatedAt is not null, "validation");
+                try
+                {
+                    await api.UpdateCashClosingAsync(draft.Id, new CashClosingRequest(today, 0, preview.ExpectedCash, null));
+                    Check(false, "une clôture validée ne doit plus être modifiable");
+                }
+                catch (ApiException ex)
+                {
+                    Check(ex.StatusCode == System.Net.HttpStatusCode.BadRequest, "refus de modification : " + ex.Message);
+                }
+
+                byte[] pdf = await api.GetCashClosingPdfAsync(draft.Id);
+                Check(pdf.Length > 1000 && pdf[0] == (byte)'%' && pdf[1] == (byte)'P', "PDF de la clôture");
+            }
+
+            CashClosingPreviewDto? previewYesterday = await api.PreviewCashClosingAsync(yesterday);
+            if (previewYesterday is { ExistingStatus: null })
+            {
+                await api.CreateCashClosingAsync(new CashClosingRequest(yesterday, 20000, 20000 + previewYesterday.ExpectedCash, null));
+            }
+
+            Check((await api.GetCashClosingsAsync(yesterday, today))!.Count >= 1, "historique des clôtures");
+            CashView cashView = new(fake);
+            hostForm.Controls.Add(cashView);
+            cashView.Dock = DockStyle.Fill;
+            await cashView.LoadAsync();
+            await Capture(cashView, screensDir, "view-cash-closings");
+            hostForm.Controls.Remove(cashView);
+            cashView.Dispose();
+        });
+
         await Step("Retrait partiel avec encaissement du reste", async () =>
         {
             OrderDto fresh = (await api.GetOrderAsync(order.Id))!;
