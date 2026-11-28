@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Pressing.Client;
 using Pressing.Core;
 using Pressing.Core.Dtos;
+using Pressing.Core.Entities;
 using Pressing.Web.Infrastructure;
 using Pressing.Web.Models;
 
@@ -175,7 +176,10 @@ public sealed class AccountController : Controller
         return View(RetryForm.Restore(TempData, new ProfileForm
         {
             FirstName = c.FirstName, LastName = c.LastName, Phone = c.Phone,
-            WhatsApp = c.WhatsApp, Email = c.Email, Address = c.Address
+            WhatsApp = c.WhatsApp, Email = c.Email, Address = c.Address,
+            NotificationPreference = c.NotificationPreference,
+            Consent = c.NotificationPreference != ClientNotificationPreference.None &&
+                      c.ConsentGivenAt.HasValue && !c.ConsentRevokedAt.HasValue
         }));
     }
 
@@ -188,7 +192,7 @@ public sealed class AccountController : Controller
             {
                 var updated = await Api.UpdateProfileAsync(new UpdateProfileRequest(
                     form.FirstName.Trim(), form.LastName.Trim(), form.Phone.Trim(), form.WhatsApp.Trim(),
-                    Blank(form.Email), Blank(form.Address)), ct) ?? throw EmptyResponse();
+                    Blank(form.Email), Blank(form.Address), form.NotificationPreference), ct) ?? throw EmptyResponse();
 
                 // Le nom affiché vient du cookie : on le réémet avec le même jeton.
                 var expires = DateTime.TryParse(User.FindFirst(AuthClaims.TokenExpires)?.Value,

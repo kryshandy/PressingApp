@@ -133,7 +133,7 @@ révocation (`consentRevokedAt`). Un canal exige le numéro WhatsApp ou l'e-mail
 | GET | `/api/portal/orders/{id}` | ClientOnly | | `OrderDto` · 404 (jamais la commande d'un autre client) |
 | GET | `/api/portal/orders/{id}/receipt` | ClientOnly | | `application/pdf` |
 | GET | `/api/portal/profile` | ClientOnly | | `ClientDto` |
-| PUT | `/api/portal/profile` | ClientOnly | `UpdateProfileRequest` | `ClientDto` |
+| PUT | `/api/portal/profile` | ClientOnly | `UpdateProfileRequest` (`NotificationPreference` : `None`, `WhatsApp` ou `Email` ; le consentement est daté à l'enregistrement, 400 si l'e-mail ou le numéro WhatsApp manque) | `ClientDto` |
 | GET | `/api/portal/loyalty` | ClientOnly | | `LoyaltyTransactionDto[]` |
 
 ## Tableau de bord, notifications, rapports

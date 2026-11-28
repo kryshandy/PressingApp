@@ -1,3 +1,4 @@
+@using Pressing.Core.Entities
 @model ProfileForm
 @{
     Layout = "_AccountLayout";
@@ -55,6 +56,27 @@
                 <label asp-for="Address">Adresse</label>
                 <input asp-for="Address" autocomplete="street-address" />
                 <span asp-validation-for="Address" class="field-error"></span>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="field">
+                <label asp-for="NotificationPreference">Rappels de retrait et de solde</label>
+                <select asp-for="NotificationPreference" aria-describedby="notif-hint">
+                    <option value="@ClientNotificationPreference.None">Aucun rappel</option>
+                    <option value="@ClientNotificationPreference.WhatsApp">WhatsApp</option>
+                    <option value="@ClientNotificationPreference.Email">E-mail</option>
+                </select>
+                <span id="notif-hint" class="hint">Vous pouvez changer d'avis à tout moment : choisissez « Aucun rappel » pour tout arrêter.</span>
+                <span asp-validation-for="NotificationPreference" class="field-error"></span>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="field">
+                <label class="check" for="Consent">
+                    <input asp-for="Consent" type="checkbox" />
+                    <span>J'accepte de recevoir des rappels du pressing sur le canal choisi (commande prête, retrait, solde).</span>
+                </label>
+                <span asp-validation-for="Consent" class="field-error"></span>
             </div>
         </div>
     </div>
