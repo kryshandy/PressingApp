@@ -39,7 +39,8 @@ Les trois partagent **la même base SQLite** à travers l'API : un dépôt enreg
 - Un client ne voit **que ses propres** commandes et reçus.
 - Limitation des tentatives de connexion par adresse IP.
 - Journal d'audit de toutes les opérations sensibles.
-- **157 tests automatisés** (calculs, paiements, retraits, droits, portail, suivi, reprise après panne de l'API).
+- **253 tests automatisés** (calculs, paiements, retraits, droits, portail, suivi, reprise après panne de l'API,
+  migrations, rappels, désinscription, assistant vocal).
 
 ---
 
@@ -174,6 +175,10 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Le f
 | `EMAIL_PROVIDER` | `auto`, `resend`, `smtp` ou `simulated` | `auto` |
 | `RESEND_*` ou `SMTP_*` | envoi réel des e-mails | vide |
 | `EMAIL_BACKGROUND_ENABLED` | traitement automatique de la file d'e-mails | `true` |
+| `REMINDERS_ENABLED` | rappels automatiques (WhatsApp / e-mail) aux clients consentants | `true` |
+| `WHATSAPP_PROVIDER` | `simulated` ou `meta` | `simulated` |
+| `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | accès à l'API WhatsApp Business Cloud (Meta) | vide |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` / `WHATSAPP_APP_SECRET` | webhook Meta (réponse « STOP ») | vide |
 | `PRESSING_TRUSTED_PROXIES` | IP des proxys de confiance (reverse proxy) | vide |
 
 `PRESSING_API_URL` et `PRESSING_PUBLIC_API_URL` sont **différents** : le premier dit à l'API sur quelle adresse
@@ -230,11 +235,23 @@ automatiques voulus (confirmation, commande prête, reçu).
    à côté un `.env` contenant `PRESSING_PUBLIC_API_URL=http://<ip-du-serveur>:5180`.
 4. Ne partagez **jamais** le fichier `.db` par le réseau : tous les postes passent par l'API.
 
-### 6.5 Ce qui n'est pas encore configurable
+### 6.5 Rappels WhatsApp et e-mail
 
-Les rappels WhatsApp, l'assistant vocal IA, le paiement en ligne et les étiquettes QR font partie de la v3 en cours
-(voir [CONTRIBUTING.md](CONTRIBUTING.md) et `docs/Brief-etat-et-feuille-de-route-v3.pdf`) : aucune variable n'est à
-renseigner pour eux aujourd'hui. Le numéro WhatsApp saisi dans Paramètres → Boutique est seulement affiché.
+- **Consentement d'abord** : un client ne reçoit des rappels que si sa fiche (Desktop → Clients → modifier) indique un
+  **canal de rappel** (WhatsApp ou e-mail). Ce choix est daté ; « Aucun rappel » date la révocation.
+- **Quels rappels** (toutes les 15 min, entre 8 h et 20 h) : commande prête (WhatsApp), commande non retirée à J+3,
+  J+7 puis J+14 (un seul palier à la fois), solde restant quand la commande attend son retrait, veille de l'échéance.
+  Chaque rappel ne part qu'une fois par commande.
+- **E-mail** : utilise la configuration de la section 6.3 ; chaque e-mail contient un lien vers la page
+  `/desabonnement` du site (`PRESSING_WEB_URL` doit donc être l'adresse publique du site).
+- **WhatsApp** : par défaut `WHATSAPP_PROVIDER=simulated` (rien ne part, tout est journalisé). Avec `meta`, renseignez
+  `WHATSAPP_ACCESS_TOKEN` et `WHATSAPP_PHONE_NUMBER_ID` (Meta for Developers → WhatsApp). **Limite actuelle** : en dehors
+  des 24 h qui suivent un message du client, Meta n'accepte que des *modèles de messages approuvés* ; leur branchement
+  est en cours (tâche T3.1b), les rappels WhatsApp réels ne sont donc fiables qu'en test pour l'instant.
+- Pour tout couper : `REMINDERS_ENABLED=false`.
+
+Pas encore disponibles (v3 en cours, voir `docs/Bilan-integration-et-attentes.pdf`) : l'assistant vocal IA, les
+étiquettes QR, le ticket thermique, la clôture de caisse et le paiement en ligne.
 
 ### 6.6 Dépannage
 
@@ -253,7 +270,11 @@ renseigner pour eux aujourd'hui. Le numéro WhatsApp saisi dans Paramètres → 
 - Base : `%LOCALAPPDATA%\Pressing\pressing.db` (créée automatiquement, mode WAL, catalogue de 20 catégories et tarifs de départ).
 - **Paramètres → Sauvegardes → Sauvegarder maintenant** crée une copie vérifiée dans `Backups`.
 - Ne supprimez jamais `pressing.db`, `pressing.db-wal` ou `pressing.db-shm` : faites d'abord une sauvegarde.
-- Le schéma est créé avec `EnsureCreated` ; le passage aux migrations EF Core est prévu dans les évolutions futures (voir CONTRIBUTING).
+- Le schéma est versionné par des **migrations EF Core** (`src/Pressing.Core/Data/Migrations`), appliquées au démarrage
+  de l'API. Une base existante (créée par la v2) est **adoptée sans perte**, après une sauvegarde automatique
+  `pressing-avant-adoption-…db` ; toute nouvelle migration est précédée d'une sauvegarde `pressing-avant-migration-…db`
+  (dans `PRESSING_BACKUP_PATH`).
+- Développeurs : `dotnet tool restore` installe `dotnet-ef` ; ajout d'une migration, voir CONTRIBUTING §5.
 
 ## 8. Architecture
 
@@ -289,9 +310,9 @@ Guides internes :
 
 ## 10. Suite du projet
 
-Les évolutions à venir (notifications WhatsApp/SMS, paiement Mobile Money en ligne, collecte et livraison,
-étiquettes code-barres, clôture de caisse, migrations, CI, déploiement…) sont réparties entre les 5 membres dans
-**[CONTRIBUTING.md](CONTRIBUTING.md)**.
+État d'avancement, travail attendu de chaque membre et règles pour éviter les conflits :
+**`docs/Bilan-integration-et-attentes.pdf`** (28/11/2026). Organisation Git et conventions :
+**[CONTRIBUTING.md](CONTRIBUTING.md)**. Feuille de route initiale : `docs/Brief-etat-et-feuille-de-route-v3.pdf`.
 
 ## Équipe
 

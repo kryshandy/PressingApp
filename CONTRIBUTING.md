@@ -63,7 +63,7 @@ Comptes de démonstration : voir la section « Comptes » du README.
 | Commits | petits et fréquents, en français, préfixés par la zone : `API : …`, `Core : …`, `Desktop : …`, `Web : …`, `Tests : …`, `Docs : …` |
 | Synchronisation | `git pull --rebase origin main` au moins une fois par jour |
 | Pull Request | une PR par fonctionnalité, description = quoi / pourquoi / comment tester / captures d'écran |
-| Revue | **au moins 1 relecteur** d'un autre lot avant fusion ; l'auteur ne fusionne pas sa propre PR sans relecture |
+| Revue | **Copilot relit automatiquement** chaque PR (effort Max, consignes dans `.github/copilot-instructions.md`) ; on traite chacun de ses commentaires. **+ 1 relecteur humain d'un autre lot** (obligatoire pour `Core/Data`, `Program.cs` et la sécurité, via CODEOWNERS). L'auteur ne fusionne jamais sa PR sans approbation |
 | Fusion | « Squash and merge » si les commits sont désordonnés, sinon « Rebase and merge » |
 
 Avant d'ouvrir une PR, **obligatoire** :
@@ -82,6 +82,9 @@ Avant d'ouvrir une PR, **obligatoire** :
 - `docs/API.md` : contrat partagé.
 
 ## 4. Répartition des chantiers avancés (5 lots)
+
+> **Attribution et échéances à jour : `docs/Bilan-integration-et-attentes.pdf` (28/11/2026)** — lot 1 : Astride ;
+> lot 2 : Mael ; lot 3 : Serena ; lots 4 et 5 : Kevin et Victoire. La liste des tâches ci-dessous reste la référence.
 
 Chaque lot est **indépendant** : un propriétaire principal, des fichiers majoritairement à lui,
 et des points de contact clairement identifiés. Les priorités sont notées **P1** (à faire en premier) à **P3**.
@@ -147,16 +150,31 @@ Points de contact : tous les projets — le lot E relit en priorité les PR qui 
 ## 5. Changer le schéma de la base
 
 La base SQLite contient les vraies données du pressing : **on ne supprime jamais `pressing.db`**.
+Depuis le 28/11, le schéma est versionné par des **migrations EF Core** (`src/Pressing.Core/Data/Migrations`).
 
-1. Tant que les migrations (lot E) ne sont pas en place : coordonnez-vous avec le propriétaire du lot E avant tout ajout de colonne/table.
-2. Une fois en place : `dotnet ef migrations add NomExplicite --project src/Pressing.Core --startup-project src/Pressing.Api`.
-3. Une migration doit être **non destructive** (ajout de colonnes avec valeur par défaut, pas de suppression de données).
-4. Testez-la sur une **copie** de la base (sauvegarde créée depuis Paramètres → Sauvegarder).
+**Interdit** : `ALTER TABLE` / `CREATE TABLE` en SQL brut dans `DatabaseInitializer` (c'est ce qui a mis la PR des
+migrations en conflit le 27/11). **Toute** modification d'entité passe par une migration :
+
+```powershell
+dotnet tool restore                      # une fois : installe dotnet-ef (version figée dans dotnet-tools.json)
+.\scripts\stop.ps1                        # l'outil compile l'API : rien ne doit tourner
+dotnet tool run dotnet-ef migrations add NomExplicite --project src/Pressing.Core --startup-project src/Pressing.Api --output-dir Data/Migrations
+```
+
+1. **Annoncer** dans le canal de l'équipe « je crée la migration X » ; une seule migration en cours à la fois.
+2. **Relire le fichier généré** : migration **non destructive** ; une colonne non nulle reçoit une vraie valeur par
+   défaut (pour une énumération stockée en texte : son nom, ex. `"None"`, jamais `""`).
+3. Si `main` a reçu une autre migration entre-temps : supprimer la sienne (`migrations remove`), se rebaser, la
+   **régénérer**. On ne fusionne jamais deux `PressingDbContextModelSnapshot.cs` à la main.
+4. Ajouter un test dans `tests/Pressing.Tests/Integration/MigrationTests.cs` si la migration touche des données existantes.
+5. La tester sur une **copie** de la vraie base (`PRESSING_DB_PATH` vers la copie) : l'API sauvegarde avant de migrer.
 
 ## 6. Conventions de code
 
 - C# moderne (`Nullable` activé, `async/await` partout, jamais de `.Result` / `.Wait()`).
 - Noms de types et membres en anglais (comme l'existant), **textes visibles en français** avec accents.
+- **Fichiers en UTF-8.** Sous Windows PowerShell 5, `Get-Content`/`Set-Content` sans `-Encoding utf8` corrompent les
+  accents (« Ã© ») : avant chaque commit, `git diff` ne doit contenir ni « Ã » ni « â€ ».
 - Montants en `decimal`, affichage via `Fmt.Money` ; dates via `Fmt.Date` / `Fmt.DateTime`.
 - Desktop : un écran = un `UserControl` enregistré dans la navigation (voir `src/Pressing.Desktop/README-DESKTOP.md`) ; réutiliser les contrôles de `Ui/` (boutons, cartes, grilles) — pas de contrôle Windows gris non stylé.
 - Web : réutiliser les variables et composants de `wwwroot/css/site.css` ; pas de nouvelle bibliothèque front sans accord de l'équipe ; accessibilité (labels, contrastes, focus visibles).
