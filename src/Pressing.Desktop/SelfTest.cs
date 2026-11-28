@@ -598,6 +598,17 @@ internal static class SelfTest
             Write("       notifications non lues : " + unread);
         });
 
+        await Step("Charge atelier prévisionnelle et date conseillée", async () =>
+        {
+            WorkshopLoadDto? load = await api.GetWorkshopLoadAsync(14);
+            Check(load is { DaysCount: 14, DailyCapacity: >= 1 } && load.Days.Count == 14 && load.Days[0].IsToday, "charge sur 14 jours");
+            CategoryDto first = (await api.GetCatalogAsync())!.First();
+            ServiceType service = first.Prices.First(p => p.IsActive).ServiceType;
+            WorkshopDueDateSuggestionDto? suggestion = await api.SuggestDueDateAsync([new WorkshopSuggestLineRequest(first.Id, service, 2)], false);
+            Check(suggestion is { SuggestedDate: var d } && d >= DateTime.Today && suggestion.Explanation.Contains("délai", StringComparison.Ordinal), "date conseillée");
+            Write("       " + suggestion!.Explanation);
+        });
+
         OrderDto cancelOrder = null!;
         await Step("Annulation et remboursement (Manager/Admin)", async () =>
         {
@@ -657,11 +668,28 @@ internal static class SelfTest
             await Task.Delay(500); // laisse finir le chargement asynchrone déclenché par le changement d'onglet
             string? original = settings.GetFieldValue(SettingsKeys.ShopSlogan);
             settings.SetFieldValue(SettingsKeys.ShopSlogan, "Slogan auto-test " + tag);
-            int saved = await settings.SaveChangesAsync();
-            Check(saved == 1, "un seul paramètre modifié, obtenu " + saved);
+            // Le chargement d'un onglet lancé par le changement de section peut encore occuper l'écran (UiRun refuse alors
+            // un second appel et renvoie -1) : on réessaie brièvement au lieu de dépendre du hasard.
+            async Task<int> SaveWhenIdleAsync()
+            {
+                int count = -1;
+                for (int attempt = 0; attempt < 20 && count == -1; attempt++)
+                {
+                    count = await settings.SaveChangesAsync();
+                    if (count == -1)
+                    {
+                        await Task.Delay(250);
+                    }
+                }
+
+                return count;
+            }
+
+            int savedCount = await SaveWhenIdleAsync();
+            Check(savedCount == 1, "un seul paramètre modifié (enregistrés : " + savedCount + ")");
             Check((await api.GetSettingsAsync())!.Values[SettingsKeys.ShopSlogan] == "Slogan auto-test " + tag, "paramètre enregistré");
             settings.SetFieldValue(SettingsKeys.ShopSlogan, original ?? string.Empty);
-            Check(await settings.SaveChangesAsync() == 1, "paramètre remis");
+            Check(await SaveWhenIdleAsync() == 1, "paramètre remis");
             hostForm.Controls.Remove(settings);
             settings.Dispose();
 

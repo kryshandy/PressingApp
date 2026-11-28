@@ -236,6 +236,12 @@ public class SettingsService
             throw new InvalidOperationException("Le nom de l'imprimante de tickets est invalide (120 caractères au plus, sans caractère de contrôle).");
         }
 
+        if (key == SettingsKeys.WorkshopDailyCapacity
+            && (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int capacity) || capacity is < 1 or > 10_000))
+        {
+            throw new InvalidOperationException("La capacité journalière de l'atelier doit être un nombre entier d'articles entre 1 et 10 000.");
+        }
+
         if (key is SettingsKeys.DefaultProcessingDays or SettingsKeys.ExpressProcessingDays
             or SettingsKeys.MaxDiscountPercent or SettingsKeys.LoyaltyPointsPerAmount)
         {

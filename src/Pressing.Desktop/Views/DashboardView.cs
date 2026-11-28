@@ -22,6 +22,9 @@ public sealed class DashboardView : BaseView
     private readonly StatusBars _status = new();
     private readonly GridCard _recent = new("Aucune commande récente.");
     private readonly GridCard _readyList = new("Aucune commande prête pour le moment.");
+    private readonly WorkshopLoadChart _load = new() { Compact = true, DesiredHeight = 104 };
+    private readonly TextLabel _loadSummary = new() { Wrap = true, Font = Theme.F(10f), ForeColor = Theme.TextMuted, Text = "Chargement de la charge…" };
+    private readonly TitledCard _loadCard;
 
     public DashboardView(IAppHost host) : base(host)
     {
@@ -60,13 +63,21 @@ public sealed class DashboardView : BaseView
         TitledCard recentCard = new("Commandes récentes", _recent, "Double-clic pour ouvrir", flushContent: true);
         TitledCard readyCard = new("Prêtes à retirer", _readyList, "Double-clic pour ouvrir", flushContent: true);
 
-        // Grille de 12 : KPI 4+4+4 sur deux lignes de même hauteur, 8+4 (graphique + statuts), 6+6 (listes).
+        // Carte « Charge » compacte : 14 jours de charge atelier ; un clic ouvre l'Atelier.
+        VStack loadContent = new VStack(8).Add(_load, StackSize.Fixed, 104).Add(_loadSummary);
+        _loadCard = new TitledCard("Charge de l'atelier", loadContent, "Articles attendus sur les 14 prochains jours");
+        FlatButton openWorkshop = new() { Text = "Ouvrir l'atelier", Kind = ButtonKind.Secondary, IconGlyph = Icons.Workshop };
+        openWorkshop.Click += (_, _) => Host.Navigate(NavRegistry.Workshop);
+        _loadCard.AddAction(openWorkshop);
+
+        // Grille de 12 : KPI 4+4+4 sur deux lignes de même hauteur, 8+4 (graphique + statuts), 12 (charge atelier), 6+6 (listes).
         VStack page = new VStack()
             .Add(_satisfaction is null
                 ? new GridRow().Add(_revenueToday, 4).Add(_revenueMonth, 4).Add(_outstanding, 4)
                 : new GridRow().Add(_revenueToday, 3).Add(_revenueMonth, 3).Add(_outstanding, 3).Add(_satisfaction, 3))
             .Add(new GridRow().Add(_active, 4).Add(_ready, 4).Add(_overdue, 4))
             .Add(new GridRow(352).Add(_chartCard, 8).Add(statusCard, 4))
+            .Add(_loadCard)
             .Add(new GridRow().Add(recentCard, 6).Add(readyCard, 6));
         SetPage(_header, page, scroll: true);
     }
@@ -145,5 +156,32 @@ public sealed class DashboardView : BaseView
         _readyList.Grid.SetRows(data.ReadyOrdersList.Select(o => new OrderRow(o)).ToList());
         _recent.UpdateEmpty();
         _readyList.UpdateEmpty();
+        await LoadWorkshopLoadAsync();
+    }
+
+    /// <summary>Charge atelier : une erreur ici ne doit jamais empêcher l'affichage du reste du tableau de bord.</summary>
+    private async Task LoadWorkshopLoadAsync()
+    {
+        try
+        {
+            WorkshopLoadDto? load = await Api.GetWorkshopLoadAsync(14);
+            if (!Alive || load is null)
+            {
+                return;
+            }
+
+            _load.SetData(load);
+            _loadSummary.Text = WorkshopLoadChart.Summary(load, out bool attention);
+            _loadSummary.ForeColor = attention ? Theme.Amber : Theme.TextMuted;
+            _loadCard.Subtitle = $"Articles attendus sur 14 jours · capacité {load.DailyCapacity} par jour";
+            _loadCard.RequestPageLayout();
+        }
+        catch (ApiException)
+        {
+            if (Alive)
+            {
+                _loadSummary.Text = "Charge de l'atelier indisponible pour le moment.";
+            }
+        }
     }
 }

@@ -242,6 +242,7 @@ app.MapAdminEndpoints();
 app.MapAssistantEndpoints();
 app.MapCashClosingEndpoints();
 app.MapWorkshopEndpoints();
+app.MapWorkshopLoadEndpoints();
 app.MapPrintingEndpoints();
 
 await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())

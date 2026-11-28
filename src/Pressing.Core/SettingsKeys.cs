@@ -40,6 +40,8 @@ public static class SettingsKeys
 
     /// <summary>Double authentification (TOTP) exigée des comptes Manager (Administrateur uniquement pour la modifier). Activée par défaut.</summary>
     public const string RequireManagerTwoFactor = "Security.RequireManagerTwoFactor";
+    /// <summary>Capacité de l'atelier en articles par jour (charge prévisionnelle) ; entier de 1 à 10 000.</summary>
+    public const string WorkshopDailyCapacity = "Workshop.DailyCapacity";
 
     public static readonly IReadOnlyDictionary<string, string> Defaults = new Dictionary<string, string>
     {
@@ -70,6 +72,7 @@ public static class SettingsKeys
         [ReceiptPaperSize] = "A5",
         [TicketPrinterName] = string.Empty,
         [TicketPrinterOpenDrawer] = "false",
-        [RequireManagerTwoFactor] = "true"
+        [RequireManagerTwoFactor] = "true",
+        [WorkshopDailyCapacity] = "60"
     };
 }

@@ -331,7 +331,7 @@ public sealed class SettingsView : BaseView
             ? "Configuration de la boutique, des e-mails et de la sécurité des données"
             : "Configuration de la boutique en consultation seule");
         header.AddAction("Actualiser", ButtonKind.Secondary, Icons.Refresh, async (_, _) => await RunAsync(RefreshAsync));
-        if (admin)
+        if (Session.IsManagerOrAdmin)
         {
             header.AddControl(_save);
         }
@@ -375,7 +375,7 @@ public sealed class SettingsView : BaseView
         VStack form = new();
         if (!admin)
         {
-            form.Add(new TextLabel { Text = "Lecture seule : seuls les administrateurs peuvent modifier les paramètres.", ForeColor = Theme.Amber, Font = Theme.F(9.5f), Wrap = true });
+            form.Add(new TextLabel { Text = "Lecture seule : seuls les administrateurs peuvent modifier les paramètres (les managers règlent la capacité de l'atelier dans l'onglet Commandes).", ForeColor = Theme.Amber, Font = Theme.F(9.5f), Wrap = true });
         }
 
         form.Add(host2);
@@ -384,7 +384,7 @@ public sealed class SettingsView : BaseView
 
         if (!admin)
         {
-            foreach (Field f in _fields)
+            foreach (Field f in _fields.Where(f => f.Key != SettingsKeys.WorkshopDailyCapacity || !Session.IsManagerOrAdmin))
             {
                 if (f.Control is InputBox input)
                 {
@@ -582,9 +582,14 @@ public sealed class SettingsView : BaseView
         FormGrid pickup = new(1);
         pickup.Add(Toggle(SettingsKeys.AllowPickupWithBalance, "Retrait avec solde", "Autoriser le retrait des articles même s'il reste un solde à payer"));
 
+        FormGrid capacity = new(2);
+        capacity.AddField("Capacité journalière de l'atelier", Stepper(SettingsKeys.WorkshopDailyCapacity, "Capacité journalière", 1, 10000), 1,
+            "Au-delà, le jour est signalé en surcharge.");
+
         return ScrollPage(
             Card("Délais et remises", "Valeurs proposées lors d'un nouveau dépôt.", delays),
-            Card("Retrait des articles", "Règle appliquée lors de la remise des vêtements.", pickup));
+            Card("Retrait des articles", "Règle appliquée lors de la remise des vêtements.", pickup),
+            Card("Charge de l'atelier", "Utilisée par la charge prévisionnelle et la date de retrait conseillée · modifiable par les managers.", capacity));
     }
 
     private Control BuildLoyaltyPage()
@@ -835,7 +840,8 @@ public sealed class SettingsView : BaseView
         _layout?.Viewport?.ScrollTo(0);
         _tabs.RequestPageLayout();
 
-        _save.Visible = Session.IsAdmin && key is not (TabBackups or TabAudit);
+        // Le manager n'enregistre que la capacité de l'atelier (onglet Commandes) ; l'administrateur, tout.
+        _save.Visible = Session.IsAdmin ? key is not (TabBackups or TabAudit) : Session.IsManagerOrAdmin && key == TabOrders;
         if (Alive)
         {
             await RunAsync(() => LoadTabAsync(key));
@@ -976,7 +982,7 @@ public sealed class SettingsView : BaseView
     /// <summary>Enregistre les paramètres modifiés ; retourne leur nombre (-1 si invalide ou en erreur).</summary>
     internal async Task<int> SaveChangesAsync()
     {
-        if (!Session.IsAdmin)
+        if (!Session.IsManagerOrAdmin)
         {
             return -1;
         }
@@ -985,6 +991,11 @@ public sealed class SettingsView : BaseView
         if (changes is null)
         {
             return -1;
+        }
+
+        if (!Session.IsAdmin)
+        {
+            return await SaveCapacityAsManagerAsync(changes);
         }
 
         if (changes.Count == 0)
@@ -1003,6 +1014,29 @@ public sealed class SettingsView : BaseView
         ApplySettings(result);
         Host.Toast(changes.Count == 1 ? "1 paramètre enregistré." : $"{changes.Count} paramètres enregistrés.");
         return changes.Count;
+    }
+
+    /// <summary>Un manager ne peut enregistrer que la capacité de l'atelier (<c>PUT /api/workshop/capacity</c>).</summary>
+    private async Task<int> SaveCapacityAsManagerAsync(Dictionary<string, string> changes)
+    {
+        if (!changes.TryGetValue(SettingsKeys.WorkshopDailyCapacity, out string? value))
+        {
+            Host.Toast("Aucune modification à enregistrer.", MessageKind.Info);
+            return 0;
+        }
+
+        WorkshopCapacityDto? result = null;
+        bool ok = await RunAsync(
+            async () => result = await Api.SetWorkshopCapacityAsync(int.Parse(value, CultureInfo.InvariantCulture)),
+            "Enregistrement de la capacité impossible");
+        if (!ok || !Alive || result is null)
+        {
+            return -1;
+        }
+
+        _loaded[SettingsKeys.WorkshopDailyCapacity] = result.DailyCapacity.ToString(CultureInfo.InvariantCulture);
+        Host.Toast("Capacité de l'atelier enregistrée.");
+        return 1;
     }
 
     // ---- E-mails ----------------------------------------------------------------------------------

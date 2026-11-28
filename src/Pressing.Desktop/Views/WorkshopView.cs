@@ -150,6 +150,11 @@ public sealed class WorkshopView : BaseView
     private readonly Stack<ScanEntry> _undoable = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly System.Windows.Forms.Timer _focusTimer = new() { Interval = 1500 };
+    private readonly WorkshopLoadChart _loadChart = new() { DesiredHeight = 176 };
+    private readonly TextLabel _loadSummary = new() { Wrap = true, Font = Theme.F(10f), ForeColor = Theme.TextMuted, Text = "Chargement de la charge…" };
+    private readonly TextLabel _loadServices = new() { Wrap = true, Font = Theme.F(9.5f), ForeColor = Theme.TextMuted };
+    private readonly TitledCard _loadCard;
+    private bool _loadRefreshing;
 
     public WorkshopView(IAppHost host) : base(host)
     {
@@ -170,11 +175,21 @@ public sealed class WorkshopView : BaseView
         grid.SetOptional("detail", "client", "ticket");
         TitledCard historyCard = new("Derniers scans", _history, $"Les {HistoryLimit} derniers, du plus récent au plus ancien", flushContent: true);
 
+        // Charge prévisionnelle des 14 prochains jours (capacité : Paramètres › Commandes).
+        VStack loadContent = new VStack(12)
+            .Add(_loadSummary)
+            .Add(_loadChart, StackSize.Fixed, 176)
+            .Add(_loadServices);
+        _loadCard = new TitledCard("Charge des 14 prochains jours", loadContent, "Articles attendus par jour de retrait prévu");
+
+        _history.AutoHeightRows = 6;
+        _history.MaxRows = 12;
         VStack page = new VStack()
             .Add(scanCard)
             .Add(_display, StackSize.Fixed, 184)
+            .Add(_loadCard)
             .Add(historyCard, StackSize.Fill);
-        SetPage(header, page);
+        SetPage(header, page, scroll: true);
 
         _submit.Click += async (_, _) => await SubmitFromInputAsync();
         _input.KeyDown += async (_, e) =>
@@ -197,16 +212,53 @@ public sealed class WorkshopView : BaseView
 
     public override bool KeepAlive => true;
 
-    public override Task LoadAsync()
+    public override async Task LoadAsync()
     {
         _input.Focus();
-        return Task.CompletedTask;
+        await RefreshLoadAsync();
     }
 
-    public override Task ReactivateAsync()
+    public override async Task ReactivateAsync()
     {
         _input.Focus();
-        return Task.CompletedTask;
+        await RefreshLoadAsync();
+    }
+
+    /// <summary>Recharge la carte de charge ; une erreur réseau n'interrompt jamais le scan.</summary>
+    private async Task RefreshLoadAsync()
+    {
+        if (_loadRefreshing)
+        {
+            return;
+        }
+
+        _loadRefreshing = true;
+        try
+        {
+            WorkshopLoadDto? load = await Api.GetWorkshopLoadAsync(14);
+            if (!Alive || load is null)
+            {
+                return;
+            }
+
+            _loadChart.SetData(load);
+            _loadSummary.Text = WorkshopLoadChart.Summary(load, out bool attention);
+            _loadSummary.ForeColor = attention ? Theme.Amber : Theme.TextMuted;
+            _loadServices.Text = WorkshopLoadChart.ServiceTotals(load);
+            _loadCard.Subtitle = $"Capacité : {load.DailyCapacity} articles par jour (Paramètres › Commandes) · barre rouge = surcharge";
+            _loadCard.RequestPageLayout();
+        }
+        catch (ApiException)
+        {
+            if (Alive)
+            {
+                _loadSummary.Text = "Charge de l'atelier indisponible pour le moment.";
+            }
+        }
+        finally
+        {
+            _loadRefreshing = false;
+        }
     }
 
     protected override void Dispose(bool disposing)
@@ -278,6 +330,7 @@ public sealed class WorkshopView : BaseView
 
             Show(entry);
             PlaySound(entry.Result is not null);
+            _ = RefreshLoadAsync();
             if (entry.Result?.OrderReady == true)
             {
                 Host.Toast($"Commande {entry.Result.TicketNumber} prête : le client est prévenu.");
@@ -330,6 +383,7 @@ public sealed class WorkshopView : BaseView
 
             Show(entry);
             PlaySound(entry.Result is not null);
+            _ = RefreshLoadAsync();
         }
         finally
         {

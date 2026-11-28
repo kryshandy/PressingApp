@@ -10,6 +10,15 @@ Application du personnel. API : variable `PRESSING_PUBLIC_API_URL` (défaut `htt
 ## Écrans
 Tableau de bord, Nouveau dépôt, Commandes (+ détail), Clients (+ fiche), Retraits, Caisse, Impayés, Tarifs, Mon compte, puis l'**Atelier** et l'administration :
 - **Atelier** (`WorkshopView`) : champ toujours actif pour la douchette USB (elle saisit comme un clavier et finit par Entrée) ou la saisie manuelle d'un code d'étiquette `PRESS-AAAA-NNNNN-II[-a]` ; chaque scan fait avancer l'article (Déposé → En traitement → Prêt, `POST /api/workshop/scan`), grand affichage du dernier article, historique, sons, « Annuler le dernier scan » (une étape en arrière). Étiquettes : bouton « Étiquettes » du détail de commande (planche A4 PDF).
+- **Charge de l'atelier** : carte « Charge des 14 prochains jours » dans l'Atelier (`WorkshopLoadChart` de `Ui/LoadChart.cs` : une barre par jour, verte < 70 % de la capacité, ambre jusqu'à la capacité, rouge en surcharge ; info-bulle avec le détail par service ; articles en retard) et carte « Charge de l'atelier » compacte sur le tableau de bord. Capacité journalière : Paramètres › Commandes (défaut 60 ; modifiable par Manager/Admin). **Date conseillée pour le dépôt** (à brancher dans `NewOrderView`, pas encore fait) :
+  ```csharp
+  // lignes du dépôt en cours + case Express → première date respectant le délai catalogue ET la capacité
+  WorkshopDueDateSuggestionDto? s = await Api.SuggestDueDateAsync(
+      lines.Select(l => new WorkshopSuggestLineRequest(l.CategoryId, l.ServiceType, l.Quantity)).ToList(), express);
+  // s.SuggestedDate → proposition (à passer en CreateOrderRequest.DueDate) ; s.Explanation → texte à afficher,
+  // ex. « samedi 5 déc. : délai de 3 jours, vendredi complet. » ; s.CapacityRespected == false : aucun jour libre.
+  ```
+  L'appel lève `ApiException` (400) si la liste est vide ou si un tarif est inactif : l'appeler après chaque changement de lignes/express, avec une petite temporisation.
 - **Ticket 80 mm** : bouton du détail de commande ; imprime en ESC/POS brut (`Services/RawPrinter.cs`, winspool) sur l'imprimante réglée dans Paramètres › Reçus (« Imprimante ticket 80 mm », vide = désactivé). Jamais d'impression réelle en autotest.
 - **Caisse** (`CashView`) : paiements et totaux par mode ; bouton « Clôturer la journée » (`CashClosingDialog` : attendus par mode, fond de caisse, espèces comptées, écart en direct, commentaire obligatoire si écart) ; Manager/Admin : historique des clôtures, validation (clôture figée) et PDF.
 - **Promotions** (`PromotionsView`, `PromotionDialog`) : codes promo, Manager/Admin.
