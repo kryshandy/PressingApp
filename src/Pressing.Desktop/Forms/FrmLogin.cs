@@ -1,5 +1,7 @@
 using System.Drawing.Drawing2D;
 using Pressing.Client;
+using Pressing.Core.Dtos;
+using Pressing.Desktop.Dialogs;
 using Pressing.Desktop.Services;
 using Pressing.Desktop.Ui;
 
@@ -187,12 +189,29 @@ public sealed class FrmLogin : Form
         try
         {
             var response = await _api.LoginStaffAsync(user, password);
+            if (response is { MfaRequired: true })
+            {
+                response = await CompleteSecondFactorAsync();
+                if (response is null)
+                {
+                    return;
+                }
+            }
+
             if (response?.Staff is null)
             {
                 _api.Logout();
                 ShowError(response?.Client is not null
                     ? "Ce compte est un compte client : utilisez le site web."
                     : "Réponse inattendue du serveur.");
+                return;
+            }
+
+            // Manager sans double authentification (exigée par l'administrateur) : activation avant d'ouvrir la coque.
+            if (response.TwoFactorSetupRequired && !await RunMandatorySetupAsync())
+            {
+                _api.Logout();
+                ShowError("La double authentification est obligatoire pour les comptes responsables. Connexion annulée.");
                 return;
             }
 
@@ -217,6 +236,63 @@ public sealed class FrmLogin : Form
                 _signIn.Text = "Se connecter";
                 UiRun.SetBusy(this, false);
             }
+        }
+    }
+
+    /// <summary>
+    /// Second temps de la connexion : demande le code (application ou secours) jusqu'à réussite, annulation, verrouillage
+    /// ou expiration. Renvoie null (message affiché) si la connexion est abandonnée.
+    /// </summary>
+    private async Task<AuthResponse?> CompleteSecondFactorAsync()
+    {
+        string? message = null;
+        while (true)
+        {
+            using PromptDialog prompt = new("Vérification en deux étapes",
+                message ?? "Saisissez le code de votre application d'authentification.",
+                "Code à 6 chiffres ou code de secours", "Vérifier", true, false);
+            if (prompt.ShowDialog(this) != DialogResult.OK)
+            {
+                _api.Logout();
+                ShowError("Connexion annulée : le code de vérification n'a pas été saisi.");
+                return null;
+            }
+
+            try
+            {
+                return await _api.LoginStaffMfaAsync(prompt.Value);
+            }
+            catch (ApiException ex)
+            {
+                if (ex.StatusCode == System.Net.HttpStatusCode.Locked || ex.Message.Contains("expiré", StringComparison.Ordinal) || ex.StatusCode != System.Net.HttpStatusCode.Unauthorized)
+                {
+                    _api.Logout();
+                    ShowError(ex.Message);
+                    return null;
+                }
+
+                message = ex.Message;
+            }
+        }
+    }
+
+    private async Task<bool> RunMandatorySetupAsync()
+    {
+        try
+        {
+            TwoFactorSetupDto? setup = await _api.BeginTwoFactorSetupAsync();
+            if (setup is null)
+            {
+                return false;
+            }
+
+            using TwoFactorSetupDialog dialog = new(_api, setup, mandatory: true);
+            return dialog.ShowDialog(this) == DialogResult.OK;
+        }
+        catch (ApiException ex)
+        {
+            ShowError(ex.Message);
+            return false;
         }
     }
 
