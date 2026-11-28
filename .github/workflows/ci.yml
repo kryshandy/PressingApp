@@ -29,6 +29,15 @@ jobs:
       - name: Tests
         run: dotnet test PressingApp.sln --no-build -c Release --verbosity normal
 
-      # À activer quand l'autotest Desktop tourne sans fenêtre (à valider avec le script du dépôt) :
-      # - name: Autotest Desktop
-      #   run: ./scripts/build.ps1 -Tests
+      # Autotest Desktop sans interaction : API jetable (base temporaire, port 5290) + Pressing.Desktop.exe --selftest.
+      - name: Autotest Desktop
+        shell: powershell
+        run: ./scripts/ci-selftest.ps1 -Port 5290
+
+      - name: Journal de l'autotest Desktop (en cas d'échec)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pressing-selftest-log
+          path: artifacts/selftest/
+          if-no-files-found: ignore
