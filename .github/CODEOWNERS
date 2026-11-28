@@ -1,15 +1,32 @@
 # Le propriétaire est demandé automatiquement en relecture.
-# Remplacer @membre1 ... @kevinulrichkougang-netizen par les vrais pseudos GitHub.
-/tools/assistant/ @membre1
-/src/Pressing.Core/Assistant/ @membre1 @membre2
-/src/Pressing.Api/Endpoints/AssistantEndpoints.cs @membre2
-/src/Pressing.Desktop/Assistant/ @membre2
-/src/Pressing.Core/Messaging/ @membre3
+# Pseudos GitHub : Mael = @mael74013, Serena = @serenahougang, Astride = @NtsimiAstride,
+# Kevin = @kevinulrichkougang-netizen.
+# TODO : ajouter le pseudo GitHub de Victoire à côté de Kevin (lots 4 et 5 : Kevin et Victoire)
+# Dans ce fichier, la DERNIÈRE règle qui correspond à un chemin l'emporte : les chemins précis sont donc
+# placés après les dossiers plus larges.
+
+# Lot 2 (Mael) : assistant vocal (Core, API, Desktop)
+/src/Pressing.Core/Assistant/ @mael74013
+/src/Pressing.Api/Endpoints/AssistantEndpoints.cs @mael74013
+/src/Pressing.Desktop/Assistant/ @mael74013
+
+# Lot 1 (Astride) : moteurs de l'assistant (plus précis que le dossier Assistant/ ci-dessus)
+/tools/assistant/ @NtsimiAstride
+/src/Pressing.Core/Assistant/Engines/ @NtsimiAstride
+
+# Lot 3 (Serena) : messagerie et rappels
+/src/Pressing.Core/Messaging/ @serenahougang
+/src/Pressing.Core/Services/ReminderService.cs @serenahougang
+/src/Pressing.Api/Endpoints/MessagingEndpoints.cs @serenahougang
+
+# Lots 4 et 5 (Kevin ; Victoire à ajouter) : étiquettes, caisse, données, intégration et livraison
 /src/Pressing.Core/Labels/ @kevinulrichkougang-netizen
 /src/Pressing.Core/Data/ @kevinulrichkougang-netizen
 /.github/ @kevinulrichkougang-netizen
 /scripts/ @kevinulrichkougang-netizen
 /src/Pressing.Api/Program.cs @kevinulrichkougang-netizen
-/docs/API.md @kevinulrichkougang-netizen @membre2
-/src/Pressing.Desktop/Ui/ @kevinulrichkougang-netizen @membre2
-/src/Pressing.Web/wwwroot/css/ @kevinulrichkougang-netizen @membre2
+
+# Fichiers partagés : Kevin + Mael
+/docs/API.md @kevinulrichkougang-netizen @mael74013
+/src/Pressing.Desktop/Ui/ @kevinulrichkougang-netizen @mael74013
+/src/Pressing.Web/wwwroot/css/ @kevinulrichkougang-netizen @mael74013

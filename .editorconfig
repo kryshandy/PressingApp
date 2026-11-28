@@ -1,0 +1,41 @@
+# EditorConfig : https://editorconfig.org
+# Ce fichier ne reformate rien tout seul : il évite seulement que l'éditeur de chacun abîme les accents.
+# Le dépôt est en UTF-8 ; Git gère les fins de ligne (core.autocrlf), on ne les impose donc pas, sauf pour
+# les scripts PowerShell.
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = false
+
+[*.cs]
+charset = utf-8
+indent_style = space
+indent_size = 4
+
+[*.cshtml]
+charset = utf-8
+indent_style = space
+indent_size = 4
+
+[*.{js,css}]
+charset = utf-8
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml}]
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+[*.md]
+charset = utf-8
+trim_trailing_whitespace = false
+
+# Windows PowerShell 5.1 lit un script sans BOM en ANSI et abîme les accents : BOM obligatoire.
+[*.ps1]
+charset = utf-8-bom
+end_of_line = crlf
+indent_style = space
+indent_size = 4

@@ -11,6 +11,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Accents corrompus (« Ã© », « â€™ ») et scripts .ps1 sans BOM UTF-8 : échec immédiat, avec fichier:ligne.
+      - name: Contrôle d'encodage
+        shell: powershell
+        run: ./scripts/check-encoding.ps1
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
