@@ -83,7 +83,7 @@ public sealed class ReminderService
 
             bool waitingPickup = order.Status is OrderStatus.Ready or OrderStatus.PartiallyPickedUp;
 
-            var reminders = new List<(string Type, string Subject, string Body)>();
+            var reminders = new List<(string Type, string Subject, string Body, string[] Vars)>();
 
             // « Prête » par WhatsApp seulement : l'e-mail « commande prête » existe déjà (EmailService).
             if (order.Status == OrderStatus.Ready &&
@@ -94,7 +94,8 @@ public sealed class ReminderService
                 reminders.Add((
                     "ready",
                     "Votre commande est prête",
-                    $"Bonjour {order.Client.FirstName}, votre commande {order.TicketNumber} est prête. Vous pouvez venir la récupérer."
+                    $"Bonjour {order.Client.FirstName}, votre commande {order.TicketNumber} est prête. Vous pouvez venir la récupérer.",
+                    [order.Client.FirstName, order.TicketNumber]
                 ));
             }
 
@@ -108,21 +109,24 @@ public sealed class ReminderService
                     reminders.Add((
                         "uncollected-j3",
                         "Rappel : commande non récupérée",
-                        $"Bonjour {order.Client.FirstName}, votre commande {order.TicketNumber} attend toujours d'être récupérée depuis 3 jours."
+                        $"Bonjour {order.Client.FirstName}, votre commande {order.TicketNumber} attend toujours d'être récupérée depuis 3 jours.",
+                        [order.Client.FirstName, order.TicketNumber, "3"]
                     ));
 
                 if (days >= 7 && days < 14)
                     reminders.Add((
                         "uncollected-j7",
                         "Rappel : commande en attente",
-                        $"Bonjour {order.Client.FirstName}, votre commande {order.TicketNumber} est toujours en attente de retrait depuis 7 jours."
+                        $"Bonjour {order.Client.FirstName}, votre commande {order.TicketNumber} est toujours en attente de retrait depuis 7 jours.",
+                        [order.Client.FirstName, order.TicketNumber, "7"]
                     ));
 
                 if (days >= 14)
                     reminders.Add((
                         "uncollected-j14",
                         "Dernier rappel de retrait",
-                        $"Bonjour {order.Client.FirstName}, votre commande {order.TicketNumber} est en attente de retrait depuis 14 jours. Merci de nous contacter."
+                        $"Bonjour {order.Client.FirstName}, votre commande {order.TicketNumber} est en attente de retrait depuis 14 jours. Merci de nous contacter.",
+                        [order.Client.FirstName, order.TicketNumber, "14"]
                     ));
             }
 
@@ -132,7 +136,8 @@ public sealed class ReminderService
                 reminders.Add((
                     "unpaid-balance",
                     "Rappel de solde impayé",
-                    $"Bonjour {order.Client.FirstName}, le solde restant de votre commande {order.TicketNumber} est de {order.Balance:N0} FCFA."
+                    $"Bonjour {order.Client.FirstName}, le solde restant de votre commande {order.TicketNumber} est de {order.Balance:N0} FCFA.",
+                    [order.Client.FirstName, order.TicketNumber, $"{order.Balance:N0} FCFA"]
                 ));
             }
 
@@ -141,7 +146,8 @@ public sealed class ReminderService
                 reminders.Add((
                     "due-tomorrow",
                     "Rappel : échéance de votre commande",
-                    $"Bonjour {order.Client.FirstName}, votre commande {order.TicketNumber} a une échéance prévue demain."
+                    $"Bonjour {order.Client.FirstName}, votre commande {order.TicketNumber} a une échéance prévue demain.",
+                    [order.Client.FirstName, order.TicketNumber, order.DueDate.ToString("dd/MM/yyyy")]
                 ));
             }
 
@@ -153,7 +159,7 @@ public sealed class ReminderService
                     continue;
 
                 (bool delivered, string channel, _) = await DeliverAsync(
-                    order, reminder.Type, reminder.Subject, reminder.Body, ct);
+                    order, reminder.Type, reminder.Subject, reminder.Body, reminder.Vars, ct);
 
                 if (!delivered)
                 {
@@ -219,7 +225,7 @@ public sealed class ReminderService
             body += $" Le solde restant est de {order.Balance:N0} FCFA.";
 
         (bool delivered, string channel, string? error) = await DeliverAsync(
-            order, ManualType, "Rappel de votre commande", body, ct);
+            order, ManualType, "Rappel de votre commande", body, [], ct);
 
         var log = new ReminderLog
         {
@@ -337,7 +343,7 @@ public sealed class ReminderService
 
     /// <summary>Envoie un rappel par le canal choisi par le client. Ne journalise pas : c'est l'appelant qui le fait.</summary>
     private async Task<(bool Delivered, string Channel, string? Error)> DeliverAsync(
-        Order order, string type, string subject, string body, CancellationToken ct)
+        Order order, string type, string subject, string body, string[] variables, CancellationToken ct)
     {
         Client client = order.Client!;
 
@@ -349,7 +355,7 @@ public sealed class ReminderService
             try
             {
                 WhatsAppSendResult result = await _whatsApp.SendAsync(
-                    new WhatsAppMessage(client.WhatsApp, body), ct);
+                    new WhatsAppMessage(client.WhatsApp, body, type, variables), ct);
 
                 if (result.Success)
                     return (true, result.Simulated ? "whatsapp-simulated" : "whatsapp", null);

@@ -21,6 +21,11 @@ public static class ReminderServiceCollectionExtensions
         whatsAppOptions.ApiVersion = EnvOr("WHATSAPP_API_VERSION", whatsAppOptions.ApiVersion);
         whatsAppOptions.WebhookVerifyToken = EnvOr("WHATSAPP_WEBHOOK_VERIFY_TOKEN", whatsAppOptions.WebhookVerifyToken);
         whatsAppOptions.AppSecret = EnvOr("WHATSAPP_APP_SECRET", whatsAppOptions.AppSecret);
+        whatsAppOptions.TemplateReady = EnvOr("WHATSAPP_TEMPLATE_READY", whatsAppOptions.TemplateReady);
+        whatsAppOptions.TemplateUncollected = EnvOr("WHATSAPP_TEMPLATE_UNCOLLECTED", whatsAppOptions.TemplateUncollected);
+        whatsAppOptions.TemplateBalance = EnvOr("WHATSAPP_TEMPLATE_BALANCE", whatsAppOptions.TemplateBalance);
+        whatsAppOptions.TemplateDue = EnvOr("WHATSAPP_TEMPLATE_DUE", whatsAppOptions.TemplateDue);
+        whatsAppOptions.TemplateLanguage = EnvOr("WHATSAPP_TEMPLATE_LANGUAGE", whatsAppOptions.TemplateLanguage);
 
         services.AddSingleton(whatsAppOptions);
 

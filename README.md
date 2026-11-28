@@ -244,10 +244,32 @@ automatiques voulus (confirmation, commande prête, reçu).
   Chaque rappel ne part qu'une fois par commande.
 - **E-mail** : utilise la configuration de la section 6.3 ; chaque e-mail contient un lien vers la page
   `/desabonnement` du site (`PRESSING_WEB_URL` doit donc être l'adresse publique du site).
+- **Choix du client** : depuis son profil du site (**Mon compte → Mon profil**, canal « Aucun rappel / WhatsApp / E-mail »
+  avec case de consentement obligatoire) ou depuis sa fiche dans le Desktop.
+- **Écran Rappels** (Desktop, Manager/Admin) : journal des envois (ticket, client, type, canal, résultat ; filtres par
+  type, canal et période) et bouton **Relancer le client**, qui envoie une relance manuelle. Elle est refusée si le client
+  n'a pas consenti, et journalisée et auditée.
 - **WhatsApp** : par défaut `WHATSAPP_PROVIDER=simulated` (rien ne part, tout est journalisé). Avec `meta`, renseignez
-  `WHATSAPP_ACCESS_TOKEN` et `WHATSAPP_PHONE_NUMBER_ID` (Meta for Developers → WhatsApp). **Limite actuelle** : en dehors
-  des 24 h qui suivent un message du client, Meta n'accepte que des *modèles de messages approuvés* ; leur branchement
-  est en cours (tâche T3.1b), les rappels WhatsApp réels ne sont donc fiables qu'en test pour l'instant.
+  `WHATSAPP_ACCESS_TOKEN` et `WHATSAPP_PHONE_NUMBER_ID` (Meta for Developers → WhatsApp). En dehors des 24 h qui suivent
+  un message du client, Meta n'accepte que des **modèles de messages approuvés** : configurez-les comme ci-dessous.
+  Sans nom de modèle pour un type de rappel, ce rappel part en texte libre (réservé aux tests).
+
+  **Créer les modèles WhatsApp** (WhatsApp Manager → *Modèles de messages* → *Créer un modèle*) : catégorie
+  **Utilitaire**, langue **Français** (code `fr`, ou `fr_FR` selon votre choix : le reporter dans
+  `WHATSAPP_TEMPLATE_LANGUAGE`), type de contenu *Texte*. Créez un modèle par type de rappel ; les variables du corps
+  sont fournies dans cet ordre, `{{1}}` = prénom et `{{2}}` = numéro de ticket :
+
+  | Variable `.env` | Type de rappel | `{{3}}` | Exemple de corps |
+  | --- | --- | --- | --- |
+  | `WHATSAPP_TEMPLATE_READY` | commande prête | (aucune) | « Bonjour {{1}}, votre commande {{2}} est prête. Vous pouvez venir la récupérer. » |
+  | `WHATSAPP_TEMPLATE_UNCOLLECTED` | non retirée (J+3, J+7, J+14) | nombre de jours (3, 7 ou 14) | « Bonjour {{1}}, votre commande {{2}} attend d'être récupérée depuis {{3}} jours. » |
+  | `WHATSAPP_TEMPLATE_BALANCE` | solde impayé | montant (ex. « 3 500 FCFA ») | « Bonjour {{1}}, le solde restant de votre commande {{2}} est de {{3}}. » |
+  | `WHATSAPP_TEMPLATE_DUE` | veille de l'échéance | date jj/MM/aaaa | « Bonjour {{1}}, votre commande {{2}} a une échéance prévue le {{3}}. » |
+
+  Mettez dans `.env` le **nom** exact du modèle (minuscules, chiffres et `_`, ex. `rappel_solde`), une fois le modèle au
+  statut *Approuvé* (quelques minutes à quelques heures chez Meta), puis redémarrez l'API. Un modèle qui n'a pas le
+  bon nombre de variables est refusé par Meta : l'envoi est alors journalisé en échec dans l'écran Rappels. La relance
+  manuelle part toujours en texte libre : elle n'aboutit que si le client a écrit au pressing dans les 24 dernières heures.
 - Pour tout couper : `REMINDERS_ENABLED=false`.
 
 Pas encore disponibles (v3 en cours, voir `docs/Bilan-integration-et-attentes.pdf`) : l'assistant vocal IA, les

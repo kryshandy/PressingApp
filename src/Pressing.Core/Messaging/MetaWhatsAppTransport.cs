@@ -17,6 +17,47 @@ public sealed class MetaWhatsAppTransport : IWhatsAppTransport
 
     public string Provider => "meta";
 
+    /// <summary>
+    /// Message de type « template » (obligatoire hors fenêtre de 24 h) : nom du modèle, langue et variables du corps.
+    /// Sans variable, le composant « body » est omis (Meta refuse un composant sans paramètre).
+    /// </summary>
+    private object BuildTemplatePayload(string to, string template, IReadOnlyList<string>? variables)
+    {
+        object[] components = variables is { Count: > 0 }
+            ? [new
+            {
+                type = "body",
+                // Meta refuse les retours à la ligne et les tabulations dans une variable de modèle.
+                parameters = variables
+                    .Select(v => new { type = "text", text = Clean(v) })
+                    .ToArray()
+            }]
+            : [];
+
+        return new
+        {
+            messaging_product = "whatsapp",
+            recipient_type = "individual",
+            to,
+            type = "template",
+            template = new
+            {
+                name = template,
+                language = new
+                {
+                    code = string.IsNullOrWhiteSpace(_options.TemplateLanguage) ? "fr" : _options.TemplateLanguage.Trim()
+                },
+                components
+            }
+        };
+    }
+
+    private static string Clean(string value)
+    {
+        string text = string.Join(' ', value.Split(['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries)).Trim();
+        return text.Length == 0 ? "-" : text;
+    }
+
     public async Task<WhatsAppSendResult> SendAsync(
         WhatsAppMessage message,
         CancellationToken ct = default)
@@ -39,16 +80,21 @@ public sealed class MetaWhatsAppTransport : IWhatsAppTransport
             request.Headers.Authorization =
                 new AuthenticationHeaderValue("Bearer", _options.AccessToken);
 
-            request.Content = JsonContent.Create(new
-            {
-                messaging_product = "whatsapp",
-                recipient_type = "individual",
-                // Meta attend l'indicatif international en chiffres seuls (« 2250700112233 ») :
-                // les espaces, « + » et tirets saisis dans la fiche client sont retirés.
-                to = new string(message.To.Where(char.IsDigit).ToArray()),
-                type = "text",
-                text = new { body = message.Body }
-            });
+            // Meta attend l'indicatif international en chiffres seuls (« 2250700112233 ») :
+            // les espaces, « + » et tirets saisis dans la fiche client sont retirés.
+            string to = new string(message.To.Where(char.IsDigit).ToArray());
+            string? template = _options.TemplateFor(message.ReminderType);
+
+            request.Content = template is null
+                ? JsonContent.Create(new
+                {
+                    messaging_product = "whatsapp",
+                    recipient_type = "individual",
+                    to,
+                    type = "text",
+                    text = new { body = message.Body }
+                })
+                : JsonContent.Create(BuildTemplatePayload(to, template, message.Variables));
 
             using HttpResponseMessage response = await _http.SendAsync(request, ct);
             string content = await response.Content.ReadAsStringAsync(ct);
