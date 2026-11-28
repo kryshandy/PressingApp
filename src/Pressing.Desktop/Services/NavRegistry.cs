@@ -35,6 +35,7 @@ public static class NavRegistry
     public const string Settings = "settings";
     public const string Account = "account";
     public const string Reminders = "reminders";
+    public const string Workshop = "workshop";
 
     public static readonly Func<UserRole, bool> Everyone = _ => true;
     public static readonly Func<UserRole, bool> ManagerOrAdmin = r => r is UserRole.Admin or UserRole.Manager;
@@ -62,6 +63,7 @@ public static class NavRegistry
         new(Settings, "Paramètres", Icons.Settings, "Administration",
             h => new SettingsView(h), ManagerOrAdmin),
         new(Account, "Mon compte", Icons.Account, "Compte", h => new AccountView(h), Everyone),
+        new(Workshop, "Atelier", Icons.Workshop, "Atelier", h => new WorkshopView(h), Everyone),
         new(Reminders, "Rappels", Icons.Bell, "Relation client", h => new RemindersView(h), ManagerOrAdmin)
     };
 

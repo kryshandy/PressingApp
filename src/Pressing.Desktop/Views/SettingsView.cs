@@ -686,7 +686,44 @@ public sealed class SettingsView : BaseView
         grid.Add(Toggle(SettingsKeys.ReceiptShowQr, "QR code", "Afficher le QR code de suivi sur le reçu"), 2);
         grid.Add(Toggle(SettingsKeys.ReceiptShowBarcode, "Code-barres", "Afficher le code-barres du ticket sur le reçu"), 2);
 
-        return ScrollPage(Card("Mise en page des reçus", "Options appliquées au PDF généré pour chaque commande.", grid));
+        InputBox printerName = TextField(SettingsKeys.TicketPrinterName, "Imprimante ticket 80 mm",
+            "Nom exact de l'imprimante Windows (vide = désactivé)");
+        ToggleBox drawer = Toggle(SettingsKeys.TicketPrinterOpenDrawer, "Tiroir-caisse", "Ouvrir le tiroir-caisse à l'impression du ticket");
+        FlatButton testPrint = new() { Text = "Imprimer un ticket de test", Kind = ButtonKind.Secondary, IconGlyph = Icons.Print };
+        testPrint.Click += async (_, _) => await TestPrinterAsync(printerName.Text.Trim(), drawer.Checked);
+        FormGrid thermal = new(2);
+        thermal.AddField("Imprimante ticket 80 mm", printerName, 2,
+            "Impression directe ESC/POS (sans pilote de mise en page). Laissez vide pour désactiver le bouton « Ticket 80 mm ».");
+        thermal.Add(drawer, 2);
+        thermal.Add(testPrint, 1);
+
+        return ScrollPage(
+            Card("Mise en page des reçus", "Options appliquées au PDF généré pour chaque commande.", grid),
+            Card("Ticket thermique 80 mm", "Imprimante de tickets du comptoir (ESC/POS, CP858) ; enregistrez avant de tester.", thermal));
+    }
+
+    private async Task TestPrinterAsync(string printerName, bool openDrawer)
+    {
+        TicketPrintOutcome outcome = TicketPrintOutcome.NotConfigured;
+        bool ok = await RunAsync(async () => outcome = await TicketPrintService.PrintTestAsync(printerName, openDrawer),
+            "Ticket de test");
+        if (!ok || !Alive)
+        {
+            return;
+        }
+
+        switch (outcome)
+        {
+            case TicketPrintOutcome.Printed:
+                Host.Toast($"Ticket de test envoyé à « {printerName} ».");
+                break;
+            case TicketPrintOutcome.Skipped:
+                Host.Toast("Mode autotest : impression ignorée.", MessageKind.Info);
+                break;
+            default:
+                AppDialogs.Info(this, "Imprimante de tickets non configurée", TicketPrintService.HowToConfigure, MessageKind.Info);
+                break;
+        }
     }
 
     private Control BuildBackupsPage()

@@ -32,6 +32,12 @@ public static class SettingsKeys
     public const string ReceiptShowBarcode = "Receipt.ShowBarcode";
     public const string ReceiptPaperSize = "Receipt.PaperSize";
 
+    /// <summary>Nom Windows de l'imprimante de tickets 80 mm (ESC/POS) ; vide = impression thermique désactivée.</summary>
+    public const string TicketPrinterName = "Printer.TicketName";
+
+    /// <summary>Ouvre le tiroir-caisse (ESC p) à l'impression du ticket thermique.</summary>
+    public const string TicketPrinterOpenDrawer = "Printer.OpenCashDrawer";
+
     public static readonly IReadOnlyDictionary<string, string> Defaults = new Dictionary<string, string>
     {
         [ShopName] = "Pressing Éclat",
@@ -58,6 +64,8 @@ public static class SettingsKeys
         [EmailReceipt] = "true",
         [ReceiptShowQr] = "true",
         [ReceiptShowBarcode] = "true",
-        [ReceiptPaperSize] = "A5"
+        [ReceiptPaperSize] = "A5",
+        [TicketPrinterName] = string.Empty,
+        [TicketPrinterOpenDrawer] = "false"
     };
 }

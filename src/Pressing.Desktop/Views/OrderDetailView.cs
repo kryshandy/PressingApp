@@ -36,6 +36,8 @@ public sealed class OrderDetailView : BaseView
     private readonly FlatButton _pay = new() { Text = "Encaisser", Kind = ButtonKind.Primary, IconGlyph = Icons.Money };
     private readonly FlatButton _pickup = new() { Text = "Retrait", Kind = ButtonKind.Secondary, IconGlyph = Icons.Pickup };
     private readonly FlatButton _receipt = new() { Text = "Reçu PDF", Kind = ButtonKind.Secondary, IconGlyph = Icons.Pdf };
+    private readonly FlatButton _labels = new() { Text = "Étiquettes", Kind = ButtonKind.Secondary, IconGlyph = Icons.Print };
+    private readonly FlatButton _thermal = new() { Text = "Ticket 80 mm", Kind = ButtonKind.Secondary, IconGlyph = Icons.Print };
     private readonly FlatButton _email = new() { Text = "Envoyer par e-mail", Kind = ButtonKind.Secondary, IconGlyph = Icons.Mail };
     private readonly FlatButton _refund = new() { Text = "Rembourser", Kind = ButtonKind.Secondary, IconGlyph = Icons.Refund };
     private readonly FlatButton _cancel = new() { Text = "Annuler la commande", Kind = ButtonKind.Danger, IconGlyph = Icons.Cancel };
@@ -67,7 +69,7 @@ public sealed class OrderDetailView : BaseView
         _header.SetLeading(back);
         _header.AddTitleAdornment(_statusPill);
         _header.AddTitleAdornment(_expressPill);
-        List<FlatButton> actions = new() { _email, _receipt };
+        List<FlatButton> actions = new() { _email, _labels, _thermal, _receipt };
         if (Session.IsManagerOrAdmin)
         {
             actions.Insert(0, _cancel);
@@ -171,6 +173,8 @@ public sealed class OrderDetailView : BaseView
         _pay.Click += async (_, _) => await PayAsync();
         _pickup.Click += async (_, _) => await PickupAsync();
         _receipt.Click += async (_, _) => await RunAsync(OpenReceiptAsync, "Reçu PDF");
+        _thermal.Click += async (_, _) => await PrintThermalAsync();
+        _labels.Click += async (_, _) => await RunAsync(OpenLabelsAsync, "Étiquettes");
         _email.Click += async (_, _) => await EmailAsync();
         _refund.Click += async (_, _) => await RefundAsync();
         _cancel.Click += async (_, _) => await CancelAsync();
@@ -308,6 +312,8 @@ public sealed class OrderDetailView : BaseView
         _pay.Enabled = o is not null && !cancelled && o.Balance > 0;
         _pickup.Enabled = o is not null && !cancelled && o.Items.Any(i => i.Status == ItemStatus.Ready && i.RemainingQuantity > 0);
         _receipt.Enabled = o is not null;
+        _thermal.Enabled = o is not null;
+        _labels.Enabled = o is not null && o.Status != OrderStatus.Cancelled;
         _email.Enabled = o is not null && !string.IsNullOrWhiteSpace(o.ClientEmail);
         _refund.Enabled = o is not null && o.PaidAmount > 0;
         _cancel.Enabled = o is not null && o.Status is not (OrderStatus.Cancelled or OrderStatus.Completed);
@@ -422,6 +428,44 @@ public sealed class OrderDetailView : BaseView
         if (_order is not null)
         {
             await ReceiptService.OpenAsync(Api, _order.Id, _order.TicketNumber);
+        }
+    }
+
+    private async Task PrintThermalAsync()
+    {
+        if (_order is null)
+        {
+            return;
+        }
+
+        TicketPrintOutcome outcome = TicketPrintOutcome.NotConfigured;
+        string printer = string.Empty;
+        bool ok = await RunAsync(async () => (outcome, printer) = await TicketPrintService.PrintAsync(Api, _order.Id, _order.TicketNumber),
+            "Ticket 80 mm");
+        if (!ok || !Alive)
+        {
+            return;
+        }
+
+        switch (outcome)
+        {
+            case TicketPrintOutcome.Printed:
+                Host.Toast($"Ticket envoyé à l'imprimante « {printer} ».");
+                break;
+            case TicketPrintOutcome.Skipped:
+                Host.Toast("Mode autotest : ticket généré, impression ignorée.", MessageKind.Info);
+                break;
+            default:
+                AppDialogs.Info(this, "Imprimante de tickets non configurée", TicketPrintService.HowToConfigure, MessageKind.Info);
+                break;
+        }
+    }
+
+    private async Task OpenLabelsAsync()
+    {
+        if (_order is not null)
+        {
+            await LabelFileService.OpenAsync(Api, _order.Id, _order.TicketNumber);
         }
     }
 

@@ -262,6 +262,33 @@ JSON camelCase habituel de l'API, énumérations en texte. Le brouillon n'est **
 | `uncertainFields` | Noms stables des champs à surligner en orange : `client`, `items[0].category`, `items[0].service`, `ticket`, `amount`, `paymentMethod`, `deposit`, `dueDate`, `itemStatus`. |
 | `warnings` | Messages lisibles en français (« Client inconnu : création proposée »). |
 
+## Atelier (étiquettes QR et scan)
+
+| Méthode | Route | Politique | Corps / query | Réponse |
+| --- | --- | --- | --- | --- |
+| GET | `/api/orders/{id}/labels` | StaffOnly | | `application/pdf` (planche A4, 3 × 8 étiquettes) · 404 |
+| POST | `/api/workshop/scan` | StaffOnly | `WorkshopScanRequest` — `code` | `WorkshopScanResultDto` · 400 (code illisible, article déjà prêt / retiré / annulé, pièce secondaire) · 404 (ticket ou article inconnu) |
+| POST | `/api/workshop/undo` | StaffOnly | `WorkshopUndoRequest` — `code`, `fromStatus` (statut obtenu par le scan à annuler) | `WorkshopScanResultDto` · 400 si l'article n'est plus à `fromStatus` ou est déjà `Deposited` |
+| GET | `/api/orders/{id}/receipt/escpos` | StaffOnly | | `application/octet-stream` : octets ESC/POS du ticket 80 mm (48 colonnes, CP858, QR natif `GS ( k`, coupe `GS V`, tiroir `ESC p` si réglé) · 404 |
+| GET | `/api/printing/ticket-printer` | StaffOnly | | `TicketPrinterSettingsDto` — `printerName`, `enabled`, `openCashDrawer` (lisible par tout le personnel) |
+
+L'impression elle-même est faite par le Desktop (winspool, type RAW) sur l'imprimante nommée dans le réglage
+`Printer.TicketName` (vide = désactivée) ; `Printer.OpenCashDrawer` (`true`/`false`) ajoute l'impulsion d'ouverture du
+tiroir-caisse. Ces deux réglages se modifient par `PUT /api/settings` (ManagerOrAdmin), sans migration (table `AppSettings`).
+
+**Format du code d'étiquette** (dérivé du ticket, aucune colonne en base) : `PRESS-AAAA-NNNNN-II` = ticket + rang de la
+ligne d'article (2 chiffres, lignes triées par identifiant). Une ligne de quantité > 1 produit une étiquette par pièce
+avec un suffixe en minuscules : `PRESS-2026-00042-01-a`, `-b`, `-c` (puis `-aa` après `-z`). Décodage :
+`ItemCodes.TryParseItemCode` (Core) ; casse, espaces et tirets typographiques tolérés.
+
+Règles du scan : chaque scan fait avancer **la ligne** d'une étape (Déposé → En traitement → Prêt) via
+`OrderService.UpdateItemStatusAsync` ; quand le dernier article passe à « Prêt », la notification « Commande prête » et
+l'e-mail partent comme pour un changement manuel. Le statut étant porté par la ligne, seule l'étiquette sans suffixe ou
+la pièce `-a` fait avancer ; les pièces `-b`, `-c`… sont refusées sans changement (évite d'avancer trois fois une même ligne).
+Un article « Prêt » ou « Retiré » est refusé (400). L'annulation recule d'**une seule** étape et n'agit que si l'article est
+toujours au statut `fromStatus` ; un retour en arrière ne retire pas l'e-mail « prête » déjà mis en file.
+Chaque scan et chaque annulation est inscrit dans le journal d'audit (`scan`, `scan-undo`).
+
 ## Règles métier clés (implémentées dans `Pressing.Core/Services`)
 
 - Ticket unique généré à la création d'une commande.

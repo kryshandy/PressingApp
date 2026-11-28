@@ -8,7 +8,9 @@ Application du personnel. API : variable `PRESSING_PUBLIC_API_URL` (défaut `htt
 3. Navigation : `Host.Navigate(clé, paramètre)`, `Host.OpenOrder(id)`, `Host.OpenClient(id)`, `Host.OpenView(clé, () => vue)` + `Host.GoBack()`, `Host.Toast(...)`.
 
 ## Écrans
-Tableau de bord, Nouveau dépôt, Commandes (+ détail), Clients (+ fiche), Retraits, Caisse, Impayés, Tarifs, Mon compte, puis l'administration :
+Tableau de bord, Nouveau dépôt, Commandes (+ détail), Clients (+ fiche), Retraits, Caisse, Impayés, Tarifs, Mon compte, puis l'**Atelier** et l'administration :
+- **Atelier** (`WorkshopView`) : champ toujours actif pour la douchette USB (elle saisit comme un clavier et finit par Entrée) ou la saisie manuelle d'un code d'étiquette `PRESS-AAAA-NNNNN-II[-a]` ; chaque scan fait avancer l'article (Déposé → En traitement → Prêt, `POST /api/workshop/scan`), grand affichage du dernier article, historique, sons, « Annuler le dernier scan » (une étape en arrière). Étiquettes : bouton « Étiquettes » du détail de commande (planche A4 PDF).
+- **Ticket 80 mm** : bouton du détail de commande ; imprime en ESC/POS brut (`Services/RawPrinter.cs`, winspool) sur l'imprimante réglée dans Paramètres › Reçus (« Imprimante ticket 80 mm », vide = désactivé). Jamais d'impression réelle en autotest.
 - **Caisse** (`CashView`) : paiements et totaux par mode ; bouton « Clôturer la journée » (`CashClosingDialog` : attendus par mode, fond de caisse, espèces comptées, écart en direct, commentaire obligatoire si écart) ; Manager/Admin : historique des clôtures, validation (clôture figée) et PDF.
 - **Promotions** (`PromotionsView`, `PromotionDialog`) : codes promo, Manager/Admin.
 - **Rapports** (`ReportsView`) : période, chiffres clés, graphique, tableaux, export CSV, Manager/Admin.
