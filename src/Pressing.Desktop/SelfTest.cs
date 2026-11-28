@@ -597,6 +597,17 @@ internal static class SelfTest
             Write("       notifications non lues : " + unread);
         });
 
+        await Step("Charge atelier prévisionnelle et date conseillée", async () =>
+        {
+            WorkshopLoadDto? load = await api.GetWorkshopLoadAsync(14);
+            Check(load is { DaysCount: 14, DailyCapacity: >= 1 } && load.Days.Count == 14 && load.Days[0].IsToday, "charge sur 14 jours");
+            CategoryDto first = (await api.GetCatalogAsync())!.First();
+            ServiceType service = first.Prices.First(p => p.IsActive).ServiceType;
+            WorkshopDueDateSuggestionDto? suggestion = await api.SuggestDueDateAsync([new WorkshopSuggestLineRequest(first.Id, service, 2)], false);
+            Check(suggestion is { SuggestedDate: var d } && d >= DateTime.Today && suggestion.Explanation.Contains("délai", StringComparison.Ordinal), "date conseillée");
+            Write("       " + suggestion!.Explanation);
+        });
+
         OrderDto cancelOrder = null!;
         await Step("Annulation et remboursement (Manager/Admin)", async () =>
         {
@@ -655,7 +666,8 @@ internal static class SelfTest
 
             string? original = settings.GetFieldValue(SettingsKeys.ShopSlogan);
             settings.SetFieldValue(SettingsKeys.ShopSlogan, "Slogan auto-test " + tag);
-            Check(await settings.SaveChangesAsync() == 1, "un seul paramètre modifié");
+            int savedCount = await settings.SaveChangesAsync();
+            Check(savedCount == 1, "un seul paramètre modifié (enregistrés : " + savedCount + ")");
             Check((await api.GetSettingsAsync())!.Values[SettingsKeys.ShopSlogan] == "Slogan auto-test " + tag, "paramètre enregistré");
             settings.SetFieldValue(SettingsKeys.ShopSlogan, original ?? string.Empty);
             Check(await settings.SaveChangesAsync() == 1, "paramètre remis");

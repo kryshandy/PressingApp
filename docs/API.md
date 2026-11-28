@@ -269,6 +269,17 @@ JSON camelCase habituel de l'API, énumérations en texte. Le brouillon n'est **
 | GET | `/api/orders/{id}/labels` | StaffOnly | | `application/pdf` (planche A4, 3 × 8 étiquettes) · 404 |
 | POST | `/api/workshop/scan` | StaffOnly | `WorkshopScanRequest` — `code` | `WorkshopScanResultDto` · 400 (code illisible, article déjà prêt / retiré / annulé, pièce secondaire) · 404 (ticket ou article inconnu) |
 | POST | `/api/workshop/undo` | StaffOnly | `WorkshopUndoRequest` — `code`, `fromStatus` (statut obtenu par le scan à annuler) | `WorkshopScanResultDto` · 400 si l'article n'est plus à `fromStatus` ou est déjà `Deposited` |
+| GET | `/api/workshop/load` | StaffOnly | `?days=14` (1 à 60) | `WorkshopLoadDto` — un `WorkshopLoadDayDto` par jour (aujourd'hui compris : `items`, `orders`, `loadRate`, `overloaded`, `byService`), `dailyCapacity`, `overdueItems`, `overdueOrders`, `totalsByService` · 400 si `days` hors limites |
+| POST | `/api/workshop/suggest-due-date` | StaffOnly | `WorkshopSuggestDueDateRequest` — `items` (`categoryId`, `serviceType`, `quantity`), `isExpress` | `WorkshopDueDateSuggestionDto` — `suggestedDate`, `earliestDate`, `leadDays`, `skippedDays`, `capacityRespected`, `explanation` · 400 (aucun article, quantité ≤ 0, tarif inactif) |
+| PUT | `/api/workshop/capacity` | ManagerOrAdmin | `WorkshopCapacityDto` — `dailyCapacity` (1 à 10 000) | `WorkshopCapacityDto` · 400 si invalide |
+
+**Charge de l'atelier** (calculée à la volée, aucune colonne ni migration) : un article est « attendu » le jour de la date prévue
+de sa commande (`Order.DueDate`) tant qu'il n'est ni retiré ni annulé et que la commande n'est pas annulée ; on compte les pièces
+restantes (quantité − déjà retirées). Un article est « en retard » si cette date est dépassée et qu'il est encore « Déposé » ou
+« En traitement ». La capacité est le réglage `Workshop.DailyCapacity` (défaut 60, `PUT /api/settings` ou `PUT /api/workshop/capacity`) :
+un jour est en surcharge quand ses articles dépassent strictement la capacité. La date conseillée est la première date ≥ aujourd'hui + le
+délai catalogue le plus long du dépôt (`CategoryPrice.EstimatedDays`, sinon `Orders.DefaultProcessingDays`) où `charge + articles du dépôt ≤ capacité`
+(un jour vide est toujours accepté) ; en express : `Orders.ExpressProcessingDays`, capacité ignorée.
 | GET | `/api/orders/{id}/receipt/escpos` | StaffOnly | | `application/octet-stream` : octets ESC/POS du ticket 80 mm (48 colonnes, CP858, QR natif `GS ( k`, coupe `GS V`, tiroir `ESC p` si réglé) · 404 |
 | GET | `/api/printing/ticket-printer` | StaffOnly | | `TicketPrinterSettingsDto` — `printerName`, `enabled`, `openCashDrawer` (lisible par tout le personnel) |
 
