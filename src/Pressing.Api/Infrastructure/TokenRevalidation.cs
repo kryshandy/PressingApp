@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Pressing.Core;
 using Pressing.Core.Data;
+using Pressing.Core.Security;
 
 namespace Pressing.Api.Infrastructure;
 
@@ -52,7 +53,14 @@ public static class TokenRevalidation
 
                 break;
 
+            case TokenService.MfaPendingType:
+                // Jeton intermédiaire de la double authentification : valable uniquement pour POST /api/auth/staff/login/mfa
+                // (route anonyme qui le contrôle elle-même). Jamais une identité pour le reste de l'API.
+                context.Fail("Vérification en deux étapes non terminée.");
+                break;
+
             default:
+                // « unsubscribe », « feedback » et tout type inconnu : jetons de lien, sans droit sur l'API authentifiée.
                 context.Fail("Type de jeton inconnu.");
                 break;
         }

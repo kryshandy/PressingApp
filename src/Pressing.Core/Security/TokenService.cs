@@ -13,6 +13,8 @@ public class TokenOptions
     public string Audience { get; set; } = "pressing-clients";
     public int StaffHours { get; set; } = 12;
     public int ClientDays { get; set; } = 7;
+    public int MfaPendingMinutes { get; set; } = 5;
+    public int FeedbackDays { get; set; } = 14;
 }
 
 public class TokenService
@@ -77,6 +79,41 @@ public class TokenService
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Jeton intermédiaire délivré après un mot de passe correct quand la double authentification est active (5 minutes).
+    /// Type « mfa-pending » : TokenRevalidation le refuse pour toute route ; seule POST /api/auth/staff/login/mfa le lit.
+    /// Il ne porte ni rôle ni nom.
+    /// </summary>
+    public (string Token, DateTime ExpiresAt) CreateMfaPendingToken(StaffUser user)
+    {
+        DateTime expires = DateTime.UtcNow.AddMinutes(_options.MfaPendingMinutes);
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new("staff_id", user.Id.ToString()),
+            new("token_type", MfaPendingType)
+        };
+
+        return (Write(claims, expires), expires);
+    }
+
+    public const string MfaPendingType = "mfa-pending";
+    public const string FeedbackType = "feedback";
+
+    /// <summary>Jeton du lien d'enquête de satisfaction (14 jours) : il désigne une commande et son client, rien d'autre.</summary>
+    public string CreateFeedbackToken(int orderId, int clientId)
+    {
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, orderId.ToString()),
+            new("order_id", orderId.ToString()),
+            new("client_id", clientId.ToString()),
+            new("token_type", FeedbackType)
+        };
+
+        return Write(claims, DateTime.UtcNow.AddDays(_options.FeedbackDays));
     }
 
     public string CreateUnsubscribeToken(int clientId)

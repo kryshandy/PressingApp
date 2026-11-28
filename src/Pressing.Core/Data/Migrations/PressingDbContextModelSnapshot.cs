@@ -875,6 +875,9 @@ namespace Pressing.Core.Data.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("FailedLoginCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(4000)
@@ -886,13 +889,30 @@ namespace Pressing.Core.Data.Migrations
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("LockedUntil")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("RecoveryCodeHashes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Role")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("TwoFactorEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("TwoFactorLastStep")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TwoFactorSecret")
+                        .HasMaxLength(4000)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAt")
