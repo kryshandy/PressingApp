@@ -382,6 +382,21 @@ Guides internes :
 - Autotest de l'application Desktop (API démarrée) :
   `src\Pressing.Desktop\bin\Debug\net10.0-windows\Pressing.Desktop.exe --selftest` — parcourt tous les écrans et un
   dépôt complet (dépôt → statuts → paiement → retrait → reçu) et affiche `SELFTEST OK`.
+- **Tests de bout en bout du site client** (`tests/Pressing.E2E`, Playwright pour .NET + Chromium sans interface) :
+  pages publiques, suivi, contact, désinscription, espace client (connexion, commandes, reçu PDF, profil, déconnexion),
+  sécurité (redirection, cloisonnement des commandes, jeton anti-falsification) et affichage mobile/bureau.
+  Le test démarre lui-même l'API (port 5321) et le site (port 5322) en Release avec une base temporaire et les données
+  de démonstration, puis les arrête : vos instances 5180/5181 ne sont jamais touchées. Première utilisation, une seule fois
+  par poste (télécharge Chromium, environ 130 Mo) :
+
+  ```powershell
+  dotnet build PressingApp.sln -c Release
+  powershell -File tests\Pressing.E2E\bin\Release\net10.0\playwright.ps1 install chromium
+  dotnet test tests/Pressing.E2E -c Release --no-build
+  ```
+
+  Sans Chromium (ou sans compilation Release), `dotnet test PressingApp.sln` **ignore** ces tests avec un message
+  explicatif au lieu d'échouer ; en CI (`CI=true`), leur absence fait échouer l'étape.
 
 ## 10. Suite du projet
 
