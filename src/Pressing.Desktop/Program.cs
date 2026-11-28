@@ -27,8 +27,8 @@ static class Program
         }
 
         ApplicationConfiguration.Initialize();
-        Application.SetColorMode(SystemColorMode.Dark);
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.SetColorMode(SystemColorMode.Dark);
         Application.ThreadException += (_, e) => ShowUnhandled(e.Exception, recoverable: true);
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             ShowUnhandled(e.ExceptionObject as Exception ?? new Exception(e.ExceptionObject?.ToString()), recoverable: false);
