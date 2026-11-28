@@ -107,6 +107,7 @@ builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddScoped<ReminderService>();
+builder.Services.AddAssistant();
 
 if (emailOptions.EffectiveProvider == "resend")
 {
@@ -258,6 +259,7 @@ app.MapOrderEndpoints();
 app.MapPortalEndpoints();
 app.MapDashboardEndpoints();
 app.MapAdminEndpoints();
+app.MapAssistantEndpoints();
 
 await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
 {
