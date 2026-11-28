@@ -34,6 +34,7 @@ public static class NavRegistry
     public const string Staff = "staff";
     public const string Settings = "settings";
     public const string Account = "account";
+    public const string Reminders = "reminders";
 
     public static readonly Func<UserRole, bool> Everyone = _ => true;
     public static readonly Func<UserRole, bool> ManagerOrAdmin = r => r is UserRole.Admin or UserRole.Manager;
@@ -60,7 +61,8 @@ public static class NavRegistry
             h => new StaffView(h), AdminOnly),
         new(Settings, "Paramètres", Icons.Settings, "Administration",
             h => new SettingsView(h), ManagerOrAdmin),
-        new(Account, "Mon compte", Icons.Account, "Compte", h => new AccountView(h), Everyone)
+        new(Account, "Mon compte", Icons.Account, "Compte", h => new AccountView(h), Everyone),
+        new(Reminders, "Rappels", Icons.Bell, "Relation client", h => new RemindersView(h), ManagerOrAdmin)
     };
 
     public static NavItem? Find(string key) => Items.FirstOrDefault(i => i.Key == key);

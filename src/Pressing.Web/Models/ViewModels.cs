@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Pressing.Client;
 using Pressing.Core.Dtos;
+using Pressing.Core.Entities;
 
 namespace Pressing.Web.Models;
 
@@ -106,7 +107,7 @@ public class ChangePasswordForm
     public string ConfirmPassword { get; set; } = "";
 }
 
-public class ProfileForm
+public class ProfileForm : IValidatableObject
 {
     [Required(ErrorMessage = "Le prénom est obligatoire.")]
     [StringLength(80, ErrorMessage = "Le prénom est trop long.")]
@@ -130,6 +131,35 @@ public class ProfileForm
 
     [StringLength(250, ErrorMessage = "L'adresse est trop longue.")]
     public string? Address { get; set; }
+
+    /// <summary>Canal des rappels (aucun, WhatsApp ou e-mail). Un canal exige le consentement explicite ci-dessous.</summary>
+    public ClientNotificationPreference NotificationPreference { get; set; } = ClientNotificationPreference.None;
+
+    /// <summary>Case « J'accepte de recevoir des rappels » : obligatoire dès qu'un canal est choisi.</summary>
+    public bool Consent { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (!Enum.IsDefined(NotificationPreference))
+        {
+            yield return new ValidationResult("Le canal de rappel choisi est invalide.", [nameof(NotificationPreference)]);
+            yield break;
+        }
+
+        if (NotificationPreference == ClientNotificationPreference.None) yield break;
+
+        if (!Consent)
+            yield return new ValidationResult(
+                "Cochez la case de consentement pour recevoir des rappels.", [nameof(Consent)]);
+
+        if (NotificationPreference == ClientNotificationPreference.Email && string.IsNullOrWhiteSpace(Email))
+            yield return new ValidationResult(
+                "Renseignez une adresse e-mail pour recevoir les rappels par e-mail.", [nameof(Email)]);
+
+        if (NotificationPreference == ClientNotificationPreference.WhatsApp && string.IsNullOrWhiteSpace(WhatsApp))
+            yield return new ValidationResult(
+                "Renseignez un numéro WhatsApp pour recevoir les rappels par WhatsApp.", [nameof(WhatsApp)]);
+    }
 }
 
 public record DashboardViewModel(PortalDashboardDto Data);

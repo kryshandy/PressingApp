@@ -57,6 +57,23 @@ public sealed class ReminderServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Rappel_whatsapp_transmet_le_type_et_les_variables_du_modele()
+    {
+        var client = await ClientAsync(ClientNotificationPreference.WhatsApp);
+        await OrderAsync(client, OrderStatus.Ready, readyDaysAgo: 8, balance: 3500);
+
+        Assert.Equal(2, await RunAsync());
+
+        WhatsAppMessage uncollected = Assert.Single(_whatsApp.Sent, m => m.ReminderType == "uncollected-j7");
+        Assert.Equal([client.FirstName, "PRESS-2026-90001", "7"], uncollected.Variables);
+        WhatsAppMessage balance = Assert.Single(_whatsApp.Sent, m => m.ReminderType == "unpaid-balance");
+        Assert.Equal(client.FirstName, balance.Variables![0]);
+        Assert.Equal("PRESS-2026-90001", balance.Variables[1]);
+        Assert.Contains("3", balance.Variables[2]);
+        Assert.EndsWith("FCFA", balance.Variables[2]);
+    }
+
+    [Fact]
     public async Task Commande_prete_par_e_mail_ne_double_pas_l_e_mail_existant()
     {
         var client = await ClientAsync(ClientNotificationPreference.Email);
@@ -137,7 +154,7 @@ public sealed class ReminderServiceTests : IDisposable
             _t.Db, _whatsApp, _t.Get<EmailService>(),
             new EmailOptions { Provider = "simulated", AppBaseUrl = "https://pressing.example" },
             new TokenService(new TokenOptions { Key = "tests-only-jwt-key-0123456789-abcdefghijklmnopqrstuvwxyz" }),
-            new FixedTime(at ?? Now), NullLogger<ReminderService>.Instance);
+            new FixedTime(at ?? Now), NullLogger<ReminderService>.Instance, new AuditService(_t.Db));
         return await service.ProcessDueRemindersAsync();
     }
 

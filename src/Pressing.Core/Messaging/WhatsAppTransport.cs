@@ -1,8 +1,14 @@
 ﻿namespace Pressing.Core.Messaging;
 
+/// <summary>
+/// Message WhatsApp : texte libre (<see cref="Body"/>) et, pour les rappels, le type de rappel et les variables du
+/// modèle approuvé ({{1}}, {{2}}… dans l'ordre : prénom, ticket, puis solde / date / nombre de jours).
+/// </summary>
 public record WhatsAppMessage(
     string To,
-    string Body);
+    string Body,
+    string? ReminderType = null,
+    IReadOnlyList<string>? Variables = null);
 
 public record WhatsAppSendResult(
     bool Success,

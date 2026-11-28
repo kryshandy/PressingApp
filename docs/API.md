@@ -133,7 +133,7 @@ révocation (`consentRevokedAt`). Un canal exige le numéro WhatsApp ou l'e-mail
 | GET | `/api/portal/orders/{id}` | ClientOnly | | `OrderDto` · 404 (jamais la commande d'un autre client) |
 | GET | `/api/portal/orders/{id}/receipt` | ClientOnly | | `application/pdf` |
 | GET | `/api/portal/profile` | ClientOnly | | `ClientDto` |
-| PUT | `/api/portal/profile` | ClientOnly | `UpdateProfileRequest` | `ClientDto` |
+| PUT | `/api/portal/profile` | ClientOnly | `UpdateProfileRequest` (`NotificationPreference` : `None`, `WhatsApp` ou `Email` ; le consentement est daté à l'enregistrement, 400 si l'e-mail ou le numéro WhatsApp manque) | `ClientDto` |
 | GET | `/api/portal/loyalty` | ClientOnly | | `LoyaltyTransactionDto[]` |
 
 ## Tableau de bord, notifications, rapports
@@ -165,6 +165,16 @@ modification et validation sont écrites dans le journal d'audit.
 | GET | `/api/cash-closings` | ManagerOrAdmin | `?from&to` (défaut : 90 derniers jours) | `CashClosingDto[]` |
 | GET | `/api/cash-closings/{id}` | StaffOnly | | `CashClosingDto` · 404 |
 | GET | `/api/cash-closings/{id}/pdf` | StaffOnly | | `application/pdf` |
+
+## Rappels clients (responsable / administrateur)
+
+Les rappels automatiques (WhatsApp / e-mail) ne partent qu'avec un consentement daté et non révoqué. Ces routes
+exposent leur journal et permettent une relance manuelle. Méthodes du client : `PressingApiClient.Reminders.cs`.
+
+| Méthode | Route | Politique | Query / corps | Réponse |
+| --- | --- | --- | --- | --- |
+| GET | `/api/reminders` | ManagerOrAdmin | `?page&pageSize&type&channel&from&to` — `type` : `ready`, `uncollected-j3`, `uncollected-j7`, `uncollected-j14`, `unpaid-balance`, `due-tomorrow`, `manual` ; `channel` : `whatsapp` ou `email` ; `from`/`to` inclusifs | `PagedResult<ReminderLogDto>` (ticket, client, type, canal, date, succès, erreur), du plus récent au plus ancien |
+| POST | `/api/reminders/orders/{orderId}/send` | ManagerOrAdmin | | `ReminderLogDto` · 400 sans consentement (« … n'a pas consenti aux rappels … »), commande terminée/annulée, coordonnée du canal manquante ou échec d'envoi · 404 commande inconnue — journalisé (`manual`) et audité (`reminder-send`) |
 
 ## Administration
 
