@@ -26,8 +26,27 @@ jobs:
       - name: Compilation (avertissements = erreurs)
         run: dotnet build PressingApp.sln --no-restore -c Release -warnaserror
 
+      # Les tests de bout en bout (Chromium) ont leur propre étape plus bas : on les exclut ici.
       - name: Tests
-        run: dotnet test PressingApp.sln --no-build -c Release --verbosity normal
+        run: dotnet test PressingApp.sln --no-build -c Release --verbosity normal --filter "FullyQualifiedName!~Pressing.E2E"
+
+      # Chromium de Playwright (seul navigateur installé), mis en cache selon la version du paquet NuGet.
+      - name: Cache de Chromium (Playwright)
+        id: cache-chromium
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/Pressing.E2E/Pressing.E2E.csproj') }}
+
+      - name: Installation de Chromium (Playwright)
+        if: steps.cache-chromium.outputs.cache-hit != 'true'
+        shell: powershell
+        run: ./tests/Pressing.E2E/bin/Release/net10.0/playwright.ps1 install chromium
+
+      # API + site jetables (ports 5321/5322, base temporaire) pilotés par Chromium sans interface. CI=true : l'absence
+      # de Chromium fait échouer l'étape au lieu d'ignorer les tests.
+      - name: Tests de bout en bout (site client)
+        run: dotnet test tests/Pressing.E2E -c Release --no-build --verbosity normal
 
       # Autotest Desktop sans interaction : API jetable (base temporaire, port 5290) + Pressing.Desktop.exe --selftest.
       - name: Autotest Desktop
