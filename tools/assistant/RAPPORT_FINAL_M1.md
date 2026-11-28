@@ -271,7 +271,7 @@ Les tests unitaires utilisent des fakes HTTP/STT : aucun moteur n'est appelé. L
 | P4 prompt / vocabulaire / tests | **TERMINÉ** | vocabulaire réellement régénéré ; 102 tests IA |
 | T1.6 consultation en lecture seule | **DÉMONTRÉ** | `consultation.ps1` affiche la réponse et le brouillon JSON ; aucune base lue, aucune commande créée |
 | T1.1 commande unique IA | **COMMANDE FOURNIE** | `tools/assistant/start-ai.ps1 -Install` installe puis lance `8081`/`8082` ; validation concrète sur poste neuf encore à réaliser |
-| T1.5 inférences simultanées | **CONFIGURÉ + TESTÉ CÔTÉ PIPELINE** | `-np 1` / `-p 1` dans `start-ai.ps1` et `ConcurrenceTests.cs` (10 appels parallèles) ; aucun banc live de concurrence |
+| T1.5 inférences simultanées | **CONFIGURÉ + TESTÉ** | `-np 1` / `-p 1` dans `start-ai.ps1`, `ConcurrenceTests.cs` (10 appels parallèles) et `bench-concurrence.ps1` (10 LLM + 10 STT live, 20/20 réussites) ; rapport `eval/resultats/concurrence-live.md` |
 | Seuil ≥ 90 % intentions | **ATTEINT** | 150/150 live final après garde-fous |
 | Seuil ≥ 85 % articles | **ATTEINT** | 85/85 live final après garde-fous |
 | Aucune information inventée | **ATTEINT** | 0 sur recalcul et banc live final |
@@ -355,7 +355,7 @@ Cette section décrit les ajustements réalisés après l'audit. Ils ont ensuite
 | T1.3 | Aucun changement : 150/150 schémas valides après garde-fous, 147/150 sur le brut | Le brut n'est pas présenté comme conforme |
 | T1.4 | `eval/dataset.jsonl` généré en modèle `R001`–`R150` et ignoré par Git ; `.gitignore` ajouté pour `dataset.jsonl` et `eval/audio/` ; validateur et `bench.ps1` exigent un consentement explicite ; bug du validateur (`$error` réservé) corrigé | Aucun WAV ni consentement réel : WER et banc officiel toujours non mesurés |
 | Banc vocal TTS | `generer-dataset-tts.ps1` + `dataset-tts.jsonl` (`T001`–`T150`, source `tts`) + `bench.ps1 -Source tts -RawDump` ; validateur RIFF corrigé pour les chunks SAPI ; rejeu des réponses brutes par `EvaluationHarness --recompute-from-jsonl` à travers les garde-fous C# | Rapport `eval/resultats/banc-tts-150.md` : brut 138/150 intentions et 20/85 articles, **après garde-fous 150/150 et 85/85**, 0 invention ; explicitement **non réel**, p95 12,98 s non conforme |
-| T1.5 | `ConcurrenceTests.cs` : 10 appels parallèles corrects + vérification statique de `-np 1` / `-p 1` | Pas de banc live de concurrence ; la sérialisation effective reste portée par les serveurs |
+| T1.5 | `ConcurrenceTests.cs` : 10 appels parallèles corrects + vérification statique de `-np 1` / `-p 1` ; `bench-concurrence.ps1` : 10 requêtes LLM + 10 STT en parallèle, **20/20 réussites**, rapport `eval/resultats/concurrence-live.md` | Latence très élevée sous charge (p95 LLM 116,58 s) : les requêtes s’attendent par conception (`-np 1`, `-p 1`) |
 | T1.6 | Aucun changement : consultation en lecture seule inchangée | Brouillon à confirmer par M2/humain |
 
 Aucune route M2, aucun DTO concurrent, aucun appel M3, aucun changement de port, de modèle par défaut, de `max_tokens` ou de contrat JSON n'a été introduit. Les sections 10 et 11 décrivent l'état figé au commit `1ee04da` ; les ajouts de cette section sont sur `feature/ia-m1-t1-complements`, non fusionnés dans `Astride`.

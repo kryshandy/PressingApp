@@ -101,6 +101,9 @@ dotnet test PressingApp.sln --no-build
 .\tools\assistant\bench.ps1 -Dataset .\tools\assistant\eval\dataset-tts.jsonl -AudioRoot .\tools\assistant\eval -Source tts -Output .\tools\assistant\eval\resultats\banc-tts-150.md -RawDump .\tools\assistant\eval\resultats\banc-tts-150-brut.jsonl
 dotnet tools\assistant\eval\EvaluationHarness\bin\Debug\net10.0\EvaluationHarness.dll --recompute-from-jsonl tools\assistant\eval\resultats\banc-tts-150-brut.jsonl tools\assistant\eval\resultats\banc-tts-150-apres-garde-fous 'banc-tts-150-apres-garde-fous'
 
+# Concurrence live : 10 requêtes LLM + 10 STT en parallele, verifie la file d'attente.
+.\tools\assistant\bench-concurrence.ps1 -Count 10
+
 # Latence séparée du LLM (prompt / génération / HTTP / tokens) et de Whisper.
 .\tools\assistant\bench-latency.ps1 -Output .\tools\assistant\eval\latency\mesure.jsonl -Count 6
 .\tools\assistant\bench-stt.ps1 -Output .\tools\assistant\eval\latency\stt-contextual-v2.jsonl
