@@ -220,6 +220,7 @@ app.MapGet("/", () => Results.Ok(new
 
 app.MapPublicEndpoints();
 app.MapMessagingEndpoints();
+app.MapRemindersEndpoints();
 app.MapAuthEndpoints();
 app.MapClientEndpoints();
 app.MapCatalogEndpoints();

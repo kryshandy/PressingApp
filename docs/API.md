@@ -148,6 +148,16 @@ révocation (`consentRevokedAt`). Un canal exige le numéro WhatsApp ou l'e-mail
 | GET | `/api/reports` | ManagerOrAdmin | `?from&to` (défaut : 30 derniers jours) | `ReportDto` |
 | GET | `/api/reports/export` | ManagerOrAdmin | `?from&to` | `text/csv` |
 
+## Rappels clients (responsable / administrateur)
+
+Les rappels automatiques (WhatsApp / e-mail) ne partent qu'avec un consentement daté et non révoqué. Ces routes
+exposent leur journal et permettent une relance manuelle. Méthodes du client : `PressingApiClient.Reminders.cs`.
+
+| Méthode | Route | Politique | Query / corps | Réponse |
+| --- | --- | --- | --- | --- |
+| GET | `/api/reminders` | ManagerOrAdmin | `?page&pageSize&type&channel&from&to` — `type` : `ready`, `uncollected-j3`, `uncollected-j7`, `uncollected-j14`, `unpaid-balance`, `due-tomorrow`, `manual` ; `channel` : `whatsapp` ou `email` ; `from`/`to` inclusifs | `PagedResult<ReminderLogDto>` (ticket, client, type, canal, date, succès, erreur), du plus récent au plus ancien |
+| POST | `/api/reminders/orders/{orderId}/send` | ManagerOrAdmin | | `ReminderLogDto` · 400 sans consentement (« … n'a pas consenti aux rappels … »), commande terminée/annulée, coordonnée du canal manquante ou échec d'envoi · 404 commande inconnue — journalisé (`manual`) et audité (`reminder-send`) |
+
 ## Administration
 
 | Méthode | Route | Politique | Corps / query | Réponse |

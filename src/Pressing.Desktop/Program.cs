@@ -27,8 +27,10 @@ static class Program
         }
 
         ApplicationConfiguration.Initialize();
-        Application.SetColorMode(SystemColorMode.Dark);
+        // Le mode d'exceptions doit être fixé AVANT le mode sombre : SetColorMode crée déjà une fenêtre
+        // et SetUnhandledExceptionMode lève alors InvalidOperationException (l'application ne démarrait plus).
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.SetColorMode(SystemColorMode.Dark);
         Application.ThreadException += (_, e) => ShowUnhandled(e.Exception, recoverable: true);
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             ShowUnhandled(e.ExceptionObject as Exception ?? new Exception(e.ExceptionObject?.ToString()), recoverable: false);

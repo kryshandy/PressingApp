@@ -137,7 +137,7 @@ public sealed class ReminderServiceTests : IDisposable
             _t.Db, _whatsApp, _t.Get<EmailService>(),
             new EmailOptions { Provider = "simulated", AppBaseUrl = "https://pressing.example" },
             new TokenService(new TokenOptions { Key = "tests-only-jwt-key-0123456789-abcdefghijklmnopqrstuvwxyz" }),
-            new FixedTime(at ?? Now), NullLogger<ReminderService>.Instance);
+            new FixedTime(at ?? Now), NullLogger<ReminderService>.Instance, new AuditService(_t.Db));
         return await service.ProcessDueRemindersAsync();
     }
 
