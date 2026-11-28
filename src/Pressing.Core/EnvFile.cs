@@ -6,21 +6,33 @@ public static class EnvFile
     {
         try
         {
-            DirectoryInfo? directory = new(startDirectory ?? Directory.GetCurrentDirectory());
-            for (int depth = 0; directory != null && depth < 10; depth++, directory = directory.Parent)
+            if (!TryLoadFrom(startDirectory ?? Directory.GetCurrentDirectory()) && startDirectory is null)
             {
-                string path = Path.Combine(directory.FullName, ".env");
-                if (File.Exists(path))
-                {
-                    LoadFile(path);
-                    return;
-                }
+                // Service Windows : le répertoire courant est C:\Windows\System32. On remonte alors depuis le
+                // dossier de l'application (dist\<version>\api\ → .env du dossier d'installation).
+                TryLoadFrom(AppContext.BaseDirectory);
             }
         }
         catch
         {
             // Une configuration absente ne doit jamais empêcher le démarrage.
         }
+    }
+
+    private static bool TryLoadFrom(string startDirectory)
+    {
+        DirectoryInfo? directory = new(startDirectory);
+        for (int depth = 0; directory != null && depth < 10; depth++, directory = directory.Parent)
+        {
+            string path = Path.Combine(directory.FullName, ".env");
+            if (File.Exists(path))
+            {
+                LoadFile(path);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static void LoadFile(string path)

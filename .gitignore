@@ -3,6 +3,7 @@ bin/
 obj/
 artifacts/
 publish/
+dist/
 TestResults/
 *.user
 *.suo

@@ -21,7 +21,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         "PRESSING_ADMIN_USERNAME", "PRESSING_ADMIN_PASSWORD",
         "EMAIL_PROVIDER", "EMAIL_BACKGROUND_ENABLED",
         "RESEND_API_KEY", "SMTP_HOST", "SMTP_USER", "SMTP_APP_PASSWORD",
-        "REMINDERS_ENABLED", "WHATSAPP_PROVIDER"
+        "REMINDERS_ENABLED", "WHATSAPP_PROVIDER", "BACKUP_SCHEDULE_ENABLED"
     ];
 
     private readonly Dictionary<string, string?> _previous = new();
@@ -56,6 +56,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         // Les rappels sont testés directement (ReminderServiceTests) : pas de tâche de fond pendant les tests d'API.
         Environment.SetEnvironmentVariable("REMINDERS_ENABLED", "false");
         Environment.SetEnvironmentVariable("WHATSAPP_PROVIDER", "simulated");
+        // Les sauvegardes planifiées sont testées directement (ScheduledBackupTests) : pas de tâche de fond ici.
+        Environment.SetEnvironmentVariable("BACKUP_SCHEDULE_ENABLED", "false");
     }
 
     public const string AdminPassword = "Admin@2026!";

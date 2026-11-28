@@ -147,10 +147,22 @@ public class SettingsService
         return await GetDtoAsync(ct);
     }
 
-    public async Task<BackupResultDto> CreateBackupAsync(CurrentUser user, CancellationToken ct = default)
+    public Task<BackupResultDto> CreateBackupAsync(CurrentUser user, CancellationToken ct = default) =>
+        CreateBackupAsync(user, kind: null, at: null, ct);
+
+    /// <summary>
+    /// Sauvegarde vérifiée de la base. <paramref name="kind"/> (ex. « auto ») s'insère dans le nom du fichier
+    /// (<c>pressing-auto-AAAAMMJJ-HHmmss.db</c>) pour distinguer les sauvegardes planifiées des manuelles ;
+    /// <paramref name="at"/> fixe l'horodatage du nom (heure locale, défaut : maintenant).
+    /// </summary>
+    public async Task<BackupResultDto> CreateBackupAsync(
+        CurrentUser user, string? kind, DateTime? at, CancellationToken ct = default)
     {
         Directory.CreateDirectory(_databaseOptions.BackupPath);
-        string fileName = $"pressing-{DateTime.Now:yyyyMMdd-HHmmss}.db";
+        DateTime stamp = at ?? DateTime.Now;
+        string fileName = string.IsNullOrWhiteSpace(kind)
+            ? $"pressing-{stamp:yyyyMMdd-HHmmss}.db"
+            : $"pressing-{kind}-{stamp:yyyyMMdd-HHmmss}.db";
         string target = Path.Combine(_databaseOptions.BackupPath, fileName);
 
         var sourceBuilder = new SqliteConnectionStringBuilder(PressingDatabase.BuildConnectionString(_databaseOptions.Path));

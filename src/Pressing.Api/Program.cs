@@ -21,6 +21,8 @@ using Pressing.Core.Services;
 EnvFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
+// Exécution comme service Windows (scripts/install-service.ps1) ; sans effet en console.
+builder.Host.UseWindowsService();
 
 // PRESSING_API_URL (ex. http://0.0.0.0:5180) : adresse d'écoute. L'option --urls de la ligne de commande
 // et les variables ASPNETCORE_URLS / DOTNET_URLS restent prioritaires.
@@ -111,6 +113,8 @@ if (emailOptions.BackgroundEnabled)
 {
     builder.Services.AddHostedService<EmailBackgroundService>();
 }
+// Sauvegardes automatiques quotidiennes (BACKUP_SCHEDULE_ENABLED, BACKUP_HOUR, BACKUP_RETENTION_DAYS, BACKUP_COPY_PATH).
+builder.Services.AddScheduledBackups();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
