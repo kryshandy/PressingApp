@@ -270,6 +270,8 @@ Les tests unitaires utilisent des fakes HTTP/STT : aucun moteur n'est appelé. L
 | P3 catalogue / alias / services par article | **TERMINÉ** | 85/85 recalcul et 85/85 live final |
 | P4 prompt / vocabulaire / tests | **TERMINÉ** | vocabulaire réellement régénéré ; 102 tests IA |
 | T1.6 consultation en lecture seule | **DÉMONTRÉ** | `consultation.ps1` affiche la réponse et le brouillon JSON ; aucune base lue, aucune commande créée |
+| T1.1 commande unique IA | **COMMANDE FOURNIE** | `tools/assistant/start-ai.ps1 -Install` installe puis lance `8081`/`8082` ; validation concrète sur poste neuf encore à réaliser |
+| T1.5 inférences simultanées | **CONFIGURÉ + TESTÉ CÔTÉ PIPELINE** | `-np 1` / `-p 1` dans `start-ai.ps1` et `ConcurrenceTests.cs` (10 appels parallèles) ; aucun banc live de concurrence |
 | Seuil ≥ 90 % intentions | **ATTEINT** | 150/150 live final après garde-fous |
 | Seuil ≥ 85 % articles | **ATTEINT** | 85/85 live final après garde-fous |
 | Aucune information inventée | **ATTEINT** | 0 sur recalcul et banc live final |
@@ -277,7 +279,7 @@ Les tests unitaires utilisent des fakes HTTP/STT : aucun moteur n'est appelé. L
 | Chaîne TTS → Whisper → LLM → garde-fous | **VÉRIFIÉE sur synthétique** | transcription exacte sur la phrase testée ; non extrapolée au client réel |
 | p95 < 5 s | **NON ATTEINT** | 11,886 s sur 150 appels live |
 | WER réel | **NON MESURÉ** | aucun enregistrement client avec consentement |
-| Banc officiel `dataset.jsonl` | **NON MESURÉ** | fichier absent ; aucun résultat simulé. Le validateur accepte désormais `-Source reel -RequireAudio` et vérifie les 150 WAV |
+| Banc officiel `dataset.jsonl` | **NON MESURÉ** | modèle `R001`–`R150` généré et ignoré par Git ; aucun WAV ni consentement réel, aucun résultat simulé. Le validateur exige `-Source reel -RequireAudio` et un consentement explicite |
 | Comparaison base/small, 1,5B/3B | **TERMINÉ** | 4 couples × 150 scénarios ; défaut `1,5B`/`base` conservé (§5.6) |
 | `max_tokens=256` en production | **NON ADOPTÉ** | diagnostic 6/6 sans troncature, mais pas de banc 150 à 256 |
 
@@ -290,7 +292,7 @@ Les tests unitaires utilisent des fakes HTTP/STT : aucun moteur n'est appelé. L
 3. La latence est dominée par la génération CPU du 1,5B. Le 0,5B n'est pas réintroduit comme défaut : il sacrifie la fiabilité métier. Le 3B est plus lent (p95 14,174 s contre 11,381 s) et perd 7 champs sur 1840 ; `small` triple la latence STT sans gain de WER.
 4. Le prompt Whisper contextuel corrige les erreurs de décodage sur trois phrases TTS ; cela ne constitue pas un WER officiel.
 5. Le script audio ne contrôle qu'un seul article : son message de validation ne prouve pas les six scénarios bruts.
-6. `dataset.jsonl` est absent ; `bench.ps1` s'arrête sans écrire de résultat simulé.
+6. `dataset.jsonl` est un modèle de 150 lignes en attente de WAV et de consentements ; `bench.ps1` refuse de s'exécuter tant que ces éléments sont absents, sans écrire de résultat simulé.
 7. Aucun commit ni opération distante ; les changements restent locaux.
 
 ---
@@ -301,9 +303,9 @@ Les tests unitaires utilisent des fakes HTTP/STT : aucun moteur n'est appelé. L
 
 **DTO officiel M2 (`src/Pressing.Core/Dtos/`)** : `AssistantDtos.cs`.
 
-**Tests (`tests/Pressing.Tests/Unit/Assistant/`)** : `CatalogMatcherTests.cs`, `TranscriptEvidenceValidatorTests.cs`, `IntentEvidenceGuardTests.cs`, `LlmIntentExtractorTests.cs`, `LocalAssistantPipelineTests.cs`, `AssistantRulesTests.cs`, `FakeAssistantTests.cs`, `M2CompatibilityTests.cs`, `ConsultationTests.cs`.
+**Tests (`tests/Pressing.Tests/Unit/Assistant/`)** : `CatalogMatcherTests.cs`, `TranscriptEvidenceValidatorTests.cs`, `IntentEvidenceGuardTests.cs`, `LlmIntentExtractorTests.cs`, `LocalAssistantPipelineTests.cs`, `AssistantRulesTests.cs`, `FakeAssistantTests.cs`, `M2CompatibilityTests.cs`, `ConsultationTests.cs`, `ConcurrenceTests.cs`.
 
-**Outils et bancs (`tools/assistant/`)** : `prompt-systeme.txt`, `grammar.gbnf`, `intent-schema.json`, `update-vocab.ps1`, `vocab-default.txt`, `sync-ressources.ps1`, `consultation.ps1`, `comparer-modeles.ps1`, `bench-stt.ps1`, `test-llm.ps1`, `eval/EvaluationHarness/Program.cs`, `eval/dataset-fiabilite.jsonl`, `eval/resultats/live-20261127-final-150-v2.*` (brut figé), `eval/resultats/live-20261127-final-150-v3.*` (recalcul après correction de l'alias ambigu), `eval/resultats/live-20261127-curated*.{jsonl,resume.json,resume.md}`, `eval/resultats/apres-correction-m1-v2.*`, `eval/resultats/comparaisons/*`, `eval/latency/stt-*.jsonl`, `RESULTATS.md`, `eval/README.md`, `RAPPORT_FINAL_M1.md`.
+**Outils et bancs (`tools/assistant/`)** : `prompt-systeme.txt`, `grammar.gbnf`, `intent-schema.json`, `install.ps1`, `start-ai.ps1`, `stop-ai.ps1`, `update-vocab.ps1`, `vocab-default.txt`, `sync-ressources.ps1`, `consultation.ps1`, `comparer-modeles.ps1`, `bench.ps1`, `bench-stt.ps1`, `test-llm.ps1`, `eval/EvaluationHarness/Program.cs`, `eval/dataset.jsonl` (modèle ignoré), `eval/dataset-fiabilite.jsonl`, `eval/resultats/live-20261127-final-150-v2.*` (brut figé), `eval/resultats/live-20261127-final-150-v3.*` (recalcul après correction de l'alias ambigu), `eval/resultats/live-20261127-curated*.{jsonl,resume.json,resume.md}`, `eval/resultats/apres-correction-m1-v2.*`, `eval/resultats/comparaisons/*`, `eval/latency/stt-*.jsonl`, `RESULTATS.md`, `eval/README.md`, `RAPPORT_FINAL_M1.md`.
 
 **Non modifiés** : `dataset-synthetique.jsonl`, `avant-1.5b.*`, `apres-0.5b.*`, `grammar.gbnf`, `intent-schema.json`, et les deux fichiers Word protégés.
 
@@ -335,8 +337,24 @@ Aucun commit, push, pull, merge, rebase, changement de branche ni accès au dist
 
 ## 11. Conclusion
 
-**Bilan : lot P1–P4 terminé et chaîne M1 testée de bout en bout sur la plateforme locale.** Le banc live de 150 appels donne, après garde-fous, **150/150 intentions exactes**, **85/85 articles exacts**, **1840/1840 champs exacts**, **0 information inventée** et **0 erreur**, avec un p95 de **11,886 s**. Le recalcul historique et le recalcul `v3` après correction de l'alias ambigu confirment les mêmes 100 %. Le build, les **102 tests IA**, les **248 tests de la solution**, la syntaxe PowerShell et les deux validateurs sont propres. Les six tests M2 couvrent les signatures, le mapping, les garde-fous, la disponibilité et les adaptateurs ; trois tests couvrent la consultation T1.6 en lecture seule ; quatre tests couvrent les alias ambigus et les nombres inclus dans les libellés.
+**Bilan : lot P1–P4 terminé et chaîne M1 testée de bout en bout sur la plateforme locale.** Le banc live de 150 appels donne, après garde-fous, **150/150 intentions exactes**, **85/85 articles exacts**, **1840/1840 champs exacts**, **0 information inventée** et **0 erreur**, avec un p95 de **11,886 s**. Le recalcul historique et le recalcul `v3` après correction de l'alias ambigu confirment les mêmes 100 %. Le build, les **104 tests IA**, les **250 tests de la solution**, la syntaxe PowerShell et les deux validateurs sont propres. Les six tests M2 couvrent les signatures, le mapping, les garde-fous, la disponibilité et les adaptateurs ; trois tests couvrent la consultation T1.6 en lecture seule ; quatre tests couvrent les alias ambigus et les nombres inclus dans les libellés.
 
 Le module reste **non déclaré opérationnel en production** : le p95 de 11,886 s dépasse largement le seuil `< 5 s`, le WER réel et le banc officiel ne sont pas mesurés. Le défaut demeure `Qwen2.5-1.5B-Instruct Q4_K_M` et `max_tokens=512`. Les quatre comparaisons de modèles sont terminées (§5.6) : le `3B` est plus lent et moins complet après garde-fous, `small` triple la latence STT sans gain de WER ; aucun changement de défaut n'est adopté.
 
 Fichiers de référence : `RESULTATS.md`, `eval/README.md`, `eval/resultats/live-20261127-final-150-v2.resume.{json,md}`, `eval/resultats/live-20261127-final-150-v3.resume.{json,md}`, `eval/resultats/apres-correction-m1-v2.resume.{json,md}`.
+
+---
+
+## 12. Compléments après audit T1.1–T1.6 (28/11, travaux locaux)
+
+Cette section décrit uniquement des ajustements réalisés **localement, sans commit ni push** ; elle ne modifie aucune mesure ci-dessus.
+
+| Élément | Ajout | Limite conservée |
+|---|---|---|
+| T1.1 | `start-ai.ps1 -Install` installe puis lance LLM `8081` + STT `8082` en une commande ; documentation alignée dans `README.md`, `docs/API.md` et `tools/assistant/README.md` | Aucun test d'installation sur poste neuf vierge n'a été rejoué ici |
+| T1.3 | Aucun changement : 150/150 schémas valides après garde-fous, 147/150 sur le brut | Le brut n'est pas présenté comme conforme |
+| T1.4 | `eval/dataset.jsonl` généré en modèle `R001`–`R150` et ignoré par Git ; `.gitignore` ajouté pour `dataset.jsonl` et `eval/audio/` ; validateur et `bench.ps1` exigent un consentement explicite ; bug du validateur (`$error` réservé) corrigé | Aucun WAV ni consentement réel : WER et banc officiel toujours non mesurés |
+| T1.5 | `ConcurrenceTests.cs` : 10 appels parallèles corrects + vérification statique de `-np 1` / `-p 1` | Pas de banc live de concurrence ; la sérialisation effective reste portée par les serveurs |
+| T1.6 | Aucun changement : consultation en lecture seule inchangée | Brouillon à confirmer par M2/humain |
+
+Aucune route M2, aucun DTO concurrent, aucun appel M3, aucun changement de port, de modèle par défaut, de `max_tokens` ou de contrat JSON n'a été introduit. Les sections 10 et 11 ci-dessus décrivent l'état figé au commit précédent ; les ajouts de cette section restent locaux.

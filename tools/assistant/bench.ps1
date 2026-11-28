@@ -119,6 +119,13 @@ function Test-SchemaShape { param($Object)
 }
 
 foreach ($row in $rows) {
+    if ([string]$row.source -cne 'reel') {
+        throw "Ligne $($row.id) : source 'reel' attendue. Aucun résultat n'est écrit."
+    }
+    $consentement = [string]$row.consentement
+    if ([string]::IsNullOrWhiteSpace($consentement) -or $consentement -match 'attente|à recueillir|a recueillir') {
+        throw "Ligne $($row.id) : consentement explicite non renseigné. Aucun résultat n'est écrit."
+    }
     $audio = [string]$row.audio
     if ([string]::IsNullOrWhiteSpace($audio)) { throw "Ligne $($row.id) : champ audio absent." }
     if (-not [System.IO.Path]::IsPathRooted($audio)) { $audio = Join-Path $AudioRoot $audio }

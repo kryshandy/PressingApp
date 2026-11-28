@@ -57,13 +57,15 @@ Aucun serveur de base de données : SQLite est embarqué.
 git clone https://github.com/kryshandy/PressingApp.git
 cd PressingApp
 copy .env.example .env          # configuration locale (facultatif : les valeurs par défaut fonctionnent)
-.\scripts\build.ps1 -Tests      # restaure, compile et lance les tests
-.\tools\assistant\install.ps1   # IA locale : moteurs + modèles vérifiés (optionnel)
-.\scripts\start.ps1             # démarre l'API, le site, le Desktop et l'IA locale
+.\scripts\build.ps1 -Tests              # restaure, compile et lance les tests
+.\tools\assistant\install.ps1           # IA locale : moteurs + modèles vérifiés (avancé)
+.\tools\assistant\start-ai.ps1 -Install # une seule commande : installe puis lance 8081 + 8082
+.\scripts\start.ps1                     # démarre l'API, le site, le Desktop et l'IA locale
 ```
 
 - Sans le Desktop : `.\scripts\start.ps1 -SansDesktop`
 - Sans les moteurs IA : `.\scripts\start.ps1 -SansIA` (ou `ASSISTANT_ENABLED=false` dans `.env`)
+- Poste neuf, IA seule en une commande : `.\tools\assistant\start-ai.ps1 -Install` (défaut `1,5B`/`base`)
 - Arrêt de tout (applications + IA) : `.\scripts\stop.ps1`
 - Journaux : dossier `logs\` (applications) et `%LOCALAPPDATA%\Pressing\ai\logs\` (IA)
 

@@ -18,6 +18,10 @@ TestResults/
 *.db-shm
 *.log
 
+# Assistant IA local : enregistrements réels et jeu annoté (jamais versionnés)
+/tools/assistant/eval/dataset.jsonl
+/tools/assistant/eval/audio/
+
 # Secrets / environment
 .env
 .env.local

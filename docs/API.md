@@ -231,5 +231,7 @@ routes existantes (`POST /api/orders`, `/api/orders/{id}/payments`, `/api/orders
 
 `tools/assistant/RESULTATS.md` distingue les mesures réellement exécutées : banc live synthétique de 150 appels
 (150/150 intentions, 85/85 articles, 0 erreur, p95 11,886 s), recalcul hors ligne et trois phrases TTS. Aucun WER
-réel n'est publié : `dataset.jsonl` est absent et `bench.ps1` s'arrête sans écrire de résultat. Les seuils attendus
-restent ≥ 90 % d'intentions exactes, ≥ 85 % d'articles exacts et p95 < 5 s.
+réel n'est publié : `eval/dataset.jsonl` n'est qu'un modèle ignoré par Git (150 lignes `R001`–`R150`) et `bench.ps1`
+s'arrête tant que les 150 WAV et les consentements explicites ne sont pas fournis, sans écrire de résultat simulé.
+Sur un poste neuf, `.\tools\assistant\start-ai.ps1 -Install` installe puis lance les deux moteurs en une seule
+commande. Les seuils attendus restent ≥ 90 % d'intentions exactes, ≥ 85 % d'articles exacts et p95 < 5 s.

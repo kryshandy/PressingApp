@@ -26,7 +26,7 @@ Règles fortes :
 - catégories et services sont vérifiés contre le catalogue réel via `GET /api/public/catalog` (lecture seule) ;
 - l’audio n’est pas conservé : le client C# le transmet en mémoire, sans fichier temporaire ; les enregistrements du jeu d’évaluation sont stockés hors dépôt, avec consentement ;
 - les silences sont détectés avant inférence et la durée est limitée à 20 secondes ;
-- une seule inférence à la fois (file d’attente portée par le serveur llama.cpp `-np 1` et le serveur whisper.cpp `-p 1`) ;
+- une seule inférence à la fois (file d’attente portée par le serveur llama.cpp `-np 1` et le serveur whisper.cpp `-p 1`), vérifiée par `ConcurrenceTests.cs` ;
 - aucun modèle, audio ni secret n’est commité.
 
 Les garde-fous appliqués dans `LlmIntentExtractor`, indépendamment du modèle, couvrent : recopie de la transcription d’origine, tri-state `express`, vidage des champs sur `unknown`, preuve textuelle des valeurs, désambiguïsation des intentions, réparation d'un `pickup_date` invalide, affectation du service **par article** selon la position de sa catégorie dans la transcription, et refus des alias ambigus non prouvés. Un nombre intégré au libellé d'une catégorie (`Costume 2 pièces`) n'est jamais confondu avec la quantité prononcée. Le Membre 2 doit consommer `IntentExtraction.Payload`, pas `RawJson`.
@@ -54,7 +54,8 @@ Pour whisper.cpp, la release « latest » `v1.9.6` ne publie aucun asset Windows
 Depuis la racine du dépôt, en PowerShell :
 
 ```powershell
-.\tools\assistant\install.ps1                         # install vérifié (1,5B + base)
+.\tools\assistant\start-ai.ps1 -Install               # poste neuf : installe puis lance 8081 + 8082 en une commande
+.\tools\assistant\install.ps1                         # install vérifié seul (1,5B + base)
 .\tools\assistant\install.ps1 -LlmModel 0.5B -WhisperModel base
 .\tools\assistant\install.ps1 -LlmModel 3B -WhisperModel small     # comparaisons T1.4
 .\tools\assistant\update-vocab.ps1 -ApiUrl http://localhost:5180  # catalogue réel -> STT + LLM
@@ -74,7 +75,7 @@ Les fichiers sont rangés dans `%LOCALAPPDATA%\Pressing\ai\` (`llama`, `whisper`
 
 ```powershell
 # Unitaires : aucun serveur IA requis, fakes HTTP/STT.
-dotnet test tests/Pressing.Tests/Pressing.Tests.csproj --filter 'FullyQualifiedName~Assistant'  # 102 tests M1/M2
+dotnet test tests/Pressing.Tests/Pressing.Tests.csproj --filter 'FullyQualifiedName~Assistant'  # 104 tests M1/M2, dont ConcurrenceTests
 
 # Tous les tests C#.
 dotnet test PressingApp.sln --no-build
@@ -91,7 +92,7 @@ dotnet test PressingApp.sln --no-build
 .\tools\assistant\consultation.ps1 -Texte "Où en est le ticket 142 ?"
 .\tools\assistant\consultation.ps1 -Wav "C:\temp\question.wav"
 
-# Banc officiel : s'arrête sans jeu de données réel, n'écrit aucun résultat simulé.
+# Banc officiel : s'arrête sans 150 WAV réels ni consentements, n'écrit aucun résultat simulé.
 .\tools\assistant\bench.ps1
 
 # Latence séparée du LLM (prompt / génération / HTTP / tokens) et de Whisper.

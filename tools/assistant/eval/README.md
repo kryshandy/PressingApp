@@ -24,20 +24,22 @@ Aucun enregistrement client avec consentement n'a été fourni. Tout chiffre iss
 
 L'équipe doit enregistrer 150 phrases au comptoir, avec des voix et accents variés, du bruit de fond réaliste, le consentement explicite de chaque locuteur, une durée ≤ 20 s en WAV 16 kHz mono PCM 16 bits, un stockage hors Git (`eval/audio/`, ignoré) et une transcription de référence plus le JSON attendu dans `dataset.jsonl` (ignoré).
 
-Format attendu d'une ligne de `dataset.jsonl` (le chemin `audio` est relatif à `-AudioRoot`) :
+`dataset.jsonl` est déjà généré comme **modèle** : 150 lignes `R001`–`R150`, `source: "reel"`, `audio: "audio/Rxxx.wav"`, `reference` et `expected` recopiés du jeu synthétique. Le champ `consentement` contient volontairement un placeholder `en attente - consentement explicite a recueillir avant enregistrement` : le validateur et `bench.ps1` refusent de continuer tant qu'il n'est pas remplacé par un consentement explicite réel. Aucun WAV n'est fourni et aucun résultat n'en est déduit.
+
+Format attendu d'une ligne de `dataset.jsonl` une fois le consentement obtenu (le chemin `audio` est relatif à `-AudioRoot`) :
 
 ```json
-{"id":"R001","source":"reel","consentement":"consentement explicite obtenu","audio":"audio/R001.wav","reference":"Où en est le ticket 142 ?","expected":{"intent":"find_order","client":{"name":null,"phone":null},"items":[],"ticket":"142","amount":null,"payment_method":null,"deposit":null,"pickup_date":null,"item_status":null,"confidence":0.9,"transcript":"Où en est le ticket 142 ?"}}
+{"id":"R116","source":"reel","consentement":"consentement explicite obtenu","audio":"audio/R116.wav","reference":"O en est le ticket 142 ?","expected":{"intent":"find_order","client":{"name":null,"phone":null},"items":[],"ticket":"PRESS-2026-00142","amount":null,"payment_method":null,"deposit":null,"pickup_date":null,"item_status":null,"confidence":0.9,"transcript":"O en est le ticket 142 ?"}}
 ```
 
 Validation avant exécution du banc :
 
 ```powershell
-.\tools\assistant\eval\valider-dataset.ps1 -Source reel -Prefix R -RequireAudio -AudioRoot .\tools\assistant\eval
+.\tools\assistant\eval\valider-dataset.ps1 -Dataset .\tools\assistant\eval\dataset.jsonl -Source reel -Prefix R -RequireAudio -AudioRoot .\tools\assistant\eval
 .\tools\assistant\bench.ps1 -Dataset .\tools\assistant\eval\dataset.jsonl -AudioRoot .\tools\assistant\eval
 ```
 
-Le validateur vérifie maintenant les WAV réels : en-tête RIFF/WAVE, PCM, mono, 16 kHz, 16 bits et durée ≤ 20 s. Aucun résultat n'est écrit tant que les 150 lignes et les 150 fichiers audio ne sont pas présents.
+Le validateur vérifie maintenant les WAV réels : en-tête RIFF/WAVE, PCM, mono, 16 kHz, 16 bits et durée ≤ 20 s, ainsi que le consentement explicite en mode `-Source reel`. Aucun résultat n'est écrit tant que les 150 WAV et les 150 consentements ne sont pas présents.
 
 ## Jeu synthétique utilisé pour la mesure M1
 

@@ -175,4 +175,4 @@ Write-Host "Installation terminée." -ForegroundColor Green
 Write-Host "  LLM      : $llamaExe"
 Write-Host "  STT      : $whisperExe"
 Write-Host "  Modèles  : $($dirs.Models)"
-Write-Host "  Suivant  : .\tools\assistant\update-vocab.ps1 puis .\tools\assistant\start-ai.ps1"
+Write-Host "  Suivant  : .\tools\assistant\update-vocab.ps1 puis .\tools\assistant\start-ai.ps1 (ou directement .\tools\assistant\start-ai.ps1 -Install)"

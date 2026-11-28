@@ -72,6 +72,12 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
     if (-not $ids.Add($id)) { $errors.Add("$id : identifiant duplique") }
     if ($id -ne ('{0}{1:D3}' -f $Prefix, ($i + 1))) { $errors.Add("Ligne $($i + 1) : identifiant inattendu $id") }
     if ([string]$row.source -cne $Source) { $errors.Add("$id : source attendue $Source") }
+    if ($Source -eq 'reel') {
+        $consentement = [string]$row.consentement
+        if ([string]::IsNullOrWhiteSpace($consentement) -or $consentement -match 'attente|à recueillir|a recueillir') {
+            $errors.Add("$id : consentement explicite non renseigne")
+        }
+    }
     if ($RequireAudio) {
         $audio = [string]$row.audio
         if ([string]::IsNullOrWhiteSpace($audio)) { $errors.Add("$id : champ audio absent") }
@@ -120,7 +126,7 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
 }
 
 if ($errors.Count -gt 0) {
-    foreach ($error in $errors) { Write-Host "ERREUR : $error" -ForegroundColor Red }
+    foreach ($err in $errors) { Write-Host "ERREUR : $err" -ForegroundColor Red }
     throw "$($errors.Count) erreur(s) dans le jeu."
 }
 

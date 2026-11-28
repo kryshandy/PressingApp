@@ -4,6 +4,8 @@ Date des mesures finales : 27–28 novembre 2026. Machine : AMD Ryzen 5 5600U (6
 
 État : **lot P1–P4 terminé, chaîne locale testée de bout en bout, démo T1.6 en lecture seule livrée, comparaisons de modèles terminées**. La fiabilisation est obtenue par les garde-fous C#, pas par une précision inventée du modèle brut. Un alias ambigu (`costard`) et un nombre inclus dans un libellé (`Costume 2 pièces`) ont été corrigés le 28/11 ; le recalcul `live-20261127-final-150-v3.*` confirme les mêmes 100 % sur le brut figé du 27/11. Les quatre couples `1,5B/3B × base/small` ont été exécutés sur 150 scénarios ; le défaut reste `1,5B`/`base` (décision motivée en §7).
 
+Ajout local sans commit : `eval/dataset.jsonl` est un **modèle** `R001`–`R150` ignoré par Git, en attente de 150 WAV et de consentements explicites ; `start-ai.ps1 -Install` fournit l'installation + le lancement en une commande ; `ConcurrenceTests.cs` couvre 10 appels parallèles et la configuration `-np 1`/`-p 1`. **Aucune mesure ci-dessous n'est modifiée** : aucun WER réel ni p95 `< 5 s` n'est revendiqué.
+
 ---
 
 ## 1. Jeux et nature des mesures

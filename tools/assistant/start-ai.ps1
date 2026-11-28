@@ -1,10 +1,15 @@
 <#
 .SYNOPSIS
   Démarre llama-server (8081) et whisper-server (8082) sur 127.0.0.1 uniquement.
+.DESCRIPTION
+  Avec -Install, installe d'abord les moteurs et modèles vérifiés puis les démarre :
+  une seule commande suffit sur un poste neuf. Sans -Install, les artefacts doivent
+  déjà être présents dans %LOCALAPPDATA%\Pressing\ai.
 .EXAMPLE
   .\tools\assistant\start-ai.ps1
+  .\tools\assistant\start-ai.ps1 -Install
+  .\tools\assistant\start-ai.ps1 -Install -LlmModel 3B -WhisperModel small -Threads 4
   .\tools\assistant\start-ai.ps1 -LlmModel 0.5B -WhisperModel base
-  .\tools\assistant\start-ai.ps1 -LlmModel 3B -WhisperModel small -Threads 4
 #>
 param(
     [ValidateSet('0.5B', '1.5B', '3B')]
@@ -12,7 +17,8 @@ param(
     [ValidateSet('base', 'small')]
     [string]$WhisperModel = 'base',
     [ValidateRange(1, 64)]
-    [int]$Threads = 0
+    [int]$Threads = 0,
+    [switch]$Install
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,6 +28,12 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $assistantDir)
 $aiRoot = Join-Path $env:LOCALAPPDATA 'Pressing\ai'
 $logs = Join-Path $aiRoot 'logs'
 New-Item -ItemType Directory -Force $logs | Out-Null
+
+if ($Install) {
+    $installScript = Join-Path $assistantDir 'install.ps1'
+    Write-Host '==> Installation des moteurs et des modèles vérifiés' -ForegroundColor Cyan
+    & $installScript -LlmModel $LlmModel -WhisperModel $WhisperModel
+}
 
 function Get-PressingSetting {
     param([string]$Name, [string]$Default)
@@ -60,7 +72,7 @@ $alias = Get-PressingSetting 'ASSISTANT_LLM_MODEL_ALIAS' 'pressing-local'
 
 foreach ($required in @($llamaExe, $whisperExe, $llmPath, $sttPath, $grammar)) {
     if (-not (Test-Path $required)) {
-        throw "Fichier absent : $required. Lancez d'abord .\tools\assistant\install.ps1."
+        throw "Fichier absent : $required. Utilisez .\tools\assistant\start-ai.ps1 -Install puis vérifiez les journaux."
     }
 }
 
