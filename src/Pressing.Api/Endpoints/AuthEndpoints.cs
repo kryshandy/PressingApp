@@ -24,6 +24,10 @@ public static class AuthEndpoints
                     ct);
                 return Results.Ok(response);
             }
+            catch (StaffAccountLockedException ex)
+            {
+                return StaffSecurityEndpoints.Locked(ex);
+            }
             catch (UnauthorizedAccessException ex)
             {
                 return Results.Json(new { message = ex.Message }, statusCode: StatusCodes.Status401Unauthorized);

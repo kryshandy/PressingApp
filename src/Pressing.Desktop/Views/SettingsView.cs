@@ -289,6 +289,7 @@ public sealed class SettingsView : BaseView
     private const string TabLoyalty = "loyalty";
     private const string TabEmails = "emails";
     private const string TabReceipts = "receipts";
+    private const string TabSecurity = "security";
     private const string TabBackups = "backups";
     private const string TabAudit = "audit";
     private const int LogPageSize = 12;
@@ -342,6 +343,7 @@ public sealed class SettingsView : BaseView
         _tabs.Add(TabReceipts, "Reçus", Icons.Print);
         if (admin)
         {
+            _tabs.Add(TabSecurity, "Sécurité", Icons.Key);
             _tabs.Add(TabBackups, "Sauvegardes", Icons.Save);
             _tabs.Add(TabAudit, "Journal d'audit", Icons.Clock);
         }
@@ -356,6 +358,7 @@ public sealed class SettingsView : BaseView
         _pages[TabReceipts] = BuildReceiptsPage();
         if (admin)
         {
+            _pages[TabSecurity] = BuildSecurityPage();
             _pages[TabBackups] = BuildBackupsPage();
             _pages[TabAudit] = BuildAuditPage();
         }
@@ -535,6 +538,38 @@ public sealed class SettingsView : BaseView
         return ScrollPage(
             Card("Identité de la boutique", "Ces informations apparaissent sur les reçus et dans les e-mails.", identity),
             Card("Horaires et reçus", "Horaires d'ouverture et message de fin de ticket.", receipt));
+    }
+
+    private Control BuildSecurityPage()
+    {
+        FormGrid twoFactor = new(1);
+        twoFactor.Add(Toggle(SettingsKeys.RequireManagerTwoFactor, "Double authentification",
+            "Exiger la double authentification pour les managers"));
+        twoFactor.Add(new TextLabel
+        {
+            Text = "Activé : un manager saisit un code à usage unique après son mot de passe et doit l'activer à sa première connexion. " +
+                   "Désactivé : les managers se connectent avec le seul mot de passe. Les administrateurs et les caissiers n'ont pas de double authentification. " +
+                   "Pour un seul compte (téléphone perdu), utilisez « Réinitialiser la 2FA » dans l'écran Personnel.",
+            Wrap = true,
+            Height = Theme.S(64),
+            Font = Theme.F(9.5f),
+            ForeColor = Theme.TextMuted
+        });
+
+        FormGrid lockout = new(1);
+        lockout.Add(new TextLabel
+        {
+            Text = "Après 5 échecs de connexion consécutifs, un compte du personnel est verrouillé 15 minutes. " +
+                   "Un administrateur peut le déverrouiller depuis l'écran Personnel.",
+            Wrap = true,
+            Height = Theme.S(44),
+            Font = Theme.F(9.5f),
+            ForeColor = Theme.TextMuted
+        });
+
+        return ScrollPage(
+            Card("Connexion des managers", "Réservé aux administrateurs. Chaque changement est inscrit au journal d'audit.", twoFactor),
+            Card("Verrouillage des comptes", "Règle appliquée à tout le personnel (non modifiable).", lockout));
     }
 
     private Control BuildOrdersPage()

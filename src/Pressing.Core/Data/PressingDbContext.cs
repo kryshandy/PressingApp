@@ -28,6 +28,7 @@ public class PressingDbContext : DbContext
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<ReminderLog> ReminderLogs => Set<ReminderLog>();
     public DbSet<CashClosing> CashClosings => Set<CashClosing>();
+    public DbSet<Feedback> Feedbacks => Set<Feedback>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -214,6 +215,21 @@ public class PressingDbContext : DbContext
         {
             entity.HasIndex(r => new { r.OrderId, r.ReminderType }).IsUnique();
             entity.HasIndex(r => r.SentAt);
+        });
+
+        modelBuilder.Entity<Feedback>(entity =>
+        {
+            // Une seule réponse par commande.
+            entity.HasIndex(f => f.OrderId).IsUnique();
+            entity.HasIndex(f => f.CreatedAt);
+            entity.HasOne(f => f.Order)
+                .WithMany()
+                .HasForeignKey(f => f.OrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(f => f.Client)
+                .WithMany()
+                .HasForeignKey(f => f.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<CashClosing>(entity =>

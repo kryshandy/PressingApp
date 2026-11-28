@@ -1,6 +1,7 @@
 using Pressing.Client;
 using Pressing.Core;
 using Pressing.Core.Dtos;
+using Pressing.Core.Security;
 using Pressing.Desktop.Ui;
 
 namespace Pressing.Desktop.Dialogs;
@@ -8,8 +9,6 @@ namespace Pressing.Desktop.Dialogs;
 /// <summary>Création / modification d'un membre du personnel.</summary>
 public sealed class StaffDialog : DialogForm
 {
-    public const int MinPasswordLength = 8;
-
     private readonly PressingApiClient _api;
     private readonly StaffUserDto? _existing;
     private readonly bool _isSelf;
@@ -116,9 +115,9 @@ public sealed class StaffDialog : DialogForm
 
         if (_existing is null)
         {
-            if (_password.Text.Length < MinPasswordLength)
+            if (!PasswordPolicy.IsValid(_password.Text))
             {
-                Fail($"Le mot de passe doit contenir au moins {MinPasswordLength} caractères.", _password);
+                Fail(PasswordPolicy.Rule, _password);
                 return;
             }
 
@@ -181,9 +180,9 @@ public sealed class StaffPasswordDialog : DialogForm
 
     private async Task SubmitAsync()
     {
-        if (_password.Text.Length < StaffDialog.MinPasswordLength)
+        if (!PasswordPolicy.IsValid(_password.Text))
         {
-            ShowError($"Le mot de passe doit contenir au moins {StaffDialog.MinPasswordLength} caractères.");
+            ShowError(PasswordPolicy.Rule);
             _password.Focus();
             return;
         }

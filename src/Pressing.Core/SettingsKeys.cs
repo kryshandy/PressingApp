@@ -38,6 +38,9 @@ public static class SettingsKeys
     /// <summary>Ouvre le tiroir-caisse (ESC p) à l'impression du ticket thermique.</summary>
     public const string TicketPrinterOpenDrawer = "Printer.OpenCashDrawer";
 
+    /// <summary>Double authentification (TOTP) exigée des comptes Manager (Administrateur uniquement pour la modifier). Activée par défaut.</summary>
+    public const string RequireManagerTwoFactor = "Security.RequireManagerTwoFactor";
+
     public static readonly IReadOnlyDictionary<string, string> Defaults = new Dictionary<string, string>
     {
         [ShopName] = "Pressing Éclat",
@@ -66,6 +69,7 @@ public static class SettingsKeys
         [ReceiptShowBarcode] = "true",
         [ReceiptPaperSize] = "A5",
         [TicketPrinterName] = string.Empty,
-        [TicketPrinterOpenDrawer] = "false"
+        [TicketPrinterOpenDrawer] = "false",
+        [RequireManagerTwoFactor] = "true"
     };
 }

@@ -138,6 +138,49 @@ public sealed class HomeController : Controller
         return View(vm);
     }
 
+    // Enquête de satisfaction : lien reçu par WhatsApp ou e-mail 2 h après le retrait (jeton signé de 14 jours).
+    [HttpGet("avis")]
+    public async Task<IActionResult> Avis(string? token, CancellationToken ct)
+    {
+        var vm = new AvisViewModel { Token = token ?? "" };
+        if (string.IsNullOrWhiteSpace(token)) return View(vm);
+
+        try
+        {
+            vm.Form = await _portal.Api.GetFeedbackFormAsync(token, ct);
+        }
+        catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            vm.Form = null;
+        }
+        return View(vm);
+    }
+
+    [HttpPost("avis")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Avis(AvisViewModel posted, CancellationToken ct)
+    {
+        var vm = new AvisViewModel { Token = posted.Token ?? "", Note = posted.Note, Comment = posted.Comment };
+        try
+        {
+            vm.Form = await _portal.Api.GetFeedbackFormAsync(vm.Token, ct);
+            if (vm.Form is { AlreadyAnswered: false })
+            {
+                vm.Done = await _portal.Api.SubmitFeedbackAsync(vm.Token, posted.Note ?? 0, posted.Comment, ct);
+            }
+        }
+        catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.BadRequest)
+        {
+            // Lien invalide (Form reste nul) ou saisie refusée (note, longueur) : message de l'API, formulaire conservé.
+            vm.Error = vm.Form is null ? null : ex.Message;
+        }
+        catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            vm.Form = vm.Form is null ? null : vm.Form with { AlreadyAnswered = true };
+        }
+        return View(vm);
+    }
+
     [HttpGet("mentions-legales")]
     public async Task<IActionResult> MentionsLegales(CancellationToken ct) =>
         View(await _shop.GetShopAsync(ct));

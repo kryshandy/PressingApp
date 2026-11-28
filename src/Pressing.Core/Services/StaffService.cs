@@ -100,10 +100,7 @@ public class StaffService
         CurrentUser user,
         CancellationToken ct = default)
     {
-        if (password.Length < 6)
-        {
-            throw new InvalidOperationException("Le mot de passe doit contenir au moins 6 caractères.");
-        }
+        PasswordPolicy.EnsureValid(password);
 
         StaffUser staff = await _db.StaffUsers.FirstOrDefaultAsync(s => s.Id == id, ct)
             ?? throw new KeyNotFoundException("Utilisateur introuvable.");
@@ -115,6 +112,25 @@ public class StaffService
         return new MessageResponse("Le mot de passe a été mis à jour.");
     }
 
+    /// <summary>Déverrouille un compte bloqué par des échecs de connexion (administrateur) ; l'action est auditée.</summary>
+    public async Task<MessageResponse> UnlockAsync(int id, CurrentUser user, string? ip = null, CancellationToken ct = default)
+    {
+        StaffUser staff = await _db.StaffUsers.FirstOrDefaultAsync(s => s.Id == id, ct)
+            ?? throw new KeyNotFoundException("Utilisateur introuvable.");
+
+        bool wasLocked = staff.LockedUntil.HasValue && staff.LockedUntil.Value > DateTime.Now;
+        staff.FailedLoginCount = 0;
+        staff.LockedUntil = null;
+        staff.UpdatedAt = DateTime.Now;
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync(user, "unlock", nameof(StaffUser), staff.Id.ToString(),
+            wasLocked ? $"Compte de {staff.FullName} déverrouillé" : $"Échecs de connexion de {staff.FullName} remis à zéro", ip, ct);
+
+        return new MessageResponse(wasLocked
+            ? $"Le compte de {staff.FullName} est déverrouillé."
+            : $"Le compte de {staff.FullName} n'était pas verrouillé ; ses échecs de connexion ont été remis à zéro.");
+    }
+
     private async Task<int> CountActiveAdminsAsync(CancellationToken ct) =>
         await _db.StaffUsers.CountAsync(s => s.Role == UserRole.Admin && s.IsActive, ct);
 
@@ -122,6 +138,6 @@ public class StaffService
     {
         if (string.IsNullOrWhiteSpace(fullName)) throw new InvalidOperationException("Le nom complet est obligatoire.");
         if (string.IsNullOrWhiteSpace(username)) throw new InvalidOperationException("Le nom d'utilisateur est obligatoire.");
-        if (password.Length < 6) throw new InvalidOperationException("Le mot de passe doit contenir au moins 6 caractères.");
+        PasswordPolicy.EnsureValid(password);
     }
 }

@@ -95,6 +95,7 @@ builder.Services.AddScoped<CashClosingService>();
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddReminders(builder.Configuration);
 builder.Services.AddAssistant();
+builder.Services.AddStaffSecurity(databaseOptions.Path);
 
 if (emailOptions.EffectiveProvider == "resend")
 {
@@ -230,6 +231,8 @@ app.MapPublicEndpoints();
 app.MapMessagingEndpoints();
 app.MapRemindersEndpoints();
 app.MapAuthEndpoints();
+app.MapStaffSecurityEndpoints();
+app.MapFeedbackEndpoints();
 app.MapClientEndpoints();
 app.MapCatalogEndpoints();
 app.MapOrderEndpoints();

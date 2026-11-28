@@ -3,6 +3,7 @@ using System.Text;
 using Pressing.Client;
 using Pressing.Core;
 using Pressing.Core.Dtos;
+using Pressing.Core.Security;
 using Pressing.Desktop.Dialogs;
 using Pressing.Desktop.Forms;
 using Pressing.Desktop.Services;
@@ -647,15 +648,17 @@ internal static class SelfTest
             hostForm.Controls.Add(settings);
             settings.Dock = DockStyle.Fill;
             await settings.LoadAsync();
-            foreach (string section in new[] { "emails", "receipts", "backups", "audit", "loyalty", "orders", "shop" })
+            foreach (string section in new[] { "emails", "receipts", "security", "backups", "audit", "loyalty", "orders", "shop" })
             {
                 await settings.ShowSectionAsync(section);
                 await Capture(settings, screensDir, "settings-" + section);
             }
 
+            await Task.Delay(500); // laisse finir le chargement asynchrone déclenché par le changement d'onglet
             string? original = settings.GetFieldValue(SettingsKeys.ShopSlogan);
             settings.SetFieldValue(SettingsKeys.ShopSlogan, "Slogan auto-test " + tag);
-            Check(await settings.SaveChangesAsync() == 1, "un seul paramètre modifié");
+            int saved = await settings.SaveChangesAsync();
+            Check(saved == 1, "un seul paramètre modifié, obtenu " + saved);
             Check((await api.GetSettingsAsync())!.Values[SettingsKeys.ShopSlogan] == "Slogan auto-test " + tag, "paramètre enregistré");
             settings.SetFieldValue(SettingsKeys.ShopSlogan, original ?? string.Empty);
             Check(await settings.SaveChangesAsync() == 1, "paramètre remis");
@@ -689,6 +692,138 @@ internal static class SelfTest
                 Check(!string.IsNullOrWhiteSpace(ex.Message), "message vide");
                 Write("       refus lisible : " + ex.Message);
             }
+        });
+
+        await Step("Sécurité : exigence 2FA réglée par l'admin, manager en deux temps, verrouillage et déverrouillage", async () =>
+        {
+            const string managerPassword = "Manager@2026!";
+            Dictionary<string, string> require(bool on) => new() { [SettingsKeys.RequireManagerTwoFactor] = on ? "true" : "false" };
+
+            // L'administrateur désactive l'exigence : le manager se connecte avec le seul mot de passe.
+            await api.UpdateSettingsAsync(require(false));
+            using (PressingApiClient free = new(apiUrl))
+            {
+                AuthResponse? direct = await free.LoginStaffAsync("manager", managerPassword);
+                Check(direct is { MfaRequired: false, TwoFactorSetupRequired: false, Staff: not null }, "manager sans exigence : connexion directe");
+            }
+
+            // Réactivée : le manager est conduit à activer la 2FA (QR code, premier code, codes de secours).
+            await api.UpdateSettingsAsync(require(true));
+            using PressingApiClient managerApi = new(apiUrl);
+            AuthResponse? first = await managerApi.LoginStaffAsync("manager", managerPassword);
+            Check(first is { TwoFactorSetupRequired: true, Staff.Role: UserRole.Manager }, "activation exigée");
+            TwoFactorSetupDto setup = (await managerApi.BeginTwoFactorSetupAsync())!;
+            using (TwoFactorSetupDialog setupDialog = new(managerApi, setup, mandatory: true))
+            {
+                await Capture(setupDialog, screensDir, "dialog-two-factor-setup");
+                const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+                InputBox box = (InputBox)typeof(TwoFactorSetupDialog).GetField("_code", flags)!.GetValue(setupDialog)!;
+                box.Text = Totp.Compute(setup.Secret, DateTimeOffset.UtcNow);
+                await (Task)typeof(TwoFactorSetupDialog).GetMethod("ActivateAsync", flags)!.Invoke(setupDialog, null)!;
+                IReadOnlyList<string> codes = (IReadOnlyList<string>)typeof(TwoFactorSetupDialog).GetField("_recoveryCodes", flags)!.GetValue(setupDialog)!;
+                Check(codes.Count == 8, "8 codes de secours affichés");
+                await Capture(setupDialog, screensDir, "dialog-two-factor-codes");
+            }
+
+            // Connexion en deux temps avec un code calculé par le test.
+            using PressingApiClient second = new(apiUrl);
+            AuthResponse? pending = await second.LoginStaffAsync("manager", managerPassword);
+            Check(pending is { MfaRequired: true, Staff: null }, "jeton intermédiaire attendu");
+            try
+            {
+                await second.GetDashboardAsync();
+                Check(false, "le jeton intermédiaire ne doit rien ouvrir");
+            }
+            catch (ApiException ex)
+            {
+                Check(ex.IsUnauthorized, "jeton intermédiaire refusé (401)");
+            }
+
+            AuthResponse? done = await second.LoginStaffMfaAsync(Totp.Compute(setup.Secret, DateTimeOffset.UtcNow));
+            Check(done?.Staff is { Role: UserRole.Manager }, "manager connecté en deux temps");
+            AppSession managerSession = new(second, done!.Staff!);
+            BaseView account = new AccountView(new FakeHost(managerSession, hostForm));
+            hostForm.Controls.Add(account);
+            account.Dock = DockStyle.Fill;
+            await account.LoadAsync();
+            await Capture(account, screensDir, "view-account-manager");
+            hostForm.Controls.Remove(account);
+            account.Dispose();
+
+            // Verrouillage après 5 échecs, visible dans l'écran Personnel, puis déverrouillage par l'admin.
+            string tag = DateTime.Now.ToString("HHmmss");
+            StaffUserDto victim = (await api.CreateStaffAsync(new CreateStaffRequest("Compte Verrou " + tag, "verrou" + tag, null, UserRole.Cashier, "Verrou2026")))!;
+            for (int i = 0; i < 5; i++)
+            {
+                using PressingApiClient attacker = new(apiUrl) { ForwardedFor = "10.9.9." + (i + 1) };
+                try
+                {
+                    await attacker.LoginStaffAsync(victim.Username, "mauvais-mdp");
+                    Check(false, "connexion avec un mauvais mot de passe");
+                }
+                catch (ApiException ex)
+                {
+                    Check(i < 4 ? ex.IsUnauthorized : ex.StatusCode == System.Net.HttpStatusCode.Locked, "échec " + (i + 1) + " : " + ex.Message);
+                    if (i == 4)
+                    {
+                        Check(ex.Message.Contains("déverrouillé à", StringComparison.Ordinal), "heure de déverrouillage dans le message");
+                    }
+                }
+            }
+
+            StaffView staffView = new(fake);
+            hostForm.Controls.Add(staffView);
+            staffView.Dock = DockStyle.Fill;
+            await staffView.LoadAsync();
+            await Capture(staffView, screensDir, "view-staff-locked");
+            hostForm.Controls.Remove(staffView);
+            staffView.Dispose();
+
+            Check((await api.GetStaffAsync())!.Single(m => m.Id == victim.Id).IsLocked, "compte verrouillé côté liste");
+            await api.UnlockStaffAsync(victim.Id);
+            using (PressingApiClient back = new(apiUrl))
+            {
+                Check((await back.LoginStaffAsync(victim.Username, "Verrou2026"))?.Staff is not null, "connexion après déverrouillage");
+            }
+
+            // Retour à l'état de démonstration : le manager n'a plus de 2FA (l'administrateur la réinitialise).
+            Check((await api.GetStaffAsync())!.Single(m => m.Username == "manager").TwoFactorEnabled, "2FA du manager active");
+            await api.ResetStaffTwoFactorAsync(first!.Staff!.Id);
+            Check(!(await api.GetStaffAsync())!.Single(m => m.Username == "manager").TwoFactorEnabled, "2FA du manager réinitialisée");
+        });
+
+        await Step("Satisfaction : liste des avis, carte du tableau de bord et section « Avis clients » de l'écran Rappels", async () =>
+        {
+            FeedbackPageDto? page = await api.GetFeedbackAsync(1, 10, 30);
+            Check(page is { Total: >= 0, Page: 1 }, "liste des avis");
+            using PressingApiClient cashier = new(apiUrl);
+            await cashier.LoginStaffAsync("caisse", "Caisse@2026!");
+            try
+            {
+                await cashier.GetFeedbackAsync();
+                Check(false, "la liste des avis est réservée au responsable");
+            }
+            catch (ApiException ex)
+            {
+                Check(ex.IsForbidden, "caissier : 403 attendu");
+            }
+
+            RemindersView reminders = new(fake);
+            hostForm.Controls.Add(reminders);
+            reminders.Dock = DockStyle.Fill;
+            await reminders.LoadAsync();
+            await (Task)typeof(RemindersView).GetMethod("ToggleFeedbackAsync", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(reminders, null)!;
+            await Capture(reminders, screensDir, "view-reminders-feedback");
+            hostForm.Controls.Remove(reminders);
+            reminders.Dispose();
+
+            DashboardView dashboard = new(fake);
+            hostForm.Controls.Add(dashboard);
+            dashboard.Dock = DockStyle.Fill;
+            await dashboard.LoadAsync();
+            await Capture(dashboard, screensDir, "view-dashboard-satisfaction");
+            hostForm.Controls.Remove(dashboard);
+            dashboard.Dispose();
         });
 
         // Coque complète à plusieurs tailles de fenêtre (px logiques, DESIGN.md §6) : PRESSING_TEST_SIZES="1280x760,1600x900".

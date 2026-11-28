@@ -25,6 +25,7 @@ public static class ReminderServiceCollectionExtensions
         whatsAppOptions.TemplateUncollected = EnvOr("WHATSAPP_TEMPLATE_UNCOLLECTED", whatsAppOptions.TemplateUncollected);
         whatsAppOptions.TemplateBalance = EnvOr("WHATSAPP_TEMPLATE_BALANCE", whatsAppOptions.TemplateBalance);
         whatsAppOptions.TemplateDue = EnvOr("WHATSAPP_TEMPLATE_DUE", whatsAppOptions.TemplateDue);
+        whatsAppOptions.TemplateFeedback = EnvOr("WHATSAPP_TEMPLATE_FEEDBACK", whatsAppOptions.TemplateFeedback);
         whatsAppOptions.TemplateLanguage = EnvOr("WHATSAPP_TEMPLATE_LANGUAGE", whatsAppOptions.TemplateLanguage);
 
         services.AddSingleton(whatsAppOptions);
@@ -39,6 +40,7 @@ public static class ReminderServiceCollectionExtensions
         }
 
         services.AddScoped<ReminderService>();
+        services.AddScoped<FeedbackService>();
 
         // Rappels automatiques (WhatsApp / e-mail, clients ayant donné leur consentement). REMINDERS_ENABLED=false les coupe.
         if (!string.Equals(Environment.GetEnvironmentVariable("REMINDERS_ENABLED"), "false", StringComparison.OrdinalIgnoreCase))

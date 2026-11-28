@@ -120,6 +120,7 @@ public class SettingsService
     {
         var existing = await _db.AppSettings.ToDictionaryAsync(s => s.Key, s => s, ct);
         var allowed = new HashSet<string>(SettingsKeys.Defaults.Keys, StringComparer.OrdinalIgnoreCase);
+        bool requireBefore = await GetBoolAsync(SettingsKeys.RequireManagerTwoFactor, true, ct);
 
         foreach ((string key, string rawValue) in request.Values)
         {
@@ -144,6 +145,15 @@ public class SettingsService
 
         await _db.SaveChangesAsync(ct);
         await _audit.LogAsync(user, "update", "Settings", null, "Mise à jour des paramètres", ct: ct);
+        bool requireAfter = await GetBoolAsync(SettingsKeys.RequireManagerTwoFactor, true, ct);
+        if (requireAfter != requireBefore)
+        {
+            await _audit.LogAsync(user, requireAfter ? "2fa-require" : "2fa-unrequire", "Settings", SettingsKeys.RequireManagerTwoFactor,
+                requireAfter
+                    ? "Double authentification exigée des managers"
+                    : "Double authentification des managers désactivée : connexion par mot de passe seul", ct: ct);
+        }
+
         return await GetDtoAsync(ct);
     }
 
@@ -247,7 +257,7 @@ public class SettingsService
             or SettingsKeys.EmailNotifications or SettingsKeys.EmailOrderConfirmation
             or SettingsKeys.EmailOrderReady or SettingsKeys.EmailReceipt
             or SettingsKeys.ReceiptShowQr or SettingsKeys.ReceiptShowBarcode
-            or SettingsKeys.TicketPrinterOpenDrawer)
+            or SettingsKeys.TicketPrinterOpenDrawer or SettingsKeys.RequireManagerTwoFactor)
         {
             if (!bool.TryParse(value, out _))
             {

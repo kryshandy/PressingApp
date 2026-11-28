@@ -9,7 +9,13 @@ public record StaffUserDto(
     string RoleLabel,
     bool IsActive,
     DateTime CreatedAt,
-    DateTime? LastLoginAt);
+    DateTime? LastLoginAt,
+    bool TwoFactorEnabled = false,
+    DateTime? LockedUntil = null)
+{
+    /// <summary>Compte verrouillé à cet instant (échecs de connexion répétés).</summary>
+    public bool IsLocked => LockedUntil.HasValue && LockedUntil.Value > DateTime.Now;
+}
 
 public record CreateStaffRequest(
     string FullName,

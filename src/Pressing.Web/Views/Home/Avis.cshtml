@@ -1,0 +1,65 @@
+@model AvisViewModel
+@{
+    ViewData["Title"] = "Votre avis";
+    ViewData["BodyClass"] = "auth-page";
+    string[] labels = { "Décevant", "Moyen", "Correct", "Bien", "Excellent" };
+}
+
+<section class="auth">
+    <div class="container">
+        <div class="auth-card auth-card-single">
+            <div class="auth-form">
+                <p class="eyebrow">Votre avis</p>
+                @if (Model.Form is null)
+                {
+                    <h1 class="display-3">Lien invalide</h1>
+                    <div class="flash flash-error" role="alert">@Icons.Svg("alert", size: 20)<p>Ce lien d'avis est invalide ou a expiré. Vous pouvez nous écrire depuis la page contact.</p></div>
+                    <a class="btn btn-ink" href="/contact">Nous contacter</a>
+                }
+                else if (Model.Done is not null)
+                {
+                    <h1 class="display-3">Merci !</h1>
+                    <div class="flash flash-success" role="status">@Icons.Svg("check", size: 20)<p>@Model.Done</p></div>
+                    <a class="btn btn-ink" href="/">Retour à l'accueil</a>
+                }
+                else if (Model.Form.AlreadyAnswered)
+                {
+                    <h1 class="display-3">Avis déjà reçu</h1>
+                    <p>Merci @Model.Form.FirstName, vous avez déjà donné votre avis sur la commande @Model.Form.TicketNumber.</p>
+                    <a class="btn btn-ink" href="/">Retour à l'accueil</a>
+                }
+                else
+                {
+                    <h1 class="display-3">Comment s'est passée votre commande ?</h1>
+                    <p>Bonjour @Model.Form.FirstName, votre commande @Model.Form.TicketNumber est terminée. Quelques secondes pour nous dire ce que vous en pensez ?</p>
+
+                    @if (!string.IsNullOrWhiteSpace(Model.Error))
+                    {
+                        <div class="flash flash-error" role="alert" tabindex="-1" data-focus-on-load>@Icons.Svg("alert", size: 20)<p>@Model.Error</p></div>
+                    }
+
+                    <form method="post" action="/avis" novalidate>
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="Token" value="@Model.Token" />
+                        <fieldset class="rating">
+                            <legend>Votre note</legend>
+                            <div class="rating-choices">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    <input type="radio" id="note-@i" name="Note" value="@i" checked="@(Model.Note == i)" required />
+                                    <label for="note-@i">@i<small>@labels[i - 1]</small></label>
+                                }
+                            </div>
+                        </fieldset>
+                        <div class="field">
+                            <label for="Comment">Un commentaire <span class="optional">(facultatif)</span></label>
+                            <textarea id="Comment" name="Comment" rows="4" maxlength="1000">@Model.Comment</textarea>
+                            <span class="hint">1000 caractères au plus.</span>
+                        </div>
+                        <button class="btn btn-ink btn-block" type="submit">Envoyer mon avis</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</section>

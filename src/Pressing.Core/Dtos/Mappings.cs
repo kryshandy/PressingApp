@@ -190,5 +190,7 @@ public static class Mappings
         staff.Role.Label(),
         staff.IsActive,
         staff.CreatedAt,
-        staff.LastLoginAt);
+        staff.LastLoginAt,
+        staff.TwoFactorEnabled,
+        staff.LockedUntil.HasValue && staff.LockedUntil.Value > DateTime.Now ? staff.LockedUntil : null);
 }

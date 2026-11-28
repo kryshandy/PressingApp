@@ -56,6 +56,8 @@ de version du logiciel.
 | GET | `/api/public/tracking/{ticket}` | `?phone=` (obligatoire) | `TrackingDto` · 404 |
 | POST | `/api/public/contact` | `{ name, email, phone?, message }` | `{ message }` |
 | GET | `/api/public/unsubscribe` | `?token=` (lien des e-mails de rappel) | `{ active }` · 400 lien invalide ou expiré |
+| GET | `/api/public/feedback` | `?token=` (lien d'avis, type `feedback`) | `FeedbackFormDto` (`ticketNumber`, `firstName`, `shopName`, `alreadyAnswered`, `note?`) · 400 lien invalide ou expiré |
+| POST | `/api/public/feedback` | `{ token, note (1 à 5), comment? (≤ 1000 caractères) }` | `{ message }` · 400 note hors 1–5, commentaire trop long, lien invalide · 409 déjà répondu (une seule réponse par commande) |
 | POST | `/api/public/unsubscribe` | `{ token }` | `{ message }` · 400 — passe le client en « aucun rappel » et date la révocation |
 | GET | `/api/public/whatsapp/webhook` | `?hub.mode=subscribe&hub.verify_token&hub.challenge` (vérification Meta) | le `challenge` · 401 |
 | POST | `/api/public/whatsapp/webhook` | notification Meta signée (`X-Hub-Signature-256`, `WHATSAPP_APP_SECRET`) | 200 · 401 signature invalide · 503 secret absent — « STOP » révoque le consentement WhatsApp |
@@ -63,16 +65,25 @@ de version du logiciel.
 Le lien de désinscription des e-mails ouvre la page **`/desabonnement?token=`** du site, qui appelle les deux routes
 `unsubscribe`. Le jeton (`token_type = unsubscribe`, 180 jours) ne donne accès à aucune autre route.
 
+Le lien d'enquête de satisfaction, envoyé 2 h après le retrait complet, ouvre la page **`/avis?token=`** du site, qui appelle
+les deux routes `feedback`. Le jeton (`token_type = feedback`, 14 jours) désigne une commande et son client ; il est refusé
+par toute autre route, y compris comme jeton de désabonnement. Les routes sont limitées en débit (30 requêtes/minute/IP).
+
 ## Authentification
 
 | Méthode | Route | Politique | Corps | Réponse |
 | --- | --- | --- | --- | --- |
-| POST | `/api/auth/staff/login` | anonyme | `StaffLoginRequest` | `AuthResponse` · 401 `{message}` |
+| POST | `/api/auth/staff/login` | anonyme | `StaffLoginRequest` | `AuthResponse` · 401 `{message}` (identifiant inconnu et mot de passe faux : même message) · **423** `{message, lockedUntil}` compte verrouillé (5 échecs consécutifs = 15 min ; le message donne l'heure de déverrouillage) |
+| POST | `/api/auth/staff/login/mfa` | anonyme, en-tête `Authorization: Bearer <jeton mfa-pending>` | `{ code }` (6 chiffres ou code de secours) | `AuthResponse` · 401 code faux/déjà utilisé/jeton expiré · 423 verrouillé |
+| GET | `/api/auth/staff/2fa` | StaffOnly | | `{ enabled, recoveryCodesLeft, required, available }` |
+| POST | `/api/auth/staff/2fa/setup` | StaffOnly (Manager) | | `{ secret, otpAuthUri, issuer, account }` · 400 pour un Admin ou un Caissier |
+| POST | `/api/auth/staff/2fa/enable` | StaffOnly (Manager) | `{ code }` | `{ recoveryCodes[8] }` (affichés une seule fois) · 400 code faux |
+| POST | `/api/auth/staff/2fa/disable` | StaffOnly (Manager) | `{ password, code }` | `MessageResponse` · 400 si l'exigence est active (seul l'administrateur peut alors la lever) |
 | POST | `/api/auth/client/login` | anonyme | `ClientLoginRequest` (identifiant = téléphone ou e-mail) | `AuthResponse` · 401 |
 | POST | `/api/auth/client/forgot` | anonyme | `ForgotPasswordRequest` | `MessageResponse` |
 | POST | `/api/auth/client/reset` | anonyme | `ResetPasswordRequest` | `MessageResponse` |
 | GET | `/api/auth/me` | connecté | | `{ type, staff? , client? }` |
-| POST | `/api/auth/staff/change-password` | StaffOnly | `ChangeStaffPasswordRequest` | `MessageResponse` |
+| POST | `/api/auth/staff/change-password` | StaffOnly | `ChangeStaffPasswordRequest` | `MessageResponse` · 400 si le nouveau mot de passe a moins de 8 caractères, sans lettre ou sans chiffre |
 | POST | `/api/auth/client/change-password` | ClientOnly | `ClientChangePasswordRequest` | `MessageResponse` |
 
 ## Clients (personnel)
@@ -173,8 +184,33 @@ exposent leur journal et permettent une relance manuelle. Méthodes du client : 
 
 | Méthode | Route | Politique | Query / corps | Réponse |
 | --- | --- | --- | --- | --- |
-| GET | `/api/reminders` | ManagerOrAdmin | `?page&pageSize&type&channel&from&to` — `type` : `ready`, `uncollected-j3`, `uncollected-j7`, `uncollected-j14`, `unpaid-balance`, `due-tomorrow`, `manual` ; `channel` : `whatsapp` ou `email` ; `from`/`to` inclusifs | `PagedResult<ReminderLogDto>` (ticket, client, type, canal, date, succès, erreur), du plus récent au plus ancien |
+| GET | `/api/reminders` | ManagerOrAdmin | `?page&pageSize&type&channel&from&to` — `type` : `ready`, `uncollected-j3`, `uncollected-j7`, `uncollected-j14`, `unpaid-balance`, `due-tomorrow`, `manual`, `feedback` ; `channel` : `whatsapp` ou `email` ; `from`/`to` inclusifs | `PagedResult<ReminderLogDto>` (ticket, client, type, canal, date, succès, erreur), du plus récent au plus ancien |
 | POST | `/api/reminders/orders/{orderId}/send` | ManagerOrAdmin | | `ReminderLogDto` · 400 sans consentement (« … n'a pas consenti aux rappels … »), commande terminée/annulée, coordonnée du canal manquante ou échec d'envoi · 404 commande inconnue — journalisé (`manual`) et audité (`reminder-send`) |
+
+### Double authentification (TOTP) et verrouillage
+
+- **Rôle concerné : Manager uniquement.** Administrateurs et caissiers n'ont pas de double authentification.
+- Réglage `Security.RequireManagerTwoFactor` (Paramètres → Sécurité, AdminOnly, **activé par défaut**, audité `2fa-require` /
+  `2fa-unrequire`). Activé : un manager ayant la 2FA reçoit, après un mot de passe correct, un jeton intermédiaire
+  (`AuthResponse.mfaRequired = true`, `token_type = mfa-pending`, 5 minutes, sans rôle) à compléter par
+  `POST /api/auth/staff/login/mfa`. Le jeton intermédiaire est refusé par `TokenRevalidation` pour toute autre route (401).
+  Un manager qui n'a pas encore la 2FA se connecte normalement et reçoit `twoFactorSetupRequired = true` : le Desktop lui impose
+  l'activation (QR code, premier code, codes de secours) avant d'ouvrir l'application. Désactivé : connexion par mot de passe seul.
+- TOTP RFC 6238 : HMAC-SHA1, 30 s, 6 chiffres, fenêtre ±1 pas, un même code ne sert qu'une fois à la connexion. URI
+  `otpauth://totp/Pressing%20%C3%89clat:<identifiant>?secret=…&issuer=Pressing%20%C3%89clat`. Le secret est chiffré (ASP.NET
+  Core Data Protection, clés dans `dataprotection-keys/` à côté de la base) ; les 8 codes de secours sont stockés hachés (SHA-256)
+  et à usage unique.
+- Les échecs de code comptent comme des échecs de connexion (5 = verrouillage de 15 minutes).
+- Audit : `lockout`, `unlock`, `2fa-enable`, `2fa-disable`, `2fa-reset`, `2fa-require`, `2fa-unrequire`.
+
+## Satisfaction (responsable / administrateur)
+
+| Méthode | Route | Politique | Corps / query | Réponse |
+| --- | --- | --- | --- | --- |
+| GET | `/api/feedback` | ManagerOrAdmin | `?page=1&pageSize=25&days` (`days` : moyenne et nombre limités aux N derniers jours) | `FeedbackPageDto` : `items[]` (ticket, client, note, commentaire, date), `total`, `average`, `count` |
+
+Une demande d'avis part une seule fois (journal `ReminderLogs`, type `feedback`), 2 h après le retrait complet d'une commande
+(statut `Completed`, au plus 48 h plus tard), entre 8 h et 20 h, uniquement si le client a consenti (WhatsApp ou e-mail).
 
 ## Administration
 
@@ -183,7 +219,9 @@ exposent leur journal et permettent une relance manuelle. Méthodes du client : 
 | GET | `/api/staff` | AdminOnly | | `StaffUserDto[]` |
 | POST | `/api/staff` | AdminOnly | `CreateStaffRequest` | `201 StaffUserDto` |
 | PUT | `/api/staff/{id}` | AdminOnly | `UpdateStaffRequest` | `StaffUserDto` |
-| POST | `/api/staff/{id}/password` | AdminOnly | `StaffPasswordRequest` | `MessageResponse` |
+| POST | `/api/staff/{id}/password` | AdminOnly | `StaffPasswordRequest` | `MessageResponse` · 400 politique de mot de passe (8 caractères, une lettre, un chiffre) |
+| POST | `/api/staff/{id}/unlock` | AdminOnly | | `MessageResponse` — remet les échecs à zéro, audité (`unlock`) |
+| POST | `/api/staff/{id}/two-factor/reset` | AdminOnly | | `MessageResponse` — efface secret et codes de secours, audité (`2fa-reset`) |
 | GET | `/api/settings` | ManagerOrAdmin | | `SettingsDto` |
 | PUT | `/api/settings` | AdminOnly | `UpdateSettingsRequest` | `SettingsDto` |
 | POST | `/api/settings/backup` | AdminOnly | | `BackupResultDto` |
