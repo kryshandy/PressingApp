@@ -12,6 +12,7 @@ Tableau de bord, Nouveau dépôt, Commandes (+ détail), Clients (+ fiche), Retr
 - **Promotions** (`PromotionsView`, `PromotionDialog`) : codes promo, Manager/Admin.
 - **Rapports** (`ReportsView`) : période, chiffres clés, graphique, tableaux, export CSV, Manager/Admin.
 - **Personnel** (`StaffView`, `StaffDialogs`) : comptes, rôles, mots de passe, Admin.
+- **Rappels** (`RemindersView`) : journal des rappels WhatsApp / e-mail (type, canal, période) et relance manuelle d'un client consentant, Manager/Admin.
 - **Paramètres** (`SettingsView`) : boutique, commandes, fidélité, e-mails (journal, test), reçus ; sauvegardes et journal d'audit (Admin). Lecture seule pour un Manager.
 
 ## Mise en page (charte `DESIGN.md`)
