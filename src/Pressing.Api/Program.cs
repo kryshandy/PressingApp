@@ -97,6 +97,7 @@ builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<PromotionService>();
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddScoped<ReceiptService>();
+builder.Services.AddWorkshopServices();
 builder.Services.AddScoped<EmailTemplateService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<OrderService>();
@@ -258,6 +259,7 @@ app.MapOrderEndpoints();
 app.MapPortalEndpoints();
 app.MapDashboardEndpoints();
 app.MapAdminEndpoints();
+app.MapWorkshopEndpoints();
 
 await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
 {

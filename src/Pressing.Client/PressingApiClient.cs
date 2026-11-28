@@ -23,7 +23,7 @@ namespace Pressing.Client;
 /// <para><b>Règle : toute nouvelle route de docs/API.md doit avoir sa méthode ici.</b></para>
 /// <para>Toutes les erreurs (HTTP ou réseau) sont levées sous forme de <see cref="ApiException"/> au message lisible en français.</para>
 /// </summary>
-public sealed class PressingApiClient : IDisposable
+public sealed partial class PressingApiClient : IDisposable
 {
     private readonly HttpClient _http;
     private readonly bool _ownsHttp;
