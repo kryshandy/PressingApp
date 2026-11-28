@@ -27,6 +27,7 @@ public sealed class ReminderBackgroundService : BackgroundService
                 using var scope = _scopeFactory.CreateScope();
                 var service = scope.ServiceProvider.GetRequiredService<ReminderService>();
                 int count = await service.ProcessDueRemindersAsync(stoppingToken);
+                count += await service.ProcessFeedbackRequestsAsync(stoppingToken);
 
                 if (count > 0)
                     _logger.LogInformation("{Count} rappels traités.", count);

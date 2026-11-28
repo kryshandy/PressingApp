@@ -11,7 +11,7 @@ using Pressing.Core.Security;
 
 namespace Pressing.Core.Services;
 
-public sealed class ReminderService
+public sealed partial class ReminderService
 {
     private readonly PressingDbContext _db;
     private readonly IWhatsAppTransport _whatsApp;
@@ -324,6 +324,7 @@ public sealed class ReminderService
         "unpaid-balance" => "Solde impayé",
         "due-tomorrow" => "Échéance demain",
         ManualType => "Relance manuelle",
+        FeedbackType => "Demande d'avis",
         _ => type
     };
 
@@ -343,7 +344,7 @@ public sealed class ReminderService
 
     /// <summary>Envoie un rappel par le canal choisi par le client. Ne journalise pas : c'est l'appelant qui le fait.</summary>
     private async Task<(bool Delivered, string Channel, string? Error)> DeliverAsync(
-        Order order, string type, string subject, string body, string[] variables, CancellationToken ct)
+        Order order, string type, string subject, string body, string[] variables, CancellationToken ct, string? actionUrl = null, string? actionLabel = null)
     {
         Client client = order.Client!;
 
@@ -381,7 +382,10 @@ public sealed class ReminderService
                 string unsubscribeToken = _tokens.CreateUnsubscribeToken(order.ClientId);
                 // Page servie par le site (PRESSING_WEB_URL) : l'API n'est pas forcément joignable du public.
                 string unsubscribeUrl = $"{_emailOptions.AppBaseUrl}/desabonnement?token={Uri.EscapeDataString(unsubscribeToken)}";
-                string html = $"<p>{WebUtility.HtmlEncode(body)}</p><hr><p style='font-size:12px;color:#666'>Vous recevez ce message parce que vous avez accepté les rappels par e-mail. <a href='{WebUtility.HtmlEncode(unsubscribeUrl)}'>Me désabonner</a></p>";
+                string action = actionUrl is null
+                    ? string.Empty
+                    : $"<p><a href='{WebUtility.HtmlEncode(actionUrl)}'>{WebUtility.HtmlEncode(actionLabel ?? actionUrl)}</a></p>";
+                string html = $"<p>{WebUtility.HtmlEncode(body)}</p>{action}<hr><p style='font-size:12px;color:#666'>Vous recevez ce message parce que vous avez accepté les rappels par e-mail. <a href='{WebUtility.HtmlEncode(unsubscribeUrl)}'>Me désabonner</a></p>";
 
                 await _email.QueueRawAsync(
                     client.Email,

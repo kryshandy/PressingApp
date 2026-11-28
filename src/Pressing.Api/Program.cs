@@ -232,6 +232,7 @@ app.MapMessagingEndpoints();
 app.MapRemindersEndpoints();
 app.MapAuthEndpoints();
 app.MapStaffSecurityEndpoints();
+app.MapFeedbackEndpoints();
 app.MapClientEndpoints();
 app.MapCatalogEndpoints();
 app.MapOrderEndpoints();

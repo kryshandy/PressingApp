@@ -143,6 +143,39 @@ public sealed class MigrationTests : IDisposable
         Assert.NotEmpty(Directory.GetFiles(Path.Combine(_directory, "Backups"), "pressing-avant-migration-*.db"));
     }
 
+    [Fact]
+    public async Task Base_a_SecuritePersonnel_passe_a_EnqueteSatisfaction_sans_perte()
+    {
+        await using (var previous = NewContext())
+        {
+            string target = previous.Database.GetMigrations().Single(m => m.EndsWith("_SecuritePersonnel", StringComparison.Ordinal));
+            await previous.GetService<IMigrator>().MigrateAsync(target);
+        }
+
+        await InsertClientAsync();
+        await ExecuteAsync("INSERT INTO ReminderLogs (OrderId, ClientId, ReminderType, Channel, SentAt, Success) VALUES (1, 1, 'ready', 'whatsapp', '2026-11-02 09:00:00', 1);");
+
+        await InitializeAsync();
+
+        await using var db = NewContext();
+        Assert.Contains(await db.Database.GetAppliedMigrationsAsync(), m => m.EndsWith("_EnqueteSatisfaction", StringComparison.Ordinal));
+        Assert.Empty(await db.Database.GetPendingMigrationsAsync());
+        Assert.Equal("Ancienne", (await db.Clients.SingleAsync()).LastName);
+        Assert.Single(await db.ReminderLogs.ToListAsync());
+        Assert.Empty(await db.Feedbacks.ToListAsync());
+        Assert.NotEmpty(Directory.GetFiles(Path.Combine(_directory, "Backups"), "pressing-avant-migration-*.db"));
+
+        // Index unique sur OrderId : une seule réponse par commande.
+        int clientId = (await db.Clients.SingleAsync()).Id;
+        var order = new Order { TicketNumber = "PRESS-2026-00001", ClientId = clientId, Status = OrderStatus.Completed, DueDate = DateTime.Today };
+        db.Orders.Add(order);
+        await db.SaveChangesAsync();
+        db.Feedbacks.Add(new Feedback { OrderId = order.Id, ClientId = clientId, Note = 5 });
+        await db.SaveChangesAsync();
+        db.Feedbacks.Add(new Feedback { OrderId = order.Id, ClientId = clientId, Note = 2 });
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+    }
+
     /// <summary>Une ligne insérée sans statut reçoit « Draft » (jamais ""), et l'index unique ne vise que les clôtures validées.</summary>
     private async Task AssertCashClosingSchemaAsync()
     {

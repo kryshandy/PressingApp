@@ -18,6 +18,7 @@ public sealed class WhatsAppOptions
     public string TemplateUncollected { get; set; } = string.Empty;
     public string TemplateBalance { get; set; } = string.Empty;
     public string TemplateDue { get; set; } = string.Empty;
+    public string TemplateFeedback { get; set; } = string.Empty;
 
     /// <summary>Code de langue des modèles (WHATSAPP_TEMPLATE_LANGUAGE), « fr » par défaut.</summary>
     public string TemplateLanguage { get; set; } = "fr";
@@ -31,6 +32,7 @@ public sealed class WhatsAppOptions
             "uncollected-j3" or "uncollected-j7" or "uncollected-j14" => TemplateUncollected,
             "unpaid-balance" => TemplateBalance,
             "due-tomorrow" => TemplateDue,
+            "feedback" => TemplateFeedback,
             _ => string.Empty
         };
 
