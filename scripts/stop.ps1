@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-  Arrête l'API, le site client et l'application Desktop lancés en local.
+  Arrête l'API, le site client, l'application Desktop et les moteurs IA locaux.
 #>
 $names = @('Pressing.Api', 'Pressing.Web', 'Pressing.Desktop')
 $stopped = 0
@@ -11,4 +11,10 @@ foreach ($name in $names) {
         $stopped++
     }
 }
-if ($stopped -eq 0) { Write-Host "Aucune application Pressing en cours d'exécution." }
+$aiScript = Join-Path $PSScriptRoot '..\tools\assistant\stop-ai.ps1'
+if (Test-Path $aiScript) {
+    & $aiScript
+}
+elseif ($stopped -eq 0) {
+    Write-Host "Aucune application Pressing en cours d'exécution."
+}

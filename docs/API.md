@@ -174,3 +174,62 @@ de version du logiciel.
   La remise manuelle ne peut pas dépasser le montant restant après promotion.
 - Tickets : comparaison insensible à la casse et aux espaces de bordure.
 - Toutes les opérations sensibles sont journalisées dans `AuditLogs`.
+
+## Intégration de l'assistant vocal (Membre 1 → Membre 2)
+
+Aucune route d'assistant n'est définie ici : l'API et l'UI définitives appartiennent au **Membre 2**. Cette section
+décrit uniquement les points d'entrée déjà disponibles dans `Pressing.Core/Assistant/`, afin d'éviter un second
+contrat JSON concurrent.
+
+- `ISpeechToText.TranscribeAsync(Stream wav, CancellationToken)` — WAV 16 kHz mono PCM 16 bits en mémoire ; renvoie
+  `SpeechTranscription` (`Text`, `DurationSeconds`, `Rms`, `SilenceDetected`). Les silences et les formats invalides
+  sont rejetés avant tout appel réseau ; 20 secondes maximum. `IsReadyAsync(CancellationToken)` interroge `/health`.
+- `IIntentExtractor.ExtractAsync(string texte, CatalogHints catalog, CancellationToken)` — renvoie
+  `IntentExtraction` (`RawJson`, `Payload`, `Warnings`). Le catalogue est fourni par l'appelant (lecture seule,
+  par exemple `GET /api/public/catalog`) : le moteur n'accède jamais à SQLite. `IsReadyAsync(CancellationToken)`
+  interroge également `/health`.
+- Façade M2 (aucune route ajoutée ici) : `IM2SpeechToText.TranscribeAsync(Stream wav, CancellationToken)` renvoie
+  `Task<string>`, et `IM2IntentExtractor.ExtractAsync(string text, AssistantCatalogHints hints, CancellationToken)`
+  renvoie `Task<AssistantIntentDto>`. Le DTO officiel est dans `Pressing.Core.Dtos` et porte exactement les mêmes
+  noms JSON snake_case. `AssistantClientFactory.CreateM2SpeechToText()` et `CreateM2IntentExtractor()` exposent ces
+  façades. `M2SpeechToTextAdapter` et `M2IntentExtractorAdapter` permettent de consommer ces façades dans le pipeline M1
+  sans dupliquer les types internes. `AssistantUnavailableException` dérive de `AssistantException` et est traitée
+  comme `EngineUnavailable` par `LocalAssistantPipeline`.
+- `AssistantCatalogHints(Categories, Services)` est la forme réduite demandée par M2. Pour les dates relatives et les
+  synonymes, le pipeline M1 complet doit recevoir `CatalogHints(Categories, Services, ReferenceDate)` avec des
+  `CatalogTerm` : la façade M2 ne doit pas être utilisée pour contourner ces garde-fous.
+- `LocalAssistantPipeline.ProcessAsync(Stream wav, CatalogHints catalog, CancellationToken)` — chaîne les deux étapes et
+  renvoie `PipelineResult` (`Ok`, `NotUnderstood`, `Silence`, `EngineUnavailable`, `InvalidAudio`).
+- `AssistantClientFactory.CreatePipeline()` construit les clients HTTP avec les variables `ASSISTANT_*` documentées
+  dans `.env.example`. Les URL sont forcées en boucle locale.
+- `tools/assistant/consultation.ps1 -Texte "..."` (ou `-Wav`) illustre T1.6 : intention `find_order` lue à l'écran, sans accès SQLite ni création de commande ; le résultat reste un brouillon à confirmer.
+- `AssistantMessages.EngineNotStarted` contient exactement « L'assistant vocal n'est pas démarré ».
+
+Contrat de sortie figé : `IntentPayload` dans `AssistantContracts.cs` et son miroir officiel
+`AssistantIntentDto` dans `Pressing.Core.Dtos`, reliés par un mapping explicite (`ToDto` / `FromDto`).
+
+```json
+{
+  "intent": "create_order | register_pickup | add_payment | update_item_status | find_order | unknown",
+  "client": { "name": "Ngo Marie" | null, "phone": "699112233" | null },
+  "items": [{ "category": "Chemise", "service": "Lavage + repassage", "quantity": 3, "express": false }],
+  "ticket": "PRESS-2026-00142" | null,
+  "amount": 5000 | null,
+  "payment_method": "cash | mobile_money | card | transfer" | null,
+  "deposit": 5000 | null,
+  "pickup_date": "2026-12-02" | null,
+  "item_status": "in_progress | ready" | null,
+  "confidence": 0.0,
+  "transcript": "texte reconnu"
+}
+```
+
+Règles que le Membre 2 doit conserver : champ inconnu = `null` (aucune valeur métier par défaut), confiance < `0,6`
+ou `unknown` ⇒ « je n'ai pas compris » + transcription, catégories/services validés contre le catalogue, et surtout
+**aucune opération métier déclenchée directement** : le JSON est un brouillon à confirmer, à enregistrer via les
+routes existantes (`POST /api/orders`, `/api/orders/{id}/payments`, `/api/orders/{id}/status`, ...).
+
+`tools/assistant/RESULTATS.md` distingue les mesures réellement exécutées : banc live synthétique de 150 appels
+(150/150 intentions, 85/85 articles, 0 erreur, p95 11,886 s), recalcul hors ligne et trois phrases TTS. Aucun WER
+réel n'est publié : `dataset.jsonl` est absent et `bench.ps1` s'arrête sans écrire de résultat. Les seuils attendus
+restent ≥ 90 % d'intentions exactes, ≥ 85 % d'articles exacts et p95 < 5 s.

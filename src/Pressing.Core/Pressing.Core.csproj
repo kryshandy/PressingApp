@@ -7,6 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="..\..\tools\assistant\prompt-systeme.txt" LogicalName="Pressing.Core.Assistant.prompt-systeme.txt" />
+    <EmbeddedResource Include="..\..\tools\assistant\grammar.gbnf" LogicalName="Pressing.Core.Assistant.grammar.gbnf" />
+    <EmbeddedResource Include="..\..\tools\assistant\intent-schema.json" LogicalName="Pressing.Core.Assistant.intent-schema.json" />
+    <EmbeddedResource Include="..\..\tools\assistant\vocab-default.txt" LogicalName="Pressing.Core.Assistant.vocab-default.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.15" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.15">
       <PrivateAssets>all</PrivateAssets>

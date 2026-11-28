@@ -1,0 +1,306 @@
+{
+  "label": "1.5B-base-rapide",
+  "generatedAt": "2026-11-28 01:39:32 \u002B01:00",
+  "dataset": "C:\\Users\\Ntsimi\\Desktop\\Keyce\\C sharp\\Pressing Def\\PressingApp\\tools\\assistant\\eval\\dataset-fiabilite.jsonl",
+  "sourceJsonl": null,
+  "recomputeFromJsonl": false,
+  "catalog": "C:\\Users\\Ntsimi\\AppData\\Local\\Pressing\\ai\\catalogue.json",
+  "catalogReferenceDate": "2026-11-27",
+  "modelAlias": "pressing-local",
+  "scenarios": 53,
+  "scenariosSynthetiques": 53,
+  "notes": [
+    "Jeu texte synth\u00E9tique : aucun audio r\u00E9el, aucun consentement, WER non mesur\u00E9.",
+    "Sorties brutes = JSON du mod\u00E8le avant garde-fous C#.",
+    "Sorties finales = IntentPayload apr\u00E8s validation et garde-fous de LlmIntentExtractor.",
+    "validationMs mesure la validation suppl\u00E9mentaire du JSON brut par le banc ; la validation de production est d\u00E9j\u00E0 incluse dans httpSeconds.",
+    "La confiance est informative et exclue des comparaisons exactes."
+  ],
+  "errors": [],
+  "phases": {
+    "catalogueMs": 39.421,
+    "promptBuildMs": 5.801,
+    "validationMoyenneMs": 0.028956603773584902,
+    "postMoyenneMs": 0,
+    "httpMoyenne": 9.901918143396228,
+    "httpP50": 9.9658699,
+    "httpP95": 12.0647118,
+    "totalMoyen": 9.901968575471695,
+    "totalP50": 9.9659393,
+    "totalP95": 12.0647937
+  },
+  "brut": {
+    "intentionsExactes": {
+      "ok": 53,
+      "total": 53,
+      "pourcent": 100
+    },
+    "articlesExactes": {
+      "ok": 19,
+      "total": 36,
+      "pourcent": 52.78
+    },
+    "articlesNombreExact": {
+      "ok": 53,
+      "total": 53,
+      "pourcent": 100
+    },
+    "champsExact": {
+      "ok": 644,
+      "total": 674,
+      "pourcent": 95.55
+    },
+    "expressCorrect": {
+      "ok": 36,
+      "total": 36,
+      "pourcent": 100
+    },
+    "categorieCorrect": {
+      "ok": 25,
+      "total": 36,
+      "pourcent": 69.44
+    },
+    "serviceCorrect": {
+      "ok": 27,
+      "total": 36,
+      "pourcent": 75
+    },
+    "quantiteCorrect": {
+      "ok": 36,
+      "total": 36,
+      "pourcent": 100
+    },
+    "nullCorrect": {
+      "ok": 427,
+      "total": 437,
+      "pourcent": 97.71
+    },
+    "transcriptionExacte": {
+      "ok": 53,
+      "total": 53,
+      "pourcent": 100
+    },
+    "schemaValide": {
+      "ok": 51,
+      "total": 53,
+      "pourcent": 96.23
+    },
+    "informationsInventees": 10,
+    "intentionsUnknown": {
+      "ok": 2,
+      "total": 2,
+      "pourcent": 100
+    },
+    "champsSansPreuve": 0,
+    "champsVerifies": 0,
+    "champsSansPreuveDetail": [],
+    "horsCatalogue": 0,
+    "fauxUnknown": 0,
+    "valeursNormaliseesViaAlias": 0,
+    "matriceIntentions": {
+      "unknown": {
+        "unknown": 2
+      },
+      "create_order": {
+        "create_order": 30
+      },
+      "register_pickup": {
+        "register_pickup": 4
+      },
+      "find_order": {
+        "find_order": 4
+      },
+      "add_payment": {
+        "add_payment": 7
+      },
+      "update_item_status": {
+        "update_item_status": 6
+      }
+    },
+    "matriceCategories": {
+      "Chemise": {
+        "Chemise": 8
+      },
+      "Cravate": {
+        "Cravate": 2
+      },
+      "null": {
+        "Costume 2 pi\u00E8ces": 1
+      },
+      "Costume 2 pi\u00E8ces": {
+        "Costume 2 pi\u00E8ces": 3
+      },
+      "Manteau": {
+        "Manteau": 3
+      },
+      "Rideau": {
+        "Rideau": 1
+      },
+      "Jupe": {
+        "Jupes": 3
+      },
+      "Tapis": {
+        "Drap 2 places": 2,
+        "Tapis": 1
+      },
+      "Nappe": {
+        "Drap 2 places": 2,
+        "Nappe": 1
+      },
+      "Couverture": {
+        "Drap 2 places": 2
+      },
+      "Drap 2 places": {
+        "Drap 2 places": 2
+      },
+      "Pantalon": {
+        "Pantalon": 1
+      },
+      "Robe simple": {
+        "Robe simple": 2
+      },
+      "Pull": {
+        "Pull": 1
+      },
+      "Chemisier": {
+        "Chemise": 1
+      }
+    }
+  },
+  "final": {
+    "intentionsExactes": {
+      "ok": 53,
+      "total": 53,
+      "pourcent": 100
+    },
+    "articlesExactes": {
+      "ok": 34,
+      "total": 36,
+      "pourcent": 94.44
+    },
+    "articlesNombreExact": {
+      "ok": 53,
+      "total": 53,
+      "pourcent": 100
+    },
+    "champsExact": {
+      "ok": 671,
+      "total": 674,
+      "pourcent": 99.55
+    },
+    "expressCorrect": {
+      "ok": 36,
+      "total": 36,
+      "pourcent": 100
+    },
+    "categorieCorrect": {
+      "ok": 35,
+      "total": 36,
+      "pourcent": 97.22
+    },
+    "serviceCorrect": {
+      "ok": 36,
+      "total": 36,
+      "pourcent": 100
+    },
+    "quantiteCorrect": {
+      "ok": 34,
+      "total": 36,
+      "pourcent": 94.44
+    },
+    "nullCorrect": {
+      "ok": 436,
+      "total": 437,
+      "pourcent": 99.77
+    },
+    "transcriptionExacte": {
+      "ok": 53,
+      "total": 53,
+      "pourcent": 100
+    },
+    "schemaValide": {
+      "ok": 53,
+      "total": 53,
+      "pourcent": 100
+    },
+    "informationsInventees": 1,
+    "intentionsUnknown": {
+      "ok": 2,
+      "total": 2,
+      "pourcent": 100
+    },
+    "champsSansPreuve": 0,
+    "champsVerifies": 183,
+    "champsSansPreuveDetail": [],
+    "horsCatalogue": 0,
+    "fauxUnknown": 0,
+    "valeursNormaliseesViaAlias": 13,
+    "matriceIntentions": {
+      "unknown": {
+        "unknown": 2
+      },
+      "create_order": {
+        "create_order": 30
+      },
+      "register_pickup": {
+        "register_pickup": 4
+      },
+      "find_order": {
+        "find_order": 4
+      },
+      "add_payment": {
+        "add_payment": 7
+      },
+      "update_item_status": {
+        "update_item_status": 6
+      }
+    },
+    "matriceCategories": {
+      "Chemise": {
+        "Chemise": 8
+      },
+      "Cravate": {
+        "Cravate": 2
+      },
+      "null": {
+        "Costume 2 pi\u00E8ces": 1
+      },
+      "Costume 2 pi\u00E8ces": {
+        "Costume 2 pi\u00E8ces": 3
+      },
+      "Manteau": {
+        "Manteau": 3
+      },
+      "Rideau": {
+        "Rideau": 1
+      },
+      "Jupe": {
+        "Jupe": 3
+      },
+      "Tapis": {
+        "Tapis": 3
+      },
+      "Nappe": {
+        "Nappe": 3
+      },
+      "Couverture": {
+        "Couverture": 2
+      },
+      "Drap 2 places": {
+        "Drap 2 places": 2
+      },
+      "Pantalon": {
+        "Pantalon": 1
+      },
+      "Robe simple": {
+        "Robe simple": 2
+      },
+      "Pull": {
+        "Pull": 1
+      },
+      "Chemisier": {
+        "Chemisier": 1
+      }
+    }
+  }
+}

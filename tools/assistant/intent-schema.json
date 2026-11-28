@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pressing_intent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "intent",
+    "client",
+    "items",
+    "ticket",
+    "amount",
+    "payment_method",
+    "deposit",
+    "pickup_date",
+    "item_status",
+    "confidence",
+    "transcript"
+  ],
+  "properties": {
+    "intent": {
+      "type": "string",
+      "enum": ["create_order", "register_pickup", "add_payment", "update_item_status", "find_order", "unknown"]
+    },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "phone"],
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["category", "service", "quantity", "express"],
+        "properties": {
+          "category": { "type": ["string", "null"] },
+          "service": { "type": ["string", "null"] },
+          "quantity": { "type": ["integer", "null"], "minimum": 1 },
+          "express": { "type": ["boolean", "null"] }
+        }
+      }
+    },
+    "ticket": { "type": ["string", "null"] },
+    "amount": { "type": ["number", "null"], "minimum": 0 },
+    "payment_method": {
+      "type": ["string", "null"],
+      "enum": ["cash", "mobile_money", "card", "transfer", null]
+    },
+    "deposit": { "type": ["number", "null"], "minimum": 0 },
+    "pickup_date": { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "item_status": {
+      "type": ["string", "null"],
+      "enum": ["in_progress", "ready", null]
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "transcript": { "type": "string" }
+  }
+}

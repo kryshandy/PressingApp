@@ -1,0 +1,155 @@
+{
+  "label": "avant-1.5b",
+  "generatedAt": "2026-11-27 17:56:29 \u002B01:00",
+  "dataset": "C:\\Users\\Ntsimi\\Desktop\\Keyce\\C sharp\\Pressing Def\\PressingApp\\tools\\assistant\\eval\\dataset-synthetique.jsonl",
+  "catalog": "C:\\Users\\Ntsimi\\AppData\\Local\\Pressing\\ai\\catalogue.json",
+  "catalogReferenceDate": "2026-11-27",
+  "modelAlias": "pressing-local",
+  "scenarios": 150,
+  "scenariosSynthetiques": 150,
+  "notes": [
+    "Jeu texte synth\u00E9tique : aucun audio r\u00E9el, aucun consentement, WER non mesur\u00E9.",
+    "Sorties brutes = JSON du mod\u00E8le avant garde-fous C#.",
+    "Sorties finales = IntentPayload apr\u00E8s validation et garde-fous de LlmIntentExtractor.",
+    "validationMs est une mesure isol\u00E9e du validateur ; elle s\u0027ajoute au total de production une seule fois.",
+    "La confiance est informative et exclue des comparaisons exactes."
+  ],
+  "errors": [],
+  "phases": {
+    "catalogueMs": 63.301,
+    "promptBuildMs": 8.413,
+    "validationMoyenneMs": 0.03898533333333335,
+    "httpMoyenne": 11.26343331733333,
+    "httpP50": 9.1602804,
+    "httpP95": 12.8568807,
+    "totalMoyen": 11.263850041333338,
+    "totalP50": 9.1603081,
+    "totalP95": 12.8571391
+  },
+  "brut": {
+    "intentionsExactes": {
+      "ok": 132,
+      "total": 150,
+      "pourcent": 88
+    },
+    "articlesExactes": {
+      "ok": 49,
+      "total": 85,
+      "pourcent": 57.65
+    },
+    "articlesNombreExact": {
+      "ok": 136,
+      "total": 150,
+      "pourcent": 90.67
+    },
+    "champsExact": {
+      "ok": 1650,
+      "total": 1840,
+      "pourcent": 89.67
+    },
+    "expressCorrect": {
+      "ok": 84,
+      "total": 85,
+      "pourcent": 98.82
+    },
+    "categorieCorrect": {
+      "ok": 56,
+      "total": 85,
+      "pourcent": 65.88
+    },
+    "serviceCorrect": {
+      "ok": 78,
+      "total": 85,
+      "pourcent": 91.76
+    },
+    "quantiteCorrect": {
+      "ok": 73,
+      "total": 85,
+      "pourcent": 85.88
+    },
+    "nullCorrect": {
+      "ok": 1159,
+      "total": 1185,
+      "pourcent": 97.81
+    },
+    "transcriptionExacte": {
+      "ok": 70,
+      "total": 150,
+      "pourcent": 46.67
+    },
+    "schemaValide": {
+      "ok": 150,
+      "total": 150,
+      "pourcent": 100
+    },
+    "informationsInventees": 26,
+    "intentionsUnknown": {
+      "ok": 19,
+      "total": 20,
+      "pourcent": 95
+    }
+  },
+  "final": {
+    "intentionsExactes": {
+      "ok": 132,
+      "total": 150,
+      "pourcent": 88
+    },
+    "articlesExactes": {
+      "ok": 49,
+      "total": 85,
+      "pourcent": 57.65
+    },
+    "articlesNombreExact": {
+      "ok": 136,
+      "total": 150,
+      "pourcent": 90.67
+    },
+    "champsExact": {
+      "ok": 1731,
+      "total": 1840,
+      "pourcent": 94.08
+    },
+    "expressCorrect": {
+      "ok": 85,
+      "total": 85,
+      "pourcent": 100
+    },
+    "categorieCorrect": {
+      "ok": 56,
+      "total": 85,
+      "pourcent": 65.88
+    },
+    "serviceCorrect": {
+      "ok": 78,
+      "total": 85,
+      "pourcent": 91.76
+    },
+    "quantiteCorrect": {
+      "ok": 73,
+      "total": 85,
+      "pourcent": 85.88
+    },
+    "nullCorrect": {
+      "ok": 1160,
+      "total": 1185,
+      "pourcent": 97.89
+    },
+    "transcriptionExacte": {
+      "ok": 150,
+      "total": 150,
+      "pourcent": 100
+    },
+    "schemaValide": {
+      "ok": 150,
+      "total": 150,
+      "pourcent": 100
+    },
+    "informationsInventees": 25,
+    "intentionsUnknown": {
+      "ok": 19,
+      "total": 20,
+      "pourcent": 95
+    }
+  }
+}

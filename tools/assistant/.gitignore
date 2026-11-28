@@ -1,0 +1,14 @@
+# Jeu d'évaluation réel et enregistrements : jamais versionnés.
+eval/dataset.jsonl
+eval/audio/
+eval/*.wav
+eval/*.mp3
+eval/*.m4a
+eval/*.ogg
+
+# Artefacts téléchargés (installés dans %LOCALAPPDATA%\Pressing\ai).
+*.bin
+*.gguf
+*.zip
+*.log
+*.pid

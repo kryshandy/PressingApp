@@ -1,0 +1,165 @@
+{
+  "label": "apres-0.5b",
+  "generatedAt": "2026-11-27 18:08:11 \u002B01:00",
+  "dataset": "C:\\Users\\Ntsimi\\Desktop\\Keyce\\C sharp\\Pressing Def\\PressingApp\\tools\\assistant\\eval\\dataset-synthetique.jsonl",
+  "catalog": "C:\\Users\\Ntsimi\\AppData\\Local\\Pressing\\ai\\catalogue.json",
+  "catalogReferenceDate": "2026-11-27",
+  "modelAlias": "pressing-local",
+  "scenarios": 150,
+  "scenariosSynthetiques": 150,
+  "notes": [
+    "Jeu texte synth\u00E9tique : aucun audio r\u00E9el, aucun consentement, WER non mesur\u00E9.",
+    "Sorties brutes = JSON du mod\u00E8le avant garde-fous C#.",
+    "Sorties finales = IntentPayload apr\u00E8s validation et garde-fous de LlmIntentExtractor.",
+    "validationMs mesure la validation suppl\u00E9mentaire du JSON brut par le banc ; la validation de production est d\u00E9j\u00E0 incluse dans httpSeconds.",
+    "La confiance est informative et exclue des comparaisons exactes."
+  ],
+  "errors": [
+    "S019 : La r\u00E9ponse du moteur IA ne respecte pas le contrat d\u0027intention : pickup_date doit \u00EAtre au format AAAA-MM-JJ.",
+    "S057 : La r\u00E9ponse du moteur IA ne respecte pas le contrat d\u0027intention : pickup_date doit \u00EAtre au format AAAA-MM-JJ.",
+    "S087 : La r\u00E9ponse du moteur IA ne respecte pas le contrat d\u0027intention",
+    "S090 : La r\u00E9ponse du moteur IA ne respecte pas le contrat d\u0027intention",
+    "S093 : La r\u00E9ponse du moteur IA ne respecte pas le contrat d\u0027intention",
+    "S095 : La r\u00E9ponse du moteur IA ne respecte pas le contrat d\u0027intention",
+    "S096 : La r\u00E9ponse du moteur IA ne respecte pas le contrat d\u0027intention",
+    "S098 : La r\u00E9ponse du moteur IA ne respecte pas le contrat d\u0027intention",
+    "S141 : La r\u00E9ponse du moteur IA ne respecte pas le contrat d\u0027intention"
+  ],
+  "phases": {
+    "catalogueMs": 28.652,
+    "promptBuildMs": 3.408,
+    "validationMoyenneMs": 0.02853617021276597,
+    "httpMoyenne": 3.605114474666667,
+    "httpP50": 2.9673257,
+    "httpP95": 8.9358849,
+    "totalMoyen": 3.6053802446666685,
+    "totalP50": 2.9673999,
+    "totalP95": 8.9650903
+  },
+  "brut": {
+    "intentionsExactes": {
+      "ok": 115,
+      "total": 150,
+      "pourcent": 76.67
+    },
+    "articlesExactes": {
+      "ok": 40,
+      "total": 85,
+      "pourcent": 47.06
+    },
+    "articlesNombreExact": {
+      "ok": 119,
+      "total": 150,
+      "pourcent": 79.33
+    },
+    "champsExact": {
+      "ok": 1414,
+      "total": 1840,
+      "pourcent": 76.85
+    },
+    "expressCorrect": {
+      "ok": 64,
+      "total": 85,
+      "pourcent": 75.29
+    },
+    "categorieCorrect": {
+      "ok": 68,
+      "total": 85,
+      "pourcent": 80
+    },
+    "serviceCorrect": {
+      "ok": 58,
+      "total": 85,
+      "pourcent": 68.24
+    },
+    "quantiteCorrect": {
+      "ok": 75,
+      "total": 85,
+      "pourcent": 88.24
+    },
+    "nullCorrect": {
+      "ok": 961,
+      "total": 1185,
+      "pourcent": 81.1
+    },
+    "transcriptionExacte": {
+      "ok": 134,
+      "total": 150,
+      "pourcent": 89.33
+    },
+    "schemaValide": {
+      "ok": 141,
+      "total": 150,
+      "pourcent": 94
+    },
+    "informationsInventees": 224,
+    "intentionsUnknown": {
+      "ok": 7,
+      "total": 20,
+      "pourcent": 35
+    }
+  },
+  "final": {
+    "intentionsExactes": {
+      "ok": 115,
+      "total": 150,
+      "pourcent": 76.67
+    },
+    "articlesExactes": {
+      "ok": 51,
+      "total": 85,
+      "pourcent": 60
+    },
+    "articlesNombreExact": {
+      "ok": 120,
+      "total": 150,
+      "pourcent": 80
+    },
+    "champsExact": {
+      "ok": 1451,
+      "total": 1840,
+      "pourcent": 78.86
+    },
+    "expressCorrect": {
+      "ok": 83,
+      "total": 85,
+      "pourcent": 97.65
+    },
+    "categorieCorrect": {
+      "ok": 68,
+      "total": 85,
+      "pourcent": 80
+    },
+    "serviceCorrect": {
+      "ok": 58,
+      "total": 85,
+      "pourcent": 68.24
+    },
+    "quantiteCorrect": {
+      "ok": 75,
+      "total": 85,
+      "pourcent": 88.24
+    },
+    "nullCorrect": {
+      "ok": 990,
+      "total": 1185,
+      "pourcent": 83.54
+    },
+    "transcriptionExacte": {
+      "ok": 141,
+      "total": 150,
+      "pourcent": 94
+    },
+    "schemaValide": {
+      "ok": 141,
+      "total": 150,
+      "pourcent": 94
+    },
+    "informationsInventees": 195,
+    "intentionsUnknown": {
+      "ok": 7,
+      "total": 20,
+      "pourcent": 35
+    }
+  }
+}

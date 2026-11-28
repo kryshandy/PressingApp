@@ -1,0 +1,53 @@
+# Contrat d'intention de la feuille de route v3 (M1/M2).
+# Tous les champs sont présents ; les valeurs inconnues sont null.
+
+root ::= "{" ws
+  "\"intent\":" ws intent "," ws
+  "\"client\":" ws client "," ws
+  "\"items\":" ws items "," ws
+  "\"ticket\":" ws nullable-string "," ws
+  "\"amount\":" ws nullable-number "," ws
+  "\"payment_method\":" ws nullable-payment "," ws
+  "\"deposit\":" ws nullable-number "," ws
+  "\"pickup_date\":" ws nullable-date "," ws
+  "\"item_status\":" ws nullable-status "," ws
+  "\"confidence\":" ws confidence "," ws
+  "\"transcript\":" ws string
+  "}" ws
+
+intent ::= "\"" ("create_order" | "register_pickup" | "add_payment" | "update_item_status" | "find_order" | "unknown") "\"" ws
+
+client ::= "{" ws
+  "\"name\":" ws nullable-string "," ws
+  "\"phone\":" ws nullable-string
+  "}" ws
+
+items ::= "[" ws (item ("," ws item)*)? "]" ws
+
+item ::= "{" ws
+  "\"category\":" ws nullable-string "," ws
+  "\"service\":" ws nullable-string "," ws
+  "\"quantity\":" ws nullable-integer "," ws
+  "\"express\":" ws nullable-bool
+  "}" ws
+
+nullable-string ::= string | "null" ws
+nullable-number ::= number | "null" ws
+nullable-integer ::= integer | "null" ws
+nullable-bool ::= ("true" | "false") ws | "null" ws
+nullable-date ::= "\"" [0-9] [0-9] [0-9] [0-9] "-" [0-9] [0-9] "-" [0-9] [0-9] "\"" ws | "null" ws
+nullable-payment ::= "\"" ("cash" | "mobile_money" | "card" | "transfer") "\"" ws | "null" ws
+nullable-status ::= "\"" ("in_progress" | "ready") "\"" ws | "null" ws
+
+confidence ::= "0" "." [0-9] [0-9]? ws | "1" ".0" ws
+integer ::= [0-9]+ ws
+number ::= [0-9]+ ("." [0-9]+)? ws
+
+string ::=
+  "\"" (
+    [^"\\\x7F\x00-\x1F] |
+    "\\" (["\\bfnrt] | "u" [0-9a-fA-F]{4})
+  )* "\"" ws
+
+# Espaces autorisés, y compris retours à la ligne.
+ws ::= | " " | "\n" [ \t]{0,20}

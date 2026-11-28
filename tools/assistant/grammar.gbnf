@@ -1,0 +1,55 @@
+# Contrat d'intention de la feuille de route v3 (M1/M2).
+# Tous les champs sont présents ; les valeurs inconnues sont null.
+
+root ::= (
+  "{"
+  "\"intent\":" intent ","
+  "\"client\":" client ","
+  "\"items\":" items ","
+  "\"ticket\":" nullable-string ","
+  "\"amount\":" nullable-number ","
+  "\"payment_method\":" nullable-payment ","
+  "\"deposit\":" nullable-number ","
+  "\"pickup_date\":" nullable-date ","
+  "\"item_status\":" nullable-status ","
+  "\"confidence\":" confidence ","
+  "\"transcript\":" string
+  "}"
+)
+
+intent ::= "\"" ("create_order" | "register_pickup" | "add_payment" | "update_item_status" | "find_order" | "unknown") "\""
+
+client ::= (
+  "{"
+  "\"name\":" nullable-string ","
+  "\"phone\":" nullable-string
+  "}"
+)
+
+items ::= "[" (item ("," item)*)? "]"
+
+item ::= (
+  "{"
+  "\"category\":" nullable-string ","
+  "\"service\":" nullable-string ","
+  "\"quantity\":" nullable-integer ","
+  "\"express\":" nullable-bool
+  "}"
+)
+
+nullable-string ::= string | "null"
+nullable-number ::= number | "null"
+nullable-integer ::= integer | "null"
+nullable-bool ::= ("true" | "false") | "null"
+nullable-date ::= "\"" [0-9] [0-9] [0-9] [0-9] "-" [0-9] [0-9] "-" [0-9] [0-9] "\"" | "null"
+nullable-payment ::= "\"" ("cash" | "mobile_money" | "card" | "transfer") "\"" | "null"
+nullable-status ::= "\"" ("in_progress" | "ready") "\"" | "null"
+
+# Cohérent avec intent-schema.json et IntentValidator : quantité >= 1, confiance 0..1.
+confidence ::= ("0" | "1" | "0" "." [0-9]+ | "1" "." [0]+)
+integer ::= [1-9] [0-9]*
+number ::= [0-9]+ ("." [0-9]+)?
+
+string ::= "\"" ( [^"\\\x7F\x00-\x1F] | "\\" (["\\bfnrt] | "u" [0-9a-fA-F]{4}) )* "\""
+
+# JSON compact impose : aucun espace ni retour à la ligne dans la sortie.

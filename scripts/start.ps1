@@ -4,10 +4,12 @@
 .EXAMPLE
   .\scripts\start.ps1              # tout démarrer
   .\scripts\start.ps1 -SansDesktop # API + site uniquement
+  .\scripts\start.ps1 -SansIA      # applications sans les moteurs IA locaux
 #>
 param(
     [switch]$SansDesktop,
-    [switch]$SansBuild
+    [switch]$SansBuild,
+    [switch]$SansIA
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,6 +39,22 @@ function Start-PressingProject([string]$name, [string]$project, [string]$url) {
 }
 
 Write-Host "==> Démarrage" -ForegroundColor Cyan
+
+# Moteurs IA locaux (optionnels). ASSISTANT_ENABLED=false désactive aussi le démarrage.
+$aiScript = Join-Path $root 'tools\assistant\start-ai.ps1'
+if (-not $SansIA -and (Test-Path $aiScript)) {
+    try {
+        & $aiScript
+    }
+    catch {
+        Write-Warning "IA locale non démarrée : $($_.Exception.Message)"
+        Write-Warning "Les applications continuent sans assistant vocal. Consultez %LOCALAPPDATA%\Pressing\ai\logs."
+    }
+}
+elseif ($SansIA) {
+    Write-Host "IA locale ignorée (-SansIA)." -ForegroundColor Yellow
+}
+
 $api = Start-PressingProject 'api' 'src/Pressing.Api' 'http://0.0.0.0:5180'
 
 # Attendre que l'API réponde avant de lancer les clients

@@ -39,7 +39,7 @@ Les trois partagent **la même base SQLite** à travers l'API : un dépôt enreg
 - Un client ne voit **que ses propres** commandes et reçus.
 - Limitation des tentatives de connexion par adresse IP.
 - Journal d'audit de toutes les opérations sensibles.
-- **133 tests automatisés** (calculs, paiements, retraits, droits, portail, suivi).
+- **248 tests automatisés** au total, dont **102 tests IA M1/M2** (calculs, paiements, retraits, droits, portail, suivi, garde-fous, catalogue, alias ambigus, consultation).
 
 ---
 
@@ -58,12 +58,14 @@ git clone https://github.com/kryshandy/PressingApp.git
 cd PressingApp
 copy .env.example .env          # configuration locale (facultatif : les valeurs par défaut fonctionnent)
 .\scripts\build.ps1 -Tests      # restaure, compile et lance les tests
-.\scripts\start.ps1             # démarre l'API, le site et le Desktop
+.\tools\assistant\install.ps1   # IA locale : moteurs + modèles vérifiés (optionnel)
+.\scripts\start.ps1             # démarre l'API, le site, le Desktop et l'IA locale
 ```
 
 - Sans le Desktop : `.\scripts\start.ps1 -SansDesktop`
-- Arrêt : `.\scripts\stop.ps1`
-- Journaux : dossier `logs\`
+- Sans les moteurs IA : `.\scripts\start.ps1 -SansIA` (ou `ASSISTANT_ENABLED=false` dans `.env`)
+- Arrêt de tout (applications + IA) : `.\scripts\stop.ps1`
+- Journaux : dossier `logs\` (applications) et `%LOCALAPPDATA%\Pressing\ai\logs\` (IA)
 
 Lancement manuel, projet par projet :
 
@@ -115,6 +117,9 @@ Toutes les variables sont documentées dans [`.env.example`](.env.example). Les 
 | `EMAIL_PROVIDER` | `auto`, `resend`, `smtp` ou `simulated` | `auto` (simulé si rien n'est configuré) |
 | `RESEND_API_KEY` ou `SMTP_*` | envoi réel des e-mails | vide |
 | `PRESSING_TRUSTED_PROXIES` | IP des proxys de confiance (reverse proxy) | vide |
+| `ASSISTANT_ENABLED` | active/désactive les moteurs IA au démarrage | `true` |
+| `ASSISTANT_LLM_URL` / `ASSISTANT_STT_URL` | adresses **boucle locale** des moteurs | `http://127.0.0.1:8081` / `:8082` |
+| `ASSISTANT_CONFIDENCE_THRESHOLD` | seuil en dessous duquel l'assistant demande de reformuler | `0.6` |
 
 `PRESSING_API_URL` et `PRESSING_PUBLIC_API_URL` sont **différents** : le premier dit à l'API sur quelle adresse
 elle écoute (`0.0.0.0:5180` derrière un proxy) ; le second dit aux clients quelle adresse appeler
@@ -145,13 +150,18 @@ src/Pressing.Client    Client HTTP typé de l'API (partagé par le Desktop et le
 src/Pressing.Desktop   Application Windows Forms du personnel
 src/Pressing.Web       Site public + espace client
 tests/Pressing.Tests   Tests unitaires et d'intégration (xUnit, WebApplicationFactory)
+tools/assistant/       Moteur IA local (scripts, prompt, grammaire, banc d'essai, résultats)
 docs/API.md            Contrat de toutes les routes de l'API
 scripts/               build.ps1, start.ps1, stop.ps1
 ```
 
+`src/Pressing.Core/Assistant/` contient les contrats et clients IA (aucun accès SQLite, aucune route).
+
 Documentation de l'API générée : http://localhost:5180/openapi/v1.json — exemples de requêtes dans `src/Pressing.Api/Pressing.Api.http`.
 
 Guides internes :
+- [tools/assistant/README.md](tools/assistant/README.md) — installation, démarrage et reprise par le Membre 2
+- [tools/assistant/RESULTATS.md](tools/assistant/RESULTATS.md) — banc d'essai (état réellement mesuré)
 - [docs/API.md](docs/API.md) — contrat de l'API et règles métier
 - [src/Pressing.Desktop/DESIGN.md](src/Pressing.Desktop/DESIGN.md) — charte de mise en page du Desktop
 - [src/Pressing.Desktop/README-DESKTOP.md](src/Pressing.Desktop/README-DESKTOP.md) — ajouter un écran au Desktop
@@ -167,6 +177,40 @@ Guides internes :
 - Autotest de l'application Desktop (API démarrée) :
   `src\Pressing.Desktop\bin\Debug\net10.0-windows\Pressing.Desktop.exe --selftest` — parcourt tous les écrans et un
   dépôt complet (dépôt → statuts → paiement → retrait → reçu) et affiche `SELFTEST OK`.
+
+- Tests du moteur IA (sans moteur ni modèle nécessaire) :
+  `dotnet test tests/Pressing.Tests/Pressing.Tests.csproj --filter FullyQualifiedName~Assistant`
+
+## Assistant vocal IA local — Membre 1
+
+Le moteur est **entièrement local** : whisper.cpp transcrit un WAV 16 kHz mono en français sur `127.0.0.1:8082`,
+puis llama.cpp (Qwen2.5-1.5B-Instruct Q4_K_M) extrait une intention JSON sur `127.0.0.1:8081`. Aucune donnée ne sort
+de la machine, aucun modèle n'est versionné et les fichiers audio ne sont jamais écrits sur le disque.
+
+```powershell
+.\tools\assistant\install.ps1          # téléchargements vérifiés par SHA-256 officiel
+.\tools\assistant\update-vocab.ps1     # catalogue réel -> vocabulaire (API publique en lecture seule)
+.\tools\assistant\start-ai.ps1         # 8081 + 8082, journaux dans %LOCALAPPDATA%\Pressing\ai\logs
+.\tools\assistant\stop-ai.ps1
+```
+
+Le contrat JSON M1 est défini dans `src/Pressing.Core/Assistant/AssistantContracts.cs`
+(`IntentPayload`, `IntentClient`, `IntentItem`). Le DTO officiel attendu par le contrat T2.1 du Membre 2 est
+`Pressing.Core.Dtos.AssistantIntentDto`, avec un mapping explicite sans duplication de noms de champs. Le Membre 2
+doit consommer ce DTO via `IM2IntentExtractor` / `IM2SpeechToText`, sans créer de second DTO concurrent, et
+transformer le brouillon en commande via les routes existantes. Les points d'intégration (`ISpeechToText`,
+`IIntentExtractor`, `IM2*`, `LocalAssistantPipeline`, `AssistantClientFactory`) sont détaillés dans
+[tools/assistant/README.md](tools/assistant/README.md) et [docs/API.md](docs/API.md).
+
+Règles garanties par le code : champs inconnus à `null`, confiance < 0,6 ou intention `unknown` ⇒
+« je n'ai pas compris » + transcription, silences détectés avant inférence, enregistrements limités à 20 s,
+une seule inférence à la fois, lecture seule du catalogue, aucune opération métier déclenchée par l'IA.
+
+> **Divergence de documentation à trancher par l'équipe** : `CONTRIBUTING.md` attribue actuellement les
+> notifications WhatsApp/e-mail au « membre 1 », alors que la feuille de route v3 les attribue au **Membre 3**.
+> Ce module suit la feuille de route v3 et n'a pas modifié `CONTRIBUTING.md`.
+
+Aucun WER réel n'est publié : le banc officiel nécessite 150 enregistrements avec consentement, qui n'ont pas été fournis. Un banc live synthétique de 150 appels et une chaîne TTS ont été mesurés ; le p95 reste supérieur à 5 s. Voir [tools/assistant/RESULTATS.md](tools/assistant/RESULTATS.md).
 
 ## 10. Suite du projet
 

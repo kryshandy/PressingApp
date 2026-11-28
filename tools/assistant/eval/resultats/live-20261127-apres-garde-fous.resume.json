@@ -1,0 +1,209 @@
+{
+  "label": "live-20261127-apres-garde-fous",
+  "generatedAt": "2026-11-27 21:05:27 \u002B01:00",
+  "dataset": "C:\\Users\\Ntsimi\\Desktop\\Keyce\\C sharp\\Pressing Def\\PressingApp\\tools\\assistant\\eval\\resultats\\live-20261127.jsonl",
+  "sourceJsonl": "C:\\Users\\Ntsimi\\Desktop\\Keyce\\C sharp\\Pressing Def\\PressingApp\\tools\\assistant\\eval\\resultats\\live-20261127.jsonl",
+  "recomputeFromJsonl": true,
+  "catalog": "C:\\Users\\Ntsimi\\AppData\\Local\\Pressing\\ai\\catalogue.json",
+  "catalogReferenceDate": "2026-11-27",
+  "modelAlias": "pressing-local",
+  "scenarios": 6,
+  "scenariosSynthetiques": 0,
+  "notes": [
+    "Recalcul hors ligne : aucun appel au serveur LLM, aucun audio, aucun WER.",
+    "Les latences sont celles mesur\u00E9es dans le fichier source, pas remesur\u00E9es.",
+    "Sorties finales = JSON brut enregistr\u00E9, rejou\u00E9 par LlmIntentExtractor.ApplyGuardrails.",
+    "La confiance est informative et exclue des comparaisons exactes."
+  ],
+  "errors": [],
+  "phases": {
+    "catalogueMs": 0,
+    "promptBuildMs": 0,
+    "validationMoyenneMs": 0,
+    "httpMoyenne": 200,
+    "httpP50": 200,
+    "httpP95": 200,
+    "totalMoyen": 200,
+    "totalP50": 200,
+    "totalP95": 200
+  },
+  "brut": {
+    "intentionsExactes": {
+      "ok": 6,
+      "total": 6,
+      "pourcent": 100
+    },
+    "articlesExactes": {
+      "ok": 4,
+      "total": 8,
+      "pourcent": 50
+    },
+    "articlesNombreExact": {
+      "ok": 6,
+      "total": 6,
+      "pourcent": 100
+    },
+    "champsExact": {
+      "ok": 82,
+      "total": 92,
+      "pourcent": 89.13
+    },
+    "expressCorrect": {
+      "ok": 8,
+      "total": 8,
+      "pourcent": 100
+    },
+    "categorieCorrect": {
+      "ok": 7,
+      "total": 8,
+      "pourcent": 87.5
+    },
+    "serviceCorrect": {
+      "ok": 5,
+      "total": 8,
+      "pourcent": 62.5
+    },
+    "quantiteCorrect": {
+      "ok": 8,
+      "total": 8,
+      "pourcent": 100
+    },
+    "nullCorrect": {
+      "ok": 49,
+      "total": 49,
+      "pourcent": 100
+    },
+    "transcriptionExacte": {
+      "ok": 5,
+      "total": 6,
+      "pourcent": 83.33
+    },
+    "schemaValide": {
+      "ok": 6,
+      "total": 6,
+      "pourcent": 100
+    },
+    "informationsInventees": 0,
+    "intentionsUnknown": {
+      "ok": 1,
+      "total": 1,
+      "pourcent": 100
+    },
+    "champsSansPreuve": 0,
+    "champsVerifies": 0,
+    "champsSansPreuveDetail": [],
+    "horsCatalogue": 0,
+    "fauxUnknown": 0,
+    "valeursNormaliseesViaAlias": 0,
+    "matriceIntentions": {
+      "create_order": {
+        "create_order": 5
+      },
+      "unknown": {
+        "unknown": 1
+      }
+    },
+    "matriceCategories": {
+      "Chemise": {
+        "Chemise": 5
+      },
+      "Pantalon": {
+        "Pantalon": 1,
+        "Pantalons": 1
+      },
+      "Cravate": {
+        "Cravate": 1
+      }
+    }
+  },
+  "final": {
+    "intentionsExactes": {
+      "ok": 6,
+      "total": 6,
+      "pourcent": 100
+    },
+    "articlesExactes": {
+      "ok": 8,
+      "total": 8,
+      "pourcent": 100
+    },
+    "articlesNombreExact": {
+      "ok": 6,
+      "total": 6,
+      "pourcent": 100
+    },
+    "champsExact": {
+      "ok": 87,
+      "total": 92,
+      "pourcent": 94.57
+    },
+    "expressCorrect": {
+      "ok": 8,
+      "total": 8,
+      "pourcent": 100
+    },
+    "categorieCorrect": {
+      "ok": 8,
+      "total": 8,
+      "pourcent": 100
+    },
+    "serviceCorrect": {
+      "ok": 8,
+      "total": 8,
+      "pourcent": 100
+    },
+    "quantiteCorrect": {
+      "ok": 8,
+      "total": 8,
+      "pourcent": 100
+    },
+    "nullCorrect": {
+      "ok": 49,
+      "total": 49,
+      "pourcent": 100
+    },
+    "transcriptionExacte": {
+      "ok": 6,
+      "total": 6,
+      "pourcent": 100
+    },
+    "schemaValide": {
+      "ok": 6,
+      "total": 6,
+      "pourcent": 100
+    },
+    "informationsInventees": 0,
+    "intentionsUnknown": {
+      "ok": 1,
+      "total": 1,
+      "pourcent": 100
+    },
+    "champsSansPreuve": 2,
+    "champsVerifies": 32,
+    "champsSansPreuveDetail": [
+      "service"
+    ],
+    "horsCatalogue": 0,
+    "fauxUnknown": 0,
+    "valeursNormaliseesViaAlias": 4,
+    "matriceIntentions": {
+      "create_order": {
+        "create_order": 5
+      },
+      "unknown": {
+        "unknown": 1
+      }
+    },
+    "matriceCategories": {
+      "Chemise": {
+        "Chemise": 5
+      },
+      "Pantalon": {
+        "Pantalon": 2
+      },
+      "Cravate": {
+        "Cravate": 1
+      }
+    }
+  }
+}
