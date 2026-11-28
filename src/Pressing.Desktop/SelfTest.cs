@@ -173,6 +173,47 @@ internal static class SelfTest
         }
     }
 
+    /// <summary>Valeur d'un champ privé d'une vue (l'autotest pilote les vues comme le ferait un caissier).</summary>
+    private static T Field<T>(object target, string name) =>
+        (T)target.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(target)!;
+
+    private static T? FindControl<T>(Control root) where T : Control
+    {
+        foreach (Control child in root.Controls)
+        {
+            if (child is T match)
+            {
+                return match;
+            }
+
+            T? nested = FindControl<T>(child);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Brouillon factice de l'assistant : un article reconnu (express) et un article inconnu, acompte 300.</summary>
+    private static OrderDraftDto FakeDraft(ClientDto client, CategoryDto category, CategoryPriceDto price) => new(
+        Intent: AssistantIntents.CreateOrder,
+        Target: AssistantTarget.NewOrder,
+        Client: new AssistantClientMatchDto(client.Id, client.FullName, client.Phone, false, []),
+        Items:
+        [
+            new OrderDraftItemDto(category.Id, category.Name, price.ServiceType, price.ServiceLabel, 2, true,
+                price.Price, (price.Price + price.ExpressSupplement) * 2, "chemises", false),
+            new OrderDraftItemDto(null, null, null, null, 1, false, null, null, "hélicoptère", true)
+        ],
+        OrderId: null, Ticket: null, Balance: null, PaymentAmount: null, PaymentMethod: PaymentMethod.Cash,
+        DepositAmount: 300m, DueDate: null, ItemStatus: null, Quote: null,
+        UncertainFields: ["items[1].category"],
+        Warnings: ["Article 2 : « hélicoptère » n'existe pas au catalogue."],
+        Confidence: 0.92,
+        Transcript: "dépôt pour le client test, deux articles, acompte trois cents");
+
     private static async Task Scenario(string apiUrl, string? screensDir, Form hostForm)
     {
         Write($"SELFTEST Pressing Desktop — API {apiUrl} — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
@@ -568,6 +609,49 @@ internal static class SelfTest
                 await Capture(main, screensDir, "shell-client-detail" + suffix);
                 main.GoBack();
                 await Task.Delay(800);
+                main.Close();
+            });
+
+            await Step($"Assistant {logical.Width}×{logical.Height} : brouillon factice → écran pré-rempli → validation", async () =>
+            {
+                FrmMain.AllowOversize = true;
+                using FrmMain main = new(session)
+                {
+                    StartPosition = FormStartPosition.Manual,
+                    Location = new Point(-5000, -5000),
+                    ShowInTaskbar = false
+                };
+                main.WindowState = FormWindowState.Normal;
+                main.Show();
+                ResizeWindow(main, new Size(Theme.S(logical.Width), Theme.S(logical.Height)));
+                await Task.Delay(1500);
+
+                main.Navigate(NavRegistry.NewOrder, FakeDraft(client, category, price));
+                await Task.Delay(2500);
+                NewOrderView view = FindControl<NewOrderView>(main)
+                                    ?? throw new InvalidOperationException("écran Nouveau dépôt introuvable");
+                await Capture(main, screensDir, "assistant-prefilled" + suffix);
+
+                // Écran pré-rempli : client, une seule ligne (l'article inconnu n'est pas ajouté), acompte, bandeau.
+                Check(Field<ClientDto?>(view, "_client")?.Id == client.Id, "client non pré-sélectionné");
+                Check(Field<System.Collections.IList>(view, "_lines").Count == 1, "1 ligne attendue (l'article inconnu n'est pas ajouté)");
+                Check(Field<InputBox>(view, "_deposit").AmountValue == 300m, "acompte 300 attendu");
+                string note = Field<TextLabel>(view, "_assistantNote").Text;
+                Check(
+                    note.Contains("hélicoptère", StringComparison.Ordinal)
+                    && note.Contains("dépôt pour le client test", StringComparison.Ordinal),
+                    "bandeau de l'assistant incomplet : " + note);
+
+                // Validation par le caissier, comme aujourd'hui : mêmes routes, mêmes calculs.
+                Type t = typeof(NewOrderView);
+                const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+                await (Task)t.GetMethod("RequestQuoteAsync", flags)!.Invoke(view, null)!;
+                await (Task)t.GetMethod("SubmitAsync", flags)!.Invoke(view, null)!;
+                OrderDto? created = Field<OrderDto?>(view, "_createdOrder");
+                Check(created is not null && created.TicketNumber.StartsWith("PRESS-", StringComparison.Ordinal), "dépôt non créé");
+                Check(created!.PaidAmount == 300m, "acompte attendu 300, obtenu " + created.PaidAmount);
+                Check(created.Items.Count == 1, "1 article attendu, obtenu " + created.Items.Count);
+                await Capture(main, screensDir, "assistant-confirmation" + suffix);
                 main.Close();
             });
         }
