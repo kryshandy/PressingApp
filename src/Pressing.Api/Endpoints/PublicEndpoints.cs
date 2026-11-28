@@ -34,7 +34,7 @@ public static class PublicEndpoints
                 DateTime.Now,
                 emailStatus.Provider != "simulated",
                 emailStatus.Provider));
-        }).WithTags("SantÃ©");
+        }).WithTags("Santé");
 
         var group = app.MapGroup("/api/public").WithTags("Public");
 
@@ -58,12 +58,12 @@ public static class PublicEndpoints
                 promotions = activePromotions,
                 features = new[]
                 {
-                    "Suivi de commande en temps rÃ©el",
-                    "Tickets et reÃ§us numÃ©riques",
-                    "Paiement au dÃ©pÃ´t ou au retrait",
+                    "Suivi de commande en temps réel",
+                    "Tickets et reçus numériques",
+                    "Paiement au dépôt ou au retrait",
                     "Service express",
-                    "Programme de fidÃ©litÃ©",
-                    "Espace client sÃ©curisÃ©"
+                    "Programme de fidélité",
+                    "Espace client sécurisé"
                 }
             });
         });
@@ -79,12 +79,12 @@ public static class PublicEndpoints
         {
             if (string.IsNullOrWhiteSpace(phone))
             {
-                return Results.BadRequest(new { message = "Le numÃ©ro de tÃ©lÃ©phone est requis pour consulter une commande." });
+                return Results.BadRequest(new { message = "Le numéro de téléphone est requis pour consulter une commande." });
             }
 
             TrackingDto? tracking = await orders.TrackAsync(ticket, phone, ct);
             return tracking is null
-                ? Results.NotFound(new { message = "Aucune commande ne correspond Ã  ce ticket et ce tÃ©lÃ©phone." })
+                ? Results.NotFound(new { message = "Aucune commande ne correspond à ce ticket et ce téléphone." })
                 : Results.Ok(tracking);
         }).RequireRateLimiting("tracking");
 
@@ -111,19 +111,19 @@ public static class PublicEndpoints
                 <h2>Nouveau message depuis le site</h2>
                 <p><strong>Nom :</strong> {WebUtility.HtmlEncode(request.Name)}</p>
                 <p><strong>E-mail :</strong> {WebUtility.HtmlEncode(request.Email)}</p>
-                <p><strong>TÃ©lÃ©phone :</strong> {WebUtility.HtmlEncode(request.Phone ?? "non renseignÃ©")}</p>
+                <p><strong>Téléphone :</strong> {WebUtility.HtmlEncode(request.Phone ?? "non renseigné")}</p>
                 <p style="white-space:pre-wrap">{WebUtility.HtmlEncode(request.Message)}</p>
                 """;
 
             await email.QueueRawAsync(
                 shop.Email,
                 shop.Name,
-                $"Contact site â€” {request.Name}",
+                $"Contact site — {request.Name}",
                 html,
                 request.Message,
                 ct: ct);
 
-            return Results.Ok(new { message = "Votre message a bien Ã©tÃ© transmis. Nous vous rÃ©pondrons rapidement." });
+            return Results.Ok(new { message = "Votre message a bien été transmis. Nous vous répondrons rapidement." });
         }).RequireRateLimiting("tracking");
 
         group.MapGet("/whatsapp/webhook", (HttpRequest request, WhatsAppOptions options) =>
@@ -252,7 +252,7 @@ public static class PublicEndpoints
                 !client.ConsentGivenAt.HasValue ||
                 client.ConsentRevokedAt.HasValue)
                 return Results.Content(
-                    "<h2>Vos rappels e-mail sont dÃ©jÃ  dÃ©sactivÃ©s.</h2>",
+                    "<h2>Vos rappels e-mail sont déjà désactivés.</h2>",
                     "text/html; charset=utf-8");
 
             string safeToken = WebUtility.HtmlEncode(token ?? string.Empty);
@@ -261,13 +261,13 @@ public static class PublicEndpoints
                 <!doctype html>
                 <html lang="fr">
                 <meta charset="utf-8">
-                <title>DÃ©sabonnement</title>
+                <title>Désabonnement</title>
                 <body style="font-family:Arial,sans-serif;max-width:520px;margin:60px auto;padding:20px">
-                <h2>Confirmer votre dÃ©sabonnement</h2>
-                <p>Souhaitez-vous ne plus recevoir de rappels par e-mail de Pressing Ã‰clat ?</p>
+                <h2>Confirmer votre désabonnement</h2>
+                <p>Souhaitez-vous ne plus recevoir de rappels par e-mail de Pressing Éclat ?</p>
                 <form method="post" action="/api/public/unsubscribe/confirm">
                 <input type="hidden" name="token" value="{safeToken}">
-                <button type="submit">Confirmer mon dÃ©sabonnement</button>
+                <button type="submit">Confirmer mon désabonnement</button>
                 </form>
                 </body>
                 </html>
@@ -308,7 +308,7 @@ public static class PublicEndpoints
             }
 
             return Results.Content(
-                "<h2>DÃ©sabonnement confirmÃ©</h2><p>Vous ne recevrez plus de rappels par e-mail.</p>",
+                "<h2>Désabonnement confirmé</h2><p>Vous ne recevrez plus de rappels par e-mail.</p>",
                 "text/html; charset=utf-8");
         });
         return app;

@@ -56,9 +56,9 @@ public class DatabaseInitializer
     }
 
     /// <summary>
-    /// Recalcule PhoneNormalized avec la rÃ¨gle courante (bases crÃ©Ã©es avec une ancienne rÃ¨gle).
-    /// Idempotent : ne touche que les clients dont la valeur diffÃ¨re. Si deux clients aboutissent au mÃªme
-    /// numÃ©ro canonique (index unique), le second est laissÃ© tel quel pour ne pas bloquer le dÃ©marrage.
+    /// Recalcule PhoneNormalized avec la règle courante (bases créées avec une ancienne règle).
+    /// Idempotent : ne touche que les clients dont la valeur diffère. Si deux clients aboutissent au même
+    /// numéro canonique (index unique), le second est laissé tel quel pour ne pas bloquer le démarrage.
     /// </summary>
     private async Task RenormalizePhonesAsync(CancellationToken ct)
     {
@@ -87,7 +87,7 @@ public class DatabaseInitializer
 
         if (changed)
         {
-            // Mise Ã  jour en deux temps possible si des Ã©changes de valeurs existent : les collisions sont ignorÃ©es plus haut.
+            // Mise à jour en deux temps possible si des échanges de valeurs existent : les collisions sont ignorées plus haut.
             await _db.SaveChangesAsync(ct);
         }
     }
