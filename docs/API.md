@@ -154,6 +154,66 @@ de version du logiciel.
 | POST | `/api/emails/{id}/retry` | ManagerOrAdmin | | `EmailMessageDto` |
 | GET | `/api/audit` | AdminOnly | `?page=1&pageSize=50&search` | `PagedResult<AuditLogDto>` |
 
+## Assistant vocal (v3 — lot M1/M2)
+
+> **Statut : contrat figé (T2.1).** Les routes sont implémentées par T2.3 ; tant que cette PR n'est pas fusionnée,
+> elles répondent `404`. Les DTO sont dans `src/Pressing.Core/Dtos/AssistantDtos.cs`.
+> Principe non négociable : **l'IA ne touche jamais la base**. Ces routes ne créent aucune commande, aucun paiement,
+> aucun retrait : elles renvoient un **brouillon** que le caissier vérifie, puis valide par les routes existantes
+> (`POST /api/orders`, retraits, paiements, statuts).
+
+| Méthode | Route | Politique | Corps / query | Réponse |
+| --- | --- | --- | --- | --- |
+| GET | `/api/assistant/status` | StaffOnly | | `AssistantStatusDto` (activé ? moteurs prêts ? seuil de confiance) |
+| POST | `/api/assistant/transcribe` | StaffOnly | WAV, `multipart/form-data`, **2 Mo maximum** (`400` au-delà, `403` hors personnel) | `AssistantTranscriptionDto` — l'audio n'est jamais stocké |
+| POST | `/api/assistant/interpret` | StaffOnly | `AssistantInterpretRequest` (`text`, 1000 caractères maximum) | `OrderDraftDto` |
+
+Toutes trois sont soumises à la limitation de débit (`429`) et journalisées (`AuditService.LogAsync("assistant", …)`,
+le **texte** seul, jamais l'audio). Moteur arrêté ou assistant désactivé : `400` « L'assistant vocal n'est pas démarré ».
+
+### Contrat d'intention (sortie du modèle de langage → `AssistantIntentDto`)
+
+JSON en **snake_case**, produit sous contrainte de grammaire par le membre 1 ; un champ inconnu vaut `null` et n'est
+jamais inventé.
+
+```json
+{
+  "intent": "create_order | register_pickup | add_payment | update_item_status | find_order | unknown",
+  "client": { "name": "Ngo Marie" | null, "phone": "699112233" | null },
+  "items": [ { "category": "Chemise", "service": "Lavage + repassage", "quantity": 3, "express": false } ],
+  "ticket": "PRESS-2026-00142" | null,
+  "amount": 5000 | null, "payment_method": "cash | mobile_money | card | transfer" | null,
+  "deposit": 5000 | null, "pickup_date": "2026-12-02" | null,
+  "item_status": "in_progress | ready" | null,
+  "confidence": 0.0-1.0, "transcript": "texte reconnu"
+}
+```
+
+| Champ | Règle |
+| --- | --- |
+| `intent` | Une des 6 valeurs ci-dessus ; toute autre valeur est traitée comme `unknown`. |
+| `items[].category` / `service` | Texte libre entendu (« costard »). **Le backend** le rapproche du catalogue (synonymes, fautes) ; il refuse ce qui est absent du catalogue et le signale en avertissement au lieu de deviner. |
+| `payment_method` | `transfer` correspond à `BankTransfer`. Valeur inconnue → champ ignoré et surligné. |
+| `item_status` | `in_progress` ou `ready` uniquement (`PickedUp` passe par le retrait, `Cancelled` par l'annulation). |
+| `pickup_date` | Jour calendaire `AAAA-MM-JJ`, déjà résolu par le modèle (« mardi » → date). |
+| `confidence` | En dessous de **0,6** (réglable), ou si `intent` = `unknown` : `target` = `NotUnderstood`, le Desktop affiche « je n'ai pas compris » et la transcription. |
+
+### Brouillon validé (`OrderDraftDto`, réponse de `/api/assistant/interpret`)
+
+JSON camelCase habituel de l'API, énumérations en texte. Le brouillon n'est **jamais enregistré**.
+
+| Champ | Rôle |
+| --- | --- |
+| `intent`, `confidence`, `transcript` | Repris de l'intention ; la transcription est affichée à l'écran. |
+| `target` | Écran à ouvrir pré-rempli : `NotUnderstood`, `NewOrder`, `Pickup`, `Payment`, `UpdateStatus`, `FindOrder`. |
+| `client` | `clientId` si retrouvé (téléphone normalisé, puis nom approché) ; `isNew` = `true` si inconnu (création proposée) ; `candidates` = homonymes à départager. |
+| `items[]` | `categoryId`, `serviceType`, prix du catalogue ; `categoryId` / `serviceType` à `null` si introuvables ; `isUncertain` = surlignage orange. |
+| `orderId`, `ticket`, `balance` | Commande retrouvée par son ticket (retrait, paiement, statut, recherche). |
+| `paymentAmount`, `paymentMethod`, `depositAmount`, `dueDate`, `itemStatus` | Valeurs dictées, après contrôle (montant supérieur au solde, etc.). |
+| `quote` | `OrderQuoteDto` calculé par `CatalogService` pour les articles reconnus. |
+| `uncertainFields` | Noms stables des champs à surligner en orange : `client`, `items[0].category`, `items[0].service`, `ticket`, `amount`, `paymentMethod`, `deposit`, `dueDate`, `itemStatus`. |
+| `warnings` | Messages lisibles en français (« Client inconnu : création proposée »). |
+
 ## Règles métier clés (implémentées dans `Pressing.Core/Services`)
 
 - Ticket unique généré à la création d'une commande.
