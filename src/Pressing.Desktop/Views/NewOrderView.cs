@@ -22,6 +22,9 @@ public sealed class NewOrderView : BaseView
         public bool Express { get; set; }
         public string? Description { get; set; }
         public CategoryPriceDto? Grid { get; init; }
+
+        /// <summary>Ligne proposée par l'assistant vocal et jugée incertaine : surlignée en orange.</summary>
+        public bool Uncertain { get; init; }
     }
 
     private sealed class LineRow : IPillRow, ITintRow
@@ -54,6 +57,7 @@ public sealed class NewOrderView : BaseView
         {
             "remove" => Theme.TextFaint,
             "total" => Theme.Accent,
+            "article" when Line.Uncertain => Theme.Amber,
             _ => null
         };
     }
@@ -62,6 +66,10 @@ public sealed class NewOrderView : BaseView
     private IReadOnlyList<CategoryDto> _catalog = Array.Empty<CategoryDto>();
     private ClientDto? _client;
     private readonly List<LineVm> _lines = new();
+
+    // Assistant vocal : brouillon reçu avant le chargement du catalogue, et bandeau « à vérifier » (vide = masqué).
+    private OrderDraftDto? _pendingDraft;
+    private readonly TextLabel _assistantNote = new() { Wrap = true, Font = Theme.F(9.5f), ForeColor = Theme.Amber };
     private OrderQuoteDto? _quote;
     private int _quoteVersion;
     private bool _dueTouched;
@@ -176,6 +184,21 @@ public sealed class NewOrderView : BaseView
 
     public override void ApplyParameter(object? parameter)
     {
+        if (parameter is OrderDraftDto draft)
+        {
+            // Avant le premier chargement le catalogue n'est pas là : le brouillon est appliqué à la fin de LoadAsync.
+            if (_loaded)
+            {
+                _ = RunDraftAsync(draft);
+            }
+            else
+            {
+                _pendingDraft = draft;
+            }
+
+            return;
+        }
+
         if (parameter is ClientDto client)
         {
             if (_confirmPanel.Visible)
@@ -258,7 +281,7 @@ public sealed class NewOrderView : BaseView
         linesBody.Gap = Theme.S(16);
         TitledCard linesCard = new("Articles", linesBody, "Double-clic : modifier · Suppr : retirer · + / − : quantité");
 
-        return new VStack().Add(clientCard).Add(linesCard, StackSize.Fill);
+        return new VStack().Add(_assistantNote).Add(clientCard).Add(linesCard, StackSize.Fill);
     }
 
     private Control BuildRight()
@@ -577,7 +600,12 @@ public sealed class NewOrderView : BaseView
         _loaded = true;
         _category.SetItems(_catalog.Cast<object>(), _catalog.Count > 0 ? 0 : -1);
         OnCategoryChanged();
-        if (_client is null)
+        if (_pendingDraft is { } pending)
+        {
+            _pendingDraft = null;
+            await RunDraftAsync(pending);
+        }
+        else if (_client is null)
         {
             _clientSearch.Focus();
         }
@@ -1115,6 +1143,140 @@ public sealed class NewOrderView : BaseView
         }
     }
 
+    // ==== Assistant vocal ==================================================================
+    private async Task RunDraftAsync(OrderDraftDto draft)
+    {
+        try
+        {
+            await ApplyDraftAsync(draft);
+        }
+        catch (ApiException ex)
+        {
+            Host.Toast(ex.Message, MessageKind.Warning);
+        }
+    }
+
+    /// <summary>
+    /// Pré-remplit le dépôt avec le brouillon validé par le backend (client, articles du catalogue, express, acompte,
+    /// date de retrait). Rien n'est enregistré : le caissier vérifie, corrige puis clique sur « Valider le dépôt ».
+    /// Les éléments incertains sont surlignés en orange et expliqués dans le bandeau avec la transcription.
+    /// </summary>
+    public async Task ApplyDraftAsync(OrderDraftDto draft)
+    {
+        if (draft.Target != AssistantTarget.NewOrder)
+        {
+            return;
+        }
+
+        if (!_loaded)
+        {
+            _pendingDraft = draft;
+            return;
+        }
+
+        bool hasWork = !_confirmPanel.Visible && (_client is not null || _lines.Count > 0);
+        if (hasWork && !AppDialogs.Confirm(
+                this, "Remplacer la saisie ?",
+                "L'assistant a préparé un nouveau dépôt. La saisie en cours sera remplacée.", "Remplacer"))
+        {
+            return;
+        }
+
+        ResetAll();
+
+        // -- Client : retrouvé par son identifiant ; sinon la recherche affiche homonymes ou correspondances.
+        AssistantClientMatchDto? match = draft.Client;
+        if (match?.ClientId is int clientId)
+        {
+            ClientDetailDto? detail = await Api.GetClientAsync(clientId);
+            if (!Alive)
+            {
+                return;
+            }
+
+            if (detail is not null)
+            {
+                SelectClient(detail.Client);
+                if (_client is not null && draft.UncertainFields.Contains("client"))
+                {
+                    _clientMeta.ForeColor = Theme.Amber;
+                    _clientMeta.Text += " · à vérifier";
+                }
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(match?.FullName))
+        {
+            _clientSearch.Text = match!.FullName!;
+        }
+
+        // -- Articles : uniquement ceux reconnus par le catalogue, au prix du catalogue.
+        int notAdded = 0;
+        foreach (OrderDraftItemDto item in draft.Items)
+        {
+            CategoryDto? category = item.CategoryId is int categoryId
+                ? _catalog.FirstOrDefault(c => c.Id == categoryId)
+                : null;
+            CategoryPriceDto? price = category is null || item.ServiceType is null
+                ? null
+                : category.Prices.FirstOrDefault(p => p.IsActive && p.ServiceType == item.ServiceType);
+            if (category is null || price is null)
+            {
+                notAdded++;
+                continue;
+            }
+
+            _lines.Add(new LineVm
+            {
+                Category = category,
+                Service = price.ServiceType,
+                Quantity = Math.Clamp(item.Quantity, 1, 500),
+                UnitPrice = price.Price,
+                Express = item.IsExpress,
+                Grid = price,
+                Uncertain = item.IsUncertain
+            });
+        }
+
+        LinesChanged();
+
+        // -- Acompte, mode de paiement, date de retrait demandée.
+        if (draft.DepositAmount.GetValueOrDefault() > 0)
+        {
+            _deposit.AmountValue = draft.DepositAmount!.Value;
+            if (draft.PaymentMethod is { } method)
+            {
+                _depositMethod.SetChoices(Choices.PaymentMethods(), method);
+            }
+        }
+
+        if (draft.DueDate is { } due && due.Date >= DateTime.Today)
+        {
+            _settingDue = true;
+            _due.Value = due.Date;
+            _settingDue = false;
+            _dueTouched = true;
+        }
+
+        // -- Bandeau : transcription et points à vérifier.
+        List<string> note = new() { "Assistant vocal : vérifiez avant de valider." };
+        if (!string.IsNullOrWhiteSpace(draft.Transcript))
+        {
+            note.Add("J'ai compris : « " + draft.Transcript.Trim() + " »");
+        }
+
+        note.AddRange(draft.Warnings.Select(w => "• " + w));
+        if (notAdded > 0)
+        {
+            note.Add($"• {notAdded} article(s) non ajouté(s) : à saisir à la main.");
+        }
+
+        _assistantNote.Text = string.Join(Environment.NewLine, note);
+
+        UpdateSubmitState();
+        ScheduleQuote();
+        Host.Toast("Brouillon de l'assistant prêt : vérifiez puis validez.");
+    }
+
     private void ResetAll()
     {
         _quoteTimer.Stop();
@@ -1151,6 +1313,7 @@ public sealed class NewOrderView : BaseView
         _due.Value = DateTime.Today.AddDays(2);
         _settingDue = false;
         _sumError.Text = string.Empty;
+        _assistantNote.Text = string.Empty;
         SetPointsHint();
         RefreshLinesGrid();
         ShowQuote();
