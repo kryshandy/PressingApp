@@ -35,7 +35,7 @@ Aucun résultat synthétique n'est présenté comme un résultat client. Aucun W
 | `vocab-default.txt` | aligné sur le prompt généré ; hash court `44B8962ECDBAF2FD` |
 | Catalogue dynamique | unique source via `GET /api/public/catalog` ; aucun accès SQLite dans le module IA |
 | Fichiers Word protégés | non touchés ; `Rapport_Audit_Technique_Pressing.docx` et `~$pport_Audit_Technique_Pressing.docx` restent non suivis |
-| Git | aucun commit, push, pull, merge, rebase, changement de branche ni opération distante |
+| Git | à l'époque des mesures : aucun commit, push, pull, merge, rebase, changement de branche ni opération distante ; état actuel en §12 |
 
 ---
 
@@ -293,7 +293,7 @@ Les tests unitaires utilisent des fakes HTTP/STT : aucun moteur n'est appelé. L
 4. Le prompt Whisper contextuel corrige les erreurs de décodage sur trois phrases TTS ; cela ne constitue pas un WER officiel.
 5. Le script audio ne contrôle qu'un seul article : son message de validation ne prouve pas les six scénarios bruts.
 6. `dataset.jsonl` est un modèle de 150 lignes en attente de WAV et de consentements ; `bench.ps1` refuse de s'exécuter tant que ces éléments sont absents, sans écrire de résultat simulé.
-7. Aucun commit ni opération distante ; les changements restent locaux.
+7. Les mesures ci-dessus ont été figées avant la création de la branche parallèle décrite en §12 ; aucun chiffre n'a été recalculé depuis.
 
 ---
 
@@ -347,7 +347,7 @@ Fichiers de référence : `RESULTATS.md`, `eval/README.md`, `eval/resultats/live
 
 ## 12. Compléments après audit T1.1–T1.6 (28/11, travaux locaux)
 
-Cette section décrit uniquement des ajustements réalisés **localement, sans commit ni push** ; elle ne modifie aucune mesure ci-dessus.
+Cette section décrit les ajustements réalisés après l'audit. Ils ont ensuite été commités et poussés sur la branche parallèle `feature/ia-m1-t1-complements` (commit `1b1e2e0`), sans fusion dans `Astride` ; aucune mesure ci-dessus n'est modifiée.
 
 | Élément | Ajout | Limite conservée |
 |---|---|---|
@@ -357,4 +357,4 @@ Cette section décrit uniquement des ajustements réalisés **localement, sans c
 | T1.5 | `ConcurrenceTests.cs` : 10 appels parallèles corrects + vérification statique de `-np 1` / `-p 1` | Pas de banc live de concurrence ; la sérialisation effective reste portée par les serveurs |
 | T1.6 | Aucun changement : consultation en lecture seule inchangée | Brouillon à confirmer par M2/humain |
 
-Aucune route M2, aucun DTO concurrent, aucun appel M3, aucun changement de port, de modèle par défaut, de `max_tokens` ou de contrat JSON n'a été introduit. Les sections 10 et 11 ci-dessus décrivent l'état figé au commit précédent ; les ajouts de cette section restent locaux.
+Aucune route M2, aucun DTO concurrent, aucun appel M3, aucun changement de port, de modèle par défaut, de `max_tokens` ou de contrat JSON n'a été introduit. Les sections 10 et 11 décrivent l'état figé au commit `1ee04da` ; les ajouts de cette section sont sur `feature/ia-m1-t1-complements`, non fusionnés dans `Astride`.
