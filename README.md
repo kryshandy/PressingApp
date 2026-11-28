@@ -354,6 +354,29 @@ Guides internes :
 **`docs/Bilan-integration-et-attentes.pdf`** (28/11/2026). Organisation Git et conventions :
 **[CONTRIBUTING.md](CONTRIBUTING.md)**. Feuille de route initiale : `docs/Brief-etat-et-feuille-de-route-v3.pdf`.
 
+## 11. Déploiement
+
+```powershell
+.\scripts\publish.ps1                    # dist\<version>\ : api\, web\, desktop\, scripts\, .env.example, README, LISEZMOI-INSTALLATION.txt
+.\scripts\publish.ps1 -AutonomeComplet   # variante avec le runtime .NET embarqué (plus volumineuse)
+.\scripts\publish.ps1 -WhatIf            # simulation
+```
+
+- **Choix par défaut : publication dépendante du framework (win-x64).** Le dossier livré est petit et les correctifs de
+  sécurité de .NET arrivent par Windows Update. Il faut installer une fois *ASP.NET Core Runtime 10* sur le serveur et
+  *.NET Desktop Runtime 10* sur les postes (commandes `winget` dans `LISEZMOI-INSTALLATION.txt`). Avec
+  `-AutonomeComplet`, aucun prérequis mais le dossier est bien plus gros. `dist/` est ignoré par Git.
+- **Services Windows** (PowerShell en administrateur, depuis `dist\<version>\`) :
+  `.\scripts\install-service.ps1` enregistre `PressingEclatApi` et `PressingEclatWeb` (démarrage automatique,
+  redémarrage après 5 s, 5 s puis 30 s en cas d'échec), crée le `.env` (base et sauvegardes dans
+  `C:\ProgramData\PressingEclat`) puis démarre les services. `.\scripts\install-service.ps1 -Desinstaller` les supprime
+  (base, sauvegardes et `.env` conservés). Option `-WhatIf` pour simuler.
+- Un service ne tourne pas sous votre profil : renseignez toujours `PRESSING_DB_PATH` / `PRESSING_BACKUP_PATH` dans le
+  `.env` (le script le fait à la création) ; l'API et le site retrouvent le `.env` du dossier d'installation.
+- Postes du comptoir : copier `desktop\`, y ajouter un `.env` avec `PRESSING_PUBLIC_API_URL=http://<serveur>:5180`.
+- Contrôles qualité : `.\scripts\check-encoding.ps1` (accents corrompus, scripts sans BOM) et
+  `.\scripts\ci-selftest.ps1` (autotest Desktop sur une API jetable) tournent aussi dans la CI.
+
 ## Équipe
 
 Projet réalisé par l'équipe B2A Keyce — 5 membres. Le thème sombre du Desktop s'appuie sur le travail initial de Mael.

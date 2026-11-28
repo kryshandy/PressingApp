@@ -21,6 +21,8 @@ using Pressing.Core.Services;
 EnvFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
+// Exécution comme service Windows (scripts/install-service.ps1) ; sans effet en console.
+builder.Host.UseWindowsService();
 
 // PRESSING_API_URL (ex. http://0.0.0.0:5180) : adresse d'écoute. L'option --urls de la ligne de commande
 // et les variables ASPNETCORE_URLS / DOTNET_URLS restent prioritaires.

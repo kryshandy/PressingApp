@@ -11,6 +11,8 @@ using Pressing.Web.Infrastructure;
 Pressing.Core.EnvFile.Load();
 
 var builder = WebApplication.CreateBuilder(args);
+// Exécution comme service Windows (scripts/install-service.ps1) ; sans effet en console.
+builder.Host.UseWindowsService();
 
 var apiUrl = Environment.GetEnvironmentVariable("PRESSING_PUBLIC_API_URL");
 if (string.IsNullOrWhiteSpace(apiUrl)) apiUrl = builder.Configuration["Api:BaseUrl"];
