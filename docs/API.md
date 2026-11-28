@@ -148,6 +148,24 @@ révocation (`consentRevokedAt`). Un canal exige le numéro WhatsApp ou l'e-mail
 | GET | `/api/reports` | ManagerOrAdmin | `?from&to` (défaut : 30 derniers jours) | `ReportDto` |
 | GET | `/api/reports/export` | ManagerOrAdmin | `?from&to` | `text/csv` |
 
+## Clôture de caisse
+
+« Z de caisse » journalier : les montants attendus sont calculés depuis les paiements et remboursements du jour
+(net par mode : espèces, Mobile Money, carte, virement, autre). Espèces attendues en caisse = fond de caisse + espèces
+nettes ; **écart = espèces comptées − espèces attendues en caisse**. Un écart non nul impose un commentaire.
+Une seule clôture validée par jour (index unique) ; une clôture validée n'est plus modifiable (400) ; création,
+modification et validation sont écrites dans le journal d'audit.
+
+| Méthode | Route | Politique | Corps / query | Réponse |
+| --- | --- | --- | --- | --- |
+| GET | `/api/cash-closings/preview` | StaffOnly | `?date=` (défaut : aujourd'hui) | `CashClosingPreviewDto` (rien n'est enregistré) |
+| POST | `/api/cash-closings` | StaffOnly | `CashClosingRequest` (`date`, `openingFloat`, `countedCash`, `comment`) | `201 CashClosingDto` (brouillon) · 400 si la caisse du jour est déjà clôturée |
+| PUT | `/api/cash-closings/{id}` | StaffOnly | `CashClosingRequest` | `CashClosingDto` (brouillon uniquement) · 400 si validée |
+| POST | `/api/cash-closings/{id}/validate` | ManagerOrAdmin | | `CashClosingDto` (attendus recalculés puis figés) · 403 pour un caissier |
+| GET | `/api/cash-closings` | ManagerOrAdmin | `?from&to` (défaut : 90 derniers jours) | `CashClosingDto[]` |
+| GET | `/api/cash-closings/{id}` | StaffOnly | | `CashClosingDto` · 404 |
+| GET | `/api/cash-closings/{id}/pdf` | StaffOnly | | `application/pdf` |
+
 ## Administration
 
 | Méthode | Route | Politique | Corps / query | Réponse |

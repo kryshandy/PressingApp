@@ -105,6 +105,7 @@ builder.Services.AddScoped<CustomerAuthService>();
 builder.Services.AddScoped<StaffService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<ReportService>();
+builder.Services.AddScoped<CashClosingService>();
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddScoped<ReminderService>();
 
@@ -258,6 +259,7 @@ app.MapOrderEndpoints();
 app.MapPortalEndpoints();
 app.MapDashboardEndpoints();
 app.MapAdminEndpoints();
+app.MapCashClosingEndpoints();
 
 await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
 {
