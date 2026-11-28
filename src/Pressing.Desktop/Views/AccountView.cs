@@ -16,7 +16,7 @@ public sealed class AccountView : BaseView
     private readonly InputBox _confirm = new() { PasswordChar = '•', IconGlyph = Icons.Key, PlaceholderText = "Retapez le nouveau mot de passe" };
     private readonly TextLabel _message = new() { Wrap = true, Font = Theme.F(9.5f) };
     private readonly FlatButton _save = new() { Text = "Changer le mot de passe", Kind = ButtonKind.Primary, IconGlyph = Icons.Save };
-    private readonly TextLabel _twoFactorState = new() { Wrap = true, Font = Theme.F(10f), ForeColor = Theme.Text };
+    private readonly TextLabel _twoFactorState = new() { Wrap = true, Height = Theme.S(48), Font = Theme.F(10f), ForeColor = Theme.Text };
     private readonly FlatButton _enableTwoFactor = new() { Text = "Activer la double authentification", Kind = ButtonKind.Secondary, IconGlyph = Icons.Key };
     private readonly FlatButton _disableTwoFactor = new() { Text = "Désactiver", Kind = ButtonKind.Secondary, Visible = false };
     private TwoFactorStatusDto? _twoFactor;

@@ -230,7 +230,7 @@ public sealed class RemindersView : BaseView
 
         _feedbackCard.Grid.SetRows(page.Items.Select(f => new FeedbackRow(f)).ToList());
         _feedbackCard.UpdateEmpty();
-        _feedbackPager.Update(page.Page, page.TotalPages, page.Total, "avis");
+        _feedbackPager.Update(page.Page, page.TotalPages, page.Total, "réponse");
         _average.Set(month.Average is { } avg ? $"{avg:0.0} / 5" : "—", month.Count == 0 ? "aucun avis sur 30 jours" : "moyenne des avis récents");
         _feedbackCount.Set(month.Count.ToString(), "sur 30 jours");
         if (page.Items.Count > 0)

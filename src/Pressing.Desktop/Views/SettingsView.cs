@@ -551,6 +551,7 @@ public sealed class SettingsView : BaseView
                    "Désactivé : les managers se connectent avec le seul mot de passe. Les administrateurs et les caissiers n'ont pas de double authentification. " +
                    "Pour un seul compte (téléphone perdu), utilisez « Réinitialiser la 2FA » dans l'écran Personnel.",
             Wrap = true,
+            Height = Theme.S(64),
             Font = Theme.F(9.5f),
             ForeColor = Theme.TextMuted
         });
@@ -561,6 +562,7 @@ public sealed class SettingsView : BaseView
             Text = "Après 5 échecs de connexion consécutifs, un compte du personnel est verrouillé 15 minutes. " +
                    "Un administrateur peut le déverrouiller depuis l'écran Personnel.",
             Wrap = true,
+            Height = Theme.S(44),
             Font = Theme.F(9.5f),
             ForeColor = Theme.TextMuted
         });
