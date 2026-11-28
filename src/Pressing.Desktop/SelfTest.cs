@@ -666,11 +666,28 @@ internal static class SelfTest
 
             string? original = settings.GetFieldValue(SettingsKeys.ShopSlogan);
             settings.SetFieldValue(SettingsKeys.ShopSlogan, "Slogan auto-test " + tag);
-            int savedCount = await settings.SaveChangesAsync();
+            // Le chargement d'un onglet lancé par le changement de section peut encore occuper l'écran (UiRun refuse alors
+            // un second appel et renvoie -1) : on réessaie brièvement au lieu de dépendre du hasard.
+            async Task<int> SaveWhenIdleAsync()
+            {
+                int count = -1;
+                for (int attempt = 0; attempt < 20 && count == -1; attempt++)
+                {
+                    count = await settings.SaveChangesAsync();
+                    if (count == -1)
+                    {
+                        await Task.Delay(250);
+                    }
+                }
+
+                return count;
+            }
+
+            int savedCount = await SaveWhenIdleAsync();
             Check(savedCount == 1, "un seul paramètre modifié (enregistrés : " + savedCount + ")");
             Check((await api.GetSettingsAsync())!.Values[SettingsKeys.ShopSlogan] == "Slogan auto-test " + tag, "paramètre enregistré");
             settings.SetFieldValue(SettingsKeys.ShopSlogan, original ?? string.Empty);
-            Check(await settings.SaveChangesAsync() == 1, "paramètre remis");
+            Check(await SaveWhenIdleAsync() == 1, "paramètre remis");
             hostForm.Controls.Remove(settings);
             settings.Dispose();
 
